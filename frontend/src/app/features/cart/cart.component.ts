@@ -456,7 +456,7 @@ export class CartComponent implements OnInit {
   updateQuantity(item: CartItem, newQuantity: number): void {
     if (newQuantity < 0) return;
     this.actionLoading = true;
-    this.cartService.updateQuantity(item.productId, newQuantity).subscribe({
+    this.cartService.updateQuantity(item.variantId, newQuantity).subscribe({
       next: (res) => {
         this.actionLoading = false;
         if (res.success && res.data) {
@@ -472,7 +472,7 @@ export class CartComponent implements OnInit {
 
   removeItem(item: CartItem): void {
     this.actionLoading = true;
-    this.cartService.removeItem(item.productId).subscribe({
+    this.cartService.removeItem(item.variantId).subscribe({
       next: () => {
         this.actionLoading = false;
         this.notification.success(`Removed "${item.productName}" from cart`);

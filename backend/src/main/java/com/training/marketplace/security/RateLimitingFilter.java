@@ -35,29 +35,33 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         String clientIp = extractClientIp(request);
         String key = "rate_limit:" + clientIp;
 
-        Long count = redisTemplate.opsForValue().increment(key);
-        if (count != null && count == 1) {
-            redisTemplate.expire(key, WINDOW_SECONDS, TimeUnit.SECONDS);
-        }
+        try {
+            Long count = redisTemplate.opsForValue().increment(key);
+            if (count != null && count == 1) {
+                redisTemplate.expire(key, WINDOW_SECONDS, TimeUnit.SECONDS);
+            }
 
-        Long expireSeconds = redisTemplate.getExpire(key, TimeUnit.SECONDS);
-        long resetSeconds = (expireSeconds != null && expireSeconds > 0) ? expireSeconds : WINDOW_SECONDS;
-        long currentCount = (count != null) ? count : 1;
+            Long expireSeconds = redisTemplate.getExpire(key, TimeUnit.SECONDS);
+            long resetSeconds = (expireSeconds != null && expireSeconds > 0) ? expireSeconds : WINDOW_SECONDS;
+            long currentCount = (count != null) ? count : 1;
 
-        response.setHeader("X-RateLimit-Limit", String.valueOf(MAX_REQUESTS_PER_MINUTE));
-        response.setHeader("X-RateLimit-Remaining", String.valueOf(Math.max(0, MAX_REQUESTS_PER_MINUTE - currentCount)));
-        response.setHeader("X-RateLimit-Reset", String.valueOf(resetSeconds));
+            response.setHeader("X-RateLimit-Limit", String.valueOf(MAX_REQUESTS_PER_MINUTE));
+            response.setHeader("X-RateLimit-Remaining", String.valueOf(Math.max(0, MAX_REQUESTS_PER_MINUTE - currentCount)));
+            response.setHeader("X-RateLimit-Reset", String.valueOf(resetSeconds));
 
-        if (currentCount > MAX_REQUESTS_PER_MINUTE) {
-            log.warn("Rate limit exceeded for IP {}: {} requests in 60s window", clientIp, currentCount);
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            if (currentCount > MAX_REQUESTS_PER_MINUTE) {
+                log.warn("Rate limit exceeded for IP {}: {} requests in 60s window", clientIp, currentCount);
+                response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-            ApiResponse<Void> errorResponse = ApiResponse.error(
-                    "Rate limit exceeded. Maximum 100 requests per minute allowed."
-            );
-            response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
-            return;
+                ApiResponse<Void> errorResponse = ApiResponse.error(
+                        "Rate limit exceeded. Maximum 100 requests per minute allowed."
+                );
+                response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
+                return;
+            }
+        } catch (Exception e) {
+            log.warn("RateLimitingFilter: Redis rate limiting unavailable ({}), bypassing check", e.getMessage());
         }
 
         filterChain.doFilter(request, response);

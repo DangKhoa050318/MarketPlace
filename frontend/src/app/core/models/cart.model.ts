@@ -1,7 +1,8 @@
 export interface CartItem {
-  productId: number;
+  variantId: number;
+  sku?: string;
   productName: string;
-  productSlug: string;
+  variantName?: string;
   unitPrice: number;
   quantity: number;
   subtotal: number;
@@ -16,7 +17,7 @@ export interface Cart {
 }
 
 export interface AddToCartRequest {
-  productId: number;
+  variantId: number;
   quantity: number;
 }
 

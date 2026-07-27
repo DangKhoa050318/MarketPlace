@@ -5,8 +5,10 @@ import { AuthService } from '../services/auth.service';
 export const adminGuard: CanActivateFn = () => {
   const router = inject(Router);
   const authService = inject(AuthService);
+  const role = authService.getRole();
 
-  if (authService.isAuthenticated() && authService.getRole() === 'ADMIN') {
+  // Allow back-office management roles (ADMIN, MANAGER, STAFF)
+  if (authService.isAuthenticated() && (role === 'ADMIN' || role === 'MANAGER' || role === 'STAFF')) {
     return true;
   }
 

@@ -4,11 +4,19 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api-response.model';
 import { PageResponse } from '../models/page-response.model';
-import { ProductResponse, CreateProductRequest, UpdateProductRequest } from '../models/product.model';
+import {
+  ProductResponse,
+  ProductVariant,
+  CreateProductRequest,
+  UpdateProductRequest,
+  CreateProductVariantRequest,
+  UpdateProductVariantRequest
+} from '../models/product.model';
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
   private apiUrl = `${environment.apiUrl}/products`;
+  private variantApiUrl = `${environment.apiUrl}/variants`;
 
   constructor(private http: HttpClient) {}
 
@@ -47,5 +55,23 @@ export class ProductService {
 
   deleteProduct(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+
+  // --- Product Variant API Methods ---
+
+  getVariants(productId: number): Observable<ApiResponse<ProductVariant[]>> {
+    return this.http.get<ApiResponse<ProductVariant[]>>(`${this.apiUrl}/${productId}/variants`);
+  }
+
+  createVariant(productId: number, variant: CreateProductVariantRequest): Observable<ApiResponse<ProductVariant>> {
+    return this.http.post<ApiResponse<ProductVariant>>(`${this.apiUrl}/${productId}/variants`, variant);
+  }
+
+  updateVariant(variantId: number, variant: UpdateProductVariantRequest): Observable<ApiResponse<ProductVariant>> {
+    return this.http.put<ApiResponse<ProductVariant>>(`${this.variantApiUrl}/${variantId}`, variant);
+  }
+
+  deleteVariant(variantId: number): Observable<void> {
+    return this.http.delete<void>(`${this.variantApiUrl}/${variantId}`);
   }
 }

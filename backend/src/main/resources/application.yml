@@ -30,6 +30,8 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      connect-timeout: 1000ms
+      timeout: 1000ms
 
   rabbitmq:
     host: ${MQ_HOST:localhost}

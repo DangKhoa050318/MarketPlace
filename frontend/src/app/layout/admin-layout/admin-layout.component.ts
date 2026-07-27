@@ -25,41 +25,55 @@ import { AuthService } from '../../core/services/auth.service';
   template: `
     <mat-sidenav-container class="admin-shell">
       <mat-sidenav mode="side" opened class="admin-sidebar">
-        <a class="portal-brand" routerLink="/admin/dashboard">
+        <a class="portal-brand" [routerLink]="hasRole(['ADMIN', 'MANAGER']) ? '/admin/dashboard' : '/stock'">
           <span class="brand-mark"><mat-icon>local_shipping</mat-icon></span>
           <span class="brand-copy">
-            <strong>Order<span>Flow</span></strong>
-            <small>Admin Portal</small>
+            <strong>Market<span>Place</span></strong>
+            <small>Management Portal</small>
           </span>
         </a>
 
         <div class="portal-badge">
           <mat-icon>shield</mat-icon>
           <div>
-            <strong>Administration</strong>
-            <small>Protected Control Center</small>
+            <strong>{{ authService.getRole() }}</strong>
+            <small>Back-Office Center</small>
           </div>
         </div>
 
         <nav class="portal-nav" aria-label="Admin navigation">
-          <span class="nav-heading">Overview</span>
-          <a routerLink="/admin/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+          <span *ngIf="hasRole(['ADMIN', 'MANAGER'])" class="nav-heading">Overview</span>
+          <a *ngIf="hasRole(['ADMIN', 'MANAGER'])" routerLink="/admin/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
             <mat-icon>space_dashboard</mat-icon>
             <span>Dashboard</span>
           </a>
 
           <span class="nav-heading">Inventory & Orders</span>
-          <a routerLink="/admin/products" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+          <a *ngIf="hasRole(['ADMIN', 'MANAGER'])" routerLink="/admin/products" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
             <mat-icon>inventory_2</mat-icon>
             <span>Products Management</span>
           </a>
-          <a routerLink="/admin/orders" routerLinkActive="active">
+          <a *ngIf="hasRole(['ADMIN', 'MANAGER', 'STAFF'])" routerLink="/admin/orders" routerLinkActive="active">
             <mat-icon>receipt_long</mat-icon>
             <span>Order Processing</span>
           </a>
 
-          <span class="nav-heading">Administration</span>
-          <a routerLink="/admin/users" routerLinkActive="active">
+          <span class="nav-heading">Warehouse & Stock</span>
+          <a *ngIf="hasRole(['ADMIN', 'MANAGER', 'STAFF'])" routerLink="/warehouses" routerLinkActive="active">
+            <mat-icon>warehouse</mat-icon>
+            <span>Warehouses</span>
+          </a>
+          <a *ngIf="hasRole(['ADMIN', 'MANAGER', 'STAFF'])" routerLink="/stock" routerLinkActive="active">
+            <mat-icon>inventory</mat-icon>
+            <span>Stock Levels</span>
+          </a>
+          <a *ngIf="hasRole(['ADMIN', 'MANAGER', 'STAFF'])" routerLink="/stock/movements" routerLinkActive="active">
+            <mat-icon>swap_horiz</mat-icon>
+            <span>Stock Movements</span>
+          </a>
+
+          <span *ngIf="hasRole(['ADMIN'])" class="nav-heading">Administration</span>
+          <a *ngIf="hasRole(['ADMIN'])" routerLink="/admin/users" routerLinkActive="active">
             <mat-icon>manage_accounts</mat-icon>
             <span>User Accounts</span>
           </a>
@@ -80,9 +94,9 @@ import { AuthService } from '../../core/services/auth.service';
       <mat-sidenav-content class="portal-content">
         <mat-toolbar class="portal-topbar">
           <div class="breadcrumb">
-            <span>OrderFlow Portal</span>
+            <span>Marketplace Portal</span>
             <mat-icon>chevron_right</mat-icon>
-            <strong>Admin Dashboard</strong>
+            <strong>{{ authService.getRole() }} View</strong>
           </div>
 
           <span class="spacer"></span>
@@ -93,10 +107,10 @@ import { AuthService } from '../../core/services/auth.service';
           </div>
 
           <div class="admin-profile">
-            <span class="avatar">{{ (authService.getUsername() || 'A')[0].toUpperCase() }}</span>
+            <span class="avatar">{{ (authService.getUsername() || 'U')[0].toUpperCase() }}</span>
             <span class="profile-copy">
               <strong>{{ authService.getUsername() }}</strong>
-              <small>Administrator</small>
+              <small>{{ authService.getRole() }}</small>
             </span>
           </div>
 
@@ -122,189 +136,202 @@ import { AuthService } from '../../core/services/auth.service';
 
     .admin-sidebar {
       width: 260px;
-      border-right: 1px solid var(--border-subtle);
-      background: #ffffff;
-      box-shadow: var(--shadow-sm);
-    }
-
-    :host ::ng-deep .admin-sidebar .mat-drawer-inner-container {
+      background: #ffffff !important;
+      border-right: 1px solid var(--border-subtle) !important;
       display: flex;
       flex-direction: column;
-      overflow-x: hidden;
+      padding: 24px 16px;
+      box-sizing: border-box;
+      box-shadow: var(--shadow-sm);
     }
 
     .portal-brand {
       display: flex;
       align-items: center;
       gap: 12px;
-      margin: 0 18px;
-      padding: 22px 4px 18px;
-      color: var(--text-main);
       text-decoration: none;
+      color: var(--text-main);
+      margin-bottom: 20px;
+      padding: 0 8px;
     }
 
     .brand-mark {
-      display: grid;
       width: 40px;
       height: 40px;
-      flex: 0 0 40px;
-      place-items: center;
       border-radius: 10px;
+      background: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       color: #fff;
-      background: #4f46e5;
-      box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25);
     }
 
-    .brand-mark mat-icon { width: 22px; height: 22px; font-size: 22px; }
-    .brand-copy strong, .brand-copy small { display: block; }
-    .brand-copy strong { font-size: 1.1rem; letter-spacing: -.035em; color: var(--text-main); }
-    .brand-copy strong span { color: #0284c7; }
-    .brand-copy small {
-      margin-top: 2px; color: var(--text-muted); font-size: .62rem;
-      font-weight: 750; letter-spacing: .1em; text-transform: uppercase;
-    }
+    .brand-copy strong { font-size: 1.2rem; display: block; color: var(--text-main); }
+    .brand-copy strong span { color: var(--primary); }
+    .brand-copy small { color: var(--text-muted); font-size: 0.75rem; }
 
     .portal-badge {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin: 0 16px 20px;
-      padding: 10px 12px;
+      background: var(--primary-subtle);
       border: 1px solid var(--border-subtle);
       border-radius: 10px;
-      color: #4f46e5;
-      background: #eef2ff;
+      padding: 10px 12px;
+      color: var(--primary);
+      margin-bottom: 20px;
     }
-    .portal-badge mat-icon { width: 20px; height: 20px; font-size: 20px; color: #4f46e5; }
-    .portal-badge strong, .portal-badge small { display: block; }
-    .portal-badge strong { font-size: .72rem; color: #3730a3; }
-    .portal-badge small { margin-top: 2px; color: #6366f1; font-size: .6rem; }
 
-    .portal-nav { display: flex; flex-direction: column; padding: 0 12px; }
-    .nav-heading {
-      margin: 16px 12px 6px;
-      color: var(--text-muted);
-      font-size: .62rem;
-      font-weight: 800;
-      letter-spacing: .13em;
-      text-transform: uppercase;
+    .portal-badge strong { display: block; font-size: 0.85rem; color: var(--primary-text); }
+    .portal-badge small { color: var(--text-secondary); font-size: 0.7rem; }
+
+    .portal-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
     }
+
+    .nav-heading {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      margin: 16px 8px 6px;
+    }
+
     .portal-nav a {
       display: flex;
       align-items: center;
-      gap: 11px;
-      min-height: 42px;
-      padding: 0 12px;
-      border-radius: 10px;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
       color: var(--text-secondary);
-      font-size: .82rem;
-      font-weight: 650;
       text-decoration: none;
-      transition: color .15s ease, background-color .15s ease;
+      font-weight: 500;
+      transition: all 0.15s ease;
     }
-    .portal-nav a:hover { color: #4f46e5; background: #f1f5f9; }
-    .portal-nav a.active { color: #4338ca; background: #eef2ff; font-weight: 800; }
-    .portal-nav a mat-icon { width: 20px; height: 20px; font-size: 20px; }
+
+    .portal-nav a:hover {
+      background: var(--surface-hover);
+      color: var(--text-main);
+    }
+
+    .portal-nav a.active {
+      background: var(--primary-subtle);
+      color: var(--primary);
+      font-weight: 700;
+      border: 1px solid var(--border-primary);
+    }
 
     .sidebar-footer {
       margin-top: auto;
-      padding: 16px;
+      padding-top: 16px;
       border-top: 1px solid var(--border-subtle);
     }
+
     .sidebar-footer a {
-      display: grid;
-      grid-template-columns: 28px 1fr 16px;
+      display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 10px 12px;
-      border: 1px solid var(--border-subtle);
-      border-radius: 10px;
+      gap: 10px;
       color: var(--text-secondary);
-      background: #f8fafc;
       text-decoration: none;
-      transition: all 0.2s ease;
+      padding: 8px;
+      border-radius: 8px;
     }
+
     .sidebar-footer a:hover {
-      border-color: var(--primary);
-      background: #ffffff;
+      color: var(--primary);
+      background: var(--surface-hover);
     }
-    .sidebar-footer > a > mat-icon:first-child { color: #0284c7; }
-    .sidebar-footer strong, .sidebar-footer small { display: block; }
-    .sidebar-footer strong { font-size: .7rem; color: var(--text-main); }
-    .sidebar-footer small { margin-top: 2px; color: var(--text-muted); font-size: .6rem; }
-    .open-icon { color: var(--text-muted); width: 16px; height: 16px; font-size: 16px; }
+
+    .sidebar-footer strong { display: block; font-size: 0.85rem; color: var(--text-main); }
+    .sidebar-footer small { color: var(--text-muted); font-size: 0.7rem; }
 
     .portal-content {
       background: var(--bg-main);
+      display: flex;
+      flex-direction: column;
     }
+
     .portal-topbar {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      height: 65px;
-      padding: 0 28px;
-      border-bottom: 1px solid var(--border-subtle);
       background: #ffffff !important;
+      border-bottom: 1px solid var(--border-subtle);
       color: var(--text-main);
+      padding: 0 24px;
+      height: 64px;
       box-shadow: var(--shadow-sm);
     }
-    .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: .78rem; }
-    .breadcrumb span { color: var(--text-muted); }
-    .breadcrumb strong { color: var(--text-main); font-weight: 700; }
-    .breadcrumb mat-icon { color: #cbd5e1; width: 16px; height: 16px; font-size: 16px; }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .breadcrumb strong { color: var(--text-main); }
+
     .spacer { flex: 1; }
+
     .system-health {
       display: flex;
       align-items: center;
-      gap: 7px;
-      margin-right: 20px;
-      color: var(--text-secondary);
-      font-size: .72rem;
-      font-weight: 650;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--success-text);
+      background: var(--success-subtle);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--success);
+      margin-right: 16px;
     }
+
     .health-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: #10b981;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
     }
-    .admin-profile { display: flex; align-items: center; gap: 10px; margin-right: 12px; }
+
+    .admin-profile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-right: 12px;
+    }
+
     .avatar {
-      display: grid; width: 34px; height: 34px; place-items: center; border-radius: 8px;
-      color: #fff; background: #4f46e5;
-      font-size: .8rem; font-weight: 800;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
     }
-    .profile-copy strong, .profile-copy small { display: block; line-height: 1.25; }
-    .profile-copy strong { color: var(--text-main); font-size: .76rem; }
-    .profile-copy small { color: var(--text-muted); font-size: .6rem; }
-    .logout-button { color: var(--text-muted); }
+
+    .profile-copy strong { display: block; font-size: 0.85rem; color: var(--text-main); }
+    .profile-copy small { color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; }
+
+    .logout-button { color: var(--text-secondary); }
+    .logout-button:hover { color: var(--danger); }
 
     .portal-main {
-      box-sizing: border-box;
-      width: 100%;
-      max-width: 1500px;
-      min-height: calc(100dvh - 65px);
-      margin: 0 auto;
-      padding: 28px 30px 40px;
-    }
-
-    @media (max-width: 900px) {
-      .admin-sidebar { width: 220px; }
-      .system-health, .profile-copy { display: none; }
-      .portal-main { padding: 23px 20px 36px; }
-    }
-
-    @media (max-width: 680px) {
-      .admin-sidebar { width: 76px; }
-      .portal-brand { justify-content: center; margin: 0; }
-      .brand-copy, .portal-badge, .nav-heading, .portal-nav a span,
-      .sidebar-footer span, .sidebar-footer .open-icon { display: none; }
-      .portal-nav a { justify-content: center; padding: 0; }
-      .sidebar-footer a { display: flex; justify-content: center; padding: 10px 0; }
-      .breadcrumb { display: none; }
-      .portal-topbar { padding: 0 14px; }
-      .portal-main { padding: 20px 14px 32px; }
+      padding: 24px 32px;
+      flex: 1;
     }
   `]
 })
 export class AdminLayoutComponent {
   constructor(public authService: AuthService) {}
+
+  hasRole(roles: string[]): boolean {
+    const role = this.authService.getRole() || '';
+    return roles.includes(role);
+  }
 }

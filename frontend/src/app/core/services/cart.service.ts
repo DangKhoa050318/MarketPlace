@@ -28,8 +28,8 @@ export class CartService {
     );
   }
 
-  addToCart(productId: number, quantity = 1): Observable<ApiResponse<Cart>> {
-    const payload: AddToCartRequest = { productId, quantity };
+  addToCart(variantId: number, quantity = 1): Observable<ApiResponse<Cart>> {
+    const payload: AddToCartRequest = { variantId, quantity };
     return this.http.post<ApiResponse<Cart>>(`${this.apiUrl}/items`, payload).pipe(
       tap(res => {
         if (res.success && res.data) {
@@ -39,9 +39,9 @@ export class CartService {
     );
   }
 
-  updateQuantity(productId: number, quantity: number): Observable<ApiResponse<Cart>> {
+  updateQuantity(variantId: number, quantity: number): Observable<ApiResponse<Cart>> {
     const payload: UpdateCartItemRequest = { quantity };
-    return this.http.put<ApiResponse<Cart>>(`${this.apiUrl}/items/${productId}`, payload).pipe(
+    return this.http.put<ApiResponse<Cart>>(`${this.apiUrl}/items/${variantId}`, payload).pipe(
       tap(res => {
         if (res.success && res.data) {
           this.cartSubject.next(res.data);
@@ -50,8 +50,8 @@ export class CartService {
     );
   }
 
-  removeItem(productId: number): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/items/${productId}`).pipe(
+  removeItem(variantId: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/items/${variantId}`).pipe(
       tap(() => this.getCart().subscribe())
     );
   }

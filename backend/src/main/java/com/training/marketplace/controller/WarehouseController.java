@@ -74,7 +74,7 @@ public class WarehouseController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(operationId = "createWarehouse", summary = "Create a warehouse",
             description = "Creates a warehouse. Code is required and becomes immutable. Allowed role: ADMIN only.")
@@ -90,7 +90,7 @@ public class WarehouseController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Operation(operationId = "updateWarehouse", summary = "Update a warehouse",
             description = "Updates mutable warehouse fields; code is not an update property. Allowed role: ADMIN only.")
     @ApiResponses({

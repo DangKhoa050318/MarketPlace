@@ -29,7 +29,7 @@ import { NotificationService } from '../../../core/services/notification.service
 
       <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
         <div class="field-group">
-          <label for="login-username">Username</label>
+          <label for="login-username">Username or Email</label>
           <mat-form-field appearance="outline" subscriptSizing="fixed">
             <mat-icon matPrefix>person_outline</mat-icon>
             <input
@@ -37,9 +37,9 @@ import { NotificationService } from '../../../core/services/notification.service
               matInput
               formControlName="username"
               autocomplete="username"
-              placeholder="Enter your username">
+              placeholder="Enter your username or email">
             @if (form.controls.username.touched && form.controls.username.hasError('required')) {
-              <mat-error>Username is required</mat-error>
+              <mat-error>Username or Email is required</mat-error>
             }
           </mat-form-field>
         </div>
@@ -116,8 +116,15 @@ export class LoginComponent {
     this.loading = true;
     this.authService.login(this.form.getRawValue()).subscribe({
       next: () => {
-        this.notification.success('Welcome back to OrderFlow');
-        this.router.navigate([this.authService.getRole() === 'ADMIN' ? '/admin/dashboard' : '/products']);
+        this.notification.success('Welcome back to Marketplace');
+        const role = this.authService.getRole();
+        if (role === 'ADMIN' || role === 'MANAGER') {
+          this.router.navigate(['/admin/dashboard']);
+        } else if (role === 'STAFF') {
+          this.router.navigate(['/stock']);
+        } else {
+          this.router.navigate(['/products']);
+        }
       },
       error: (err) => {
         this.loading = false;

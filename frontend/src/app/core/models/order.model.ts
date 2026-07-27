@@ -2,8 +2,10 @@ export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | '
 
 export interface OrderItem {
   id: number;
-  productId: number;
+  variantId: number;
+  sku?: string;
   productName: string;
+  variantName?: string;
   unitPrice: number;
   quantity: number;
   subtotal: number;
@@ -17,6 +19,7 @@ export interface Order {
   shippingAddress?: string;
   totalAmount: number;
   status: OrderStatus;
+  warehouseId?: number;
   note?: string;
   items: OrderItem[];
   createdAt: string;

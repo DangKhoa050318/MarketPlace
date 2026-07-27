@@ -60,14 +60,15 @@ public class AuthServiceImpl implements AuthService {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.username(), request.password()));
 
-        String username = authentication.getName();
-        User user = userRepository.findByUsername(username)
+        String identifier = authentication.getName();
+        User user = userRepository.findByUsername(identifier)
+                .or(() -> userRepository.findByEmail(identifier))
                 .orElseThrow(() -> new BadRequestException("User not found"));
 
-        String accessToken = jwtTokenProvider.generateAccessToken(username);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(username);
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getUsername());
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUsername());
 
-        return new AuthResponse(accessToken, refreshToken, username, user.getRole().name());
+        return new AuthResponse(accessToken, refreshToken, user.getUsername(), user.getRole().name());
     }
 
     @Override

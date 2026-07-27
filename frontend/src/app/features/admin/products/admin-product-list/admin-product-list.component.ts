@@ -464,7 +464,7 @@ export class AdminProductListComponent implements OnInit {
   }
 
   get lowStockCount(): number {
-    return this.products.filter(p => p.stock <= 5).length;
+    return this.products.filter(p => (p.stock ?? 10) <= 5).length;
   }
 
   ngOnInit(): void {

@@ -51,10 +51,12 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/variants/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/variants/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/variants/**").hasRole("ADMIN")
-                        // Storefront (customer)
-                        .requestMatchers("/api/v1/cart", "/api/v1/cart/**").hasAnyRole("CUSTOMER", "ADMIN")
-                        .requestMatchers("/api/v1/orders", "/api/v1/orders/**").hasAnyRole("CUSTOMER", "ADMIN")
+                        // Storefront (customer and back-office staff/manager/admin)
+                        .requestMatchers("/api/v1/cart", "/api/v1/cart/**").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers("/api/v1/orders", "/api/v1/orders/**").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         // Admin
+                        .requestMatchers("/api/v1/admin/dashboard/**").hasAnyRole("MANAGER", "ADMIN")
+                        .requestMatchers("/api/v1/admin/orders/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/users/**").hasRole("ADMIN")
                         // Warehouse back-office

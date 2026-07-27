@@ -39,7 +39,7 @@ export class AuthService {
   }
 
   refreshToken(token: string): Observable<ApiResponse<AuthResponse>> {
-    return this.http.post<ApiResponse<AuthResponse>>(`${this.apiUrl}/refresh-token`, { refreshToken: token }).pipe(
+    return this.http.post<ApiResponse<AuthResponse>>(`${this.apiUrl}/refresh`, { refreshToken: token }).pipe(
       tap(res => {
         if (res.success && res.data) {
           this.storeTokens(res.data);

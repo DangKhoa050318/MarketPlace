@@ -29,7 +29,7 @@ export const routes: Routes = [
     ]
   },
 
-  // Admin Command Center Routes (Light 3D Glassmorphic Portal)
+  // Admin & Warehouse Management Routes (Command Center Portal)
   {
     path: '',
     loadComponent: () => import('./layout/admin-layout/admin-layout.component').then(m => m.AdminLayoutComponent),
@@ -67,6 +67,32 @@ export const routes: Routes = [
       {
         path: 'admin/users/:id/edit',
         loadComponent: () => import('./features/users/user-form/user-form.component').then(m => m.UserFormComponent)
+      },
+
+      // Stock & Warehouse Features (Merged from StockPulse)
+      {
+        path: 'warehouses',
+        loadComponent: () => import('./features/warehouses/warehouse-list/warehouse-list.component').then(m => m.WarehouseListComponent)
+      },
+      {
+        path: 'warehouses/create',
+        loadComponent: () => import('./features/warehouses/warehouse-form/warehouse-form.component').then(m => m.WarehouseFormComponent)
+      },
+      {
+        path: 'warehouses/:id/edit',
+        loadComponent: () => import('./features/warehouses/warehouse-form/warehouse-form.component').then(m => m.WarehouseFormComponent)
+      },
+      {
+        path: 'stock',
+        loadComponent: () => import('./features/stock/stock-list/stock-list.component').then(m => m.StockListComponent)
+      },
+      {
+        path: 'stock/movements',
+        loadComponent: () => import('./features/stock/movement-list/movement-list.component').then(m => m.MovementListComponent)
+      },
+      {
+        path: 'stock/movements/new',
+        loadComponent: () => import('./features/stock/movement-form/movement-form.component').then(m => m.MovementFormComponent)
       }
     ]
   },

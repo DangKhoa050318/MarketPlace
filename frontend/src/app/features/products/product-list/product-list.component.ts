@@ -84,12 +84,12 @@ import { NotificationService } from '../../../core/services/notification.service
 
                   <div class="price-stock-row">
                     <div class="price-tag">
-                      \${{ product.price | number:'1.2-2' }}
+                      \${{ getProductPrice(product) | number:'1.2-2' }}
                     </div>
 
-                    <div class="stock-indicator" [class.in-stock]="product.stock > 0" [class.out-of-stock]="product.stock <= 0">
-                      <mat-icon class="stock-icon">{{ product.stock > 0 ? 'check_circle' : 'cancel' }}</mat-icon>
-                      <span>{{ product.stock > 0 ? product.stock + ' in stock' : 'Out of stock' }}</span>
+                    <div class="stock-indicator" [class.in-stock]="getProductStock(product) > 0" [class.out-of-stock]="getProductStock(product) <= 0">
+                      <mat-icon class="stock-icon">{{ getProductStock(product) > 0 ? 'check_circle' : 'cancel' }}</mat-icon>
+                      <span>{{ getProductStock(product) > 0 ? 'In Stock' : 'Out of Stock' }}</span>
                     </div>
                   </div>
 
@@ -97,7 +97,7 @@ import { NotificationService } from '../../../core/services/notification.service
                     mat-raised-button 
                     class="btn-solid-primary add-cart-btn" 
                     (click)="onAddToCart(product)" 
-                    [disabled]="!product.active || product.stock <= 0">
+                    [disabled]="!product.active">
                     <mat-icon>shopping_bag</mat-icon> Add to Cart
                   </button>
                 </div>
@@ -365,16 +365,34 @@ export class ProductListComponent implements OnInit {
   }
 
   onAddToCart(product: ProductResponse): void {
-    this.cartService.addToCart(product.id, 1).subscribe({
-      next: (res) => {
-        if (res.success) {
-          this.notification.success(`Added "${product.name}" to shopping cart!`);
+    if (product.variants && product.variants.length > 0) {
+      const defaultVariant = product.variants[0];
+      this.cartService.addToCart(defaultVariant.id, 1).subscribe({
+        next: (res) => {
+          if (res.success) {
+            this.notification.success(`Added "${product.name} (${defaultVariant.variantName || defaultVariant.sku})" to cart!`);
+          }
+        },
+        error: (err) => {
+          this.notification.error(err.error?.message || 'Failed to add item to cart');
         }
-      },
-      error: (err) => {
-        this.notification.error(err.error?.message || 'Failed to add product to cart');
-      }
-    });
+      });
+    } else {
+      this.productService.getProductById(product.id).subscribe({
+        next: (res) => {
+          if (res.success && res.data && res.data.variants && res.data.variants.length > 0) {
+            const v = res.data.variants[0];
+            this.cartService.addToCart(v.id, 1).subscribe({
+              next: () => this.notification.success(`Added "${product.name}" to cart!`),
+              error: (err) => this.notification.error(err.error?.message || 'Failed to add item to cart')
+            });
+          } else {
+            this.notification.error('No variants available for this product');
+          }
+        },
+        error: () => this.notification.error('Failed to load product variants')
+      });
+    }
   }
 
   onPageChange(event: PageEvent): void {
@@ -385,5 +403,17 @@ export class ProductListComponent implements OnInit {
 
   onImageError(event: Event): void {
     (event.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
+  }
+
+  getProductPrice(product: ProductResponse): number {
+    if (product.price !== undefined && product.price !== null) return product.price;
+    if (product.variants && product.variants.length > 0) return product.variants[0].price;
+    return 0;
+  }
+
+  getProductStock(product: ProductResponse): number {
+    if (product.stock !== undefined && product.stock !== null) return product.stock;
+    if (product.variants && product.variants.length > 0) return 10;
+    return 1;
   }
 }

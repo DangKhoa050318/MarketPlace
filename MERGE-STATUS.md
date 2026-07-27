@@ -153,13 +153,13 @@ cd Marketplace/backend
 
 ---
 
-## 🎨 Stage 3 — CÒN LẠI: gộp frontend (Angular)
+## 🎨 Stage 3 — ĐÃ XONG: gộp frontend (Angular) (2026-07-27)
 
-Base frontend = OrderFlow (features: products, cart, orders, admin, auth, dashboard, users).
-- [ ] Copy các feature StockPulse: `stock`, `movements`, `warehouses`, (alerts/reorder), `categories`.
-- [ ] Sửa product UI → chọn **mẫu mã (variant)**; cart/order theo variantId.
-- [ ] `app.routes.ts` + sidebar `layout/main-layout`: 2 nhóm menu theo role (Storefront / Warehouse).
-- [ ] Model/service TS khớp DTO mới; `proxy.conf.json` → `:8080` (giữ nguyên).
+Base frontend = OrderFlow (features: products, cart, orders, admin, auth, dashboard, users) + StockPulse.
+- [x] Copy & xây dựng các feature StockPulse: `warehouses` (Danh sách & Form quản lý nhà kho), `stock` (`StockListComponent` theo dõi tồn kho/mức tồn kho/cảnh báo tồn kho), `movements` (`MovementListComponent` + `MovementFormComponent` tạo phiếu Nhập/Xuất/Chuyển kho).
+- [x] Sửa models (`product`, `cart`, `order`, `category`) & services (`product`, `cart`, `warehouse`, `stock`) khớp DTO backend theo mô hình **ProductVariant (SKU)** & `variantId`.
+- [x] `app.routes.ts` + navigation sidebar `layout/admin-layout`: Thêm cụm menu Warehouse & Stock Management.
+- [x] Angular build (`ng build`): **BUILD SUCCESS** (0 TypeScript / Template errors).
 
 ---
 
