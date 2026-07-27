@@ -1,0 +1,318 @@
+/* OrderFlow Modern Solid Design System (Clean Professional Theme) */
+
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
+
+:root {
+  /* Solid Color System */
+  --bg-main: #f8fafc;
+  --surface-card: #ffffff;
+  --surface-hover: #f1f5f9;
+  
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-primary: #818cf8;
+
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-subtle: #eef2ff;
+  --primary-text: #3730a3;
+
+  --secondary: #0284c7;
+  --secondary-hover: #0369a1;
+  --secondary-subtle: #e0f2fe;
+
+  --success: #10b981;
+  --success-subtle: #ecfdf5;
+  --success-text: #047857;
+
+  --warning: #f59e0b;
+  --warning-subtle: #fffbeb;
+  --warning-text: #b45309;
+
+  --danger: #ef4444;
+  --danger-subtle: #fef2f2;
+  --danger-text: #b91c1c;
+
+  --text-main: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --text-inverse: #ffffff;
+
+  /* Crisp Shadows */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', 'Inter', Roboto, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  overflow-x: hidden;
+}
+
+/* Legacy ambient container turned off for clean solid look */
+.ambient-3d-background,
+.ambient-orb {
+  display: none !important;
+}
+
+/* Surface & Panel Utility Classes (Solid Clean Cards) */
+.glass-panel,
+.surface-card {
+  background: var(--surface-card) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--shadow-sm) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.glass-panel-hover:hover,
+.surface-card-hover:hover {
+  border-color: var(--border-primary) !important;
+  box-shadow: var(--shadow-md) !important;
+  transform: translateY(-2px);
+}
+
+/* Tilt Card Base Cleaned Up */
+.tilt-card-container {
+  perspective: 1000px;
+}
+
+.tilt-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.tilt-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* Solid Typography Utilities (No Gradients) */
+.text-gradient-indigo,
+.text-gradient-cyan,
+.text-gradient-purple {
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  -webkit-text-fill-color: initial !important;
+  color: var(--text-main) !important;
+}
+
+/* Solid Action Buttons */
+.btn-glowing,
+.btn-glowing-purple,
+.btn-solid-primary {
+  background: var(--primary) !important;
+  color: var(--text-inverse) !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: background-color 0.15s ease, transform 0.15s ease !important;
+}
+
+.btn-glowing:hover,
+.btn-glowing-purple:hover,
+.btn-solid-primary:hover {
+  background: var(--primary-hover) !important;
+  box-shadow: var(--shadow-md) !important;
+  transform: translateY(-1px);
+}
+
+/* Status Badges - Clean Solid Badges */
+.badge-pill {
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.badge-pending {
+  background: var(--warning-subtle);
+  color: var(--warning-text);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-confirmed {
+  background: var(--primary-subtle);
+  color: var(--primary-text);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.badge-processing {
+  background: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.badge-shipped {
+  background: var(--secondary-subtle);
+  color: #0369a1;
+  border: 1px solid rgba(2, 132, 199, 0.3);
+}
+
+.badge-delivered {
+  background: var(--success-subtle);
+  color: var(--success-text);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Angular Material Overrides for Solid Clean Theme */
+.mat-mdc-card {
+  background-color: var(--surface-card) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-subtle) !important;
+  backdrop-filter: none !important;
+  border-radius: 16px !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.mat-mdc-table {
+  background: var(--surface-card) !important;
+  color: var(--text-main) !important;
+}
+
+.mat-mdc-header-row {
+  background: #f1f5f9 !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+.mat-mdc-header-cell {
+  color: var(--text-secondary) !important;
+  font-weight: 700 !important;
+  font-size: 0.8rem !important;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.mat-mdc-row {
+  border-bottom: 1px solid var(--border-subtle) !important;
+  transition: background-color 0.15s ease;
+}
+
+.mat-mdc-row:hover {
+  background-color: #f8fafc !important;
+}
+
+.mat-mdc-cell {
+  color: var(--text-main) !important;
+}
+
+.mat-mdc-form-field {
+  width: 100%;
+}
+
+.mat-mdc-select-value-text, .mat-mdc-input-element {
+  color: var(--text-main) !important;
+}
+
+/* Mat Paginator Solid Clean Override */
+.mat-mdc-paginator,
+.mat-mdc-paginator-container,
+.mat-mdc-paginator-outer-container {
+  background: transparent !important;
+  color: var(--text-main) !important;
+}
+
+.mat-mdc-paginator-page-size-label,
+.mat-mdc-paginator-range-label {
+  color: var(--text-secondary) !important;
+}
+
+.mat-mdc-paginator-navigation-button .mat-mdc-paginator-icon {
+  fill: var(--primary) !important;
+}
+
+.mat-mdc-select-value,
+.mat-mdc-select-arrow {
+  color: var(--primary) !important;
+}
+
+.mat-mdc-select-panel {
+  background: #ffffff !important;
+  border: 1px solid var(--border-subtle) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.mat-mdc-option {
+  color: var(--text-main) !important;
+}
+
+.mat-mdc-option:hover, .mat-mdc-option.mdc-list-item--selected {
+  background: var(--primary-subtle) !important;
+}
+
+/* Premium Custom Toast / SnackBar Overrides */
+.cdk-overlay-container .mat-mdc-snack-bar-container {
+  margin-top: 24px !important;
+  margin-right: 24px !important;
+}
+
+.custom-toast .mdc-snackbar__surface {
+  background-color: #ffffff !important;
+  border-radius: 12px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 4px 6px -2px rgba(15, 23, 42, 0.04) !important;
+  padding: 4px 8px !important;
+}
+
+.custom-toast .mdc-snackbar__label {
+  color: #0f172a !important;
+  font-weight: 600 !important;
+  font-size: 0.88rem !important;
+  line-height: 1.4 !important;
+}
+
+.custom-toast .mat-mdc-button .mdc-button__label {
+  font-weight: 800 !important;
+  letter-spacing: 0.5px !important;
+  font-size: 0.75rem !important;
+}
+
+.success-toast .mdc-snackbar__surface {
+  border-left: 5px solid #10b981 !important;
+}
+
+.success-toast .mat-mdc-button {
+  color: #059669 !important;
+}
+
+.error-toast .mdc-snackbar__surface {
+  border-left: 5px solid #ef4444 !important;
+}
+
+.error-toast .mat-mdc-button {
+  color: #dc2626 !important;
+}
+
+.info-toast .mdc-snackbar__surface {
+  border-left: 5px solid #0284c7 !important;
+}
+
+.info-toast .mat-mdc-button {
+  color: #0284c7 !important;
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}

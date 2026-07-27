@@ -1,0 +1,237 @@
+package com.training.marketplace.service.impl;
+
+import com.training.marketplace.common.PageResponse;
+import com.training.marketplace.dto.request.CreateOrderRequest;
+import com.training.marketplace.dto.request.UpdateOrderStatusRequest;
+import com.training.marketplace.dto.response.CartItemResponse;
+import com.training.marketplace.dto.response.CartResponse;
+import com.training.marketplace.dto.response.DashboardStatsResponse;
+import com.training.marketplace.dto.response.OrderResponse;
+import com.training.marketplace.entity.Order;
+import com.training.marketplace.entity.OrderItem;
+import com.training.marketplace.entity.User;
+import com.training.marketplace.enums.OrderStatus;
+import com.training.marketplace.enums.Role;
+import com.training.marketplace.event.OrderCreatedEvent;
+import com.training.marketplace.exception.BadRequestException;
+import com.training.marketplace.exception.ResourceNotFoundException;
+import com.training.marketplace.mapper.OrderMapper;
+import com.training.marketplace.publisher.OrderEventPublisher;
+import com.training.marketplace.repository.OrderRepository;
+import com.training.marketplace.repository.ProductRepository;
+import com.training.marketplace.repository.UserRepository;
+import com.training.marketplace.service.CartService;
+import com.training.marketplace.service.InventoryFacade;
+import com.training.marketplace.service.OrderService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class OrderServiceImpl implements OrderService {
+
+    private final OrderRepository orderRepository;
+    private final ProductRepository productRepository;
+    private final UserRepository userRepository;
+    private final CartService cartService;
+    private final InventoryFacade inventoryFacade;
+    private final OrderMapper orderMapper;
+    private final OrderEventPublisher orderEventPublisher;
+
+    @Override
+    @Transactional
+    public OrderResponse createOrder(Long userId, CreateOrderRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        CartResponse cart = cartService.getCart(userId);
+        if (cart == null || cart.items().isEmpty()) {
+            throw new BadRequestException("Shopping cart is empty");
+        }
+
+        Long warehouseId = inventoryFacade.defaultWarehouseId();
+
+        // 1. Aggregate requested quantities per variant.
+        Map<Long, Integer> quantityByVariant = new LinkedHashMap<>();
+        for (CartItemResponse item : cart.items()) {
+            quantityByVariant.merge(item.variantId(), item.quantity(), Integer::sum);
+        }
+
+        // 2. Reserve stock (locks stock_levels rows, validates no oversell). Authoritative point.
+        inventoryFacade.reserve(warehouseId, quantityByVariant);
+
+        // 3. Build order + items from cart snapshots.
+        BigDecimal calculatedTotal = BigDecimal.ZERO;
+        Order order = Order.builder()
+                .user(user)
+                .warehouseId(warehouseId)
+                .status(OrderStatus.PENDING)
+                .totalAmount(BigDecimal.ZERO)
+                .shippingAddress(request.shippingAddress())
+                .note(request.note())
+                .build();
+
+        for (CartItemResponse item : cart.items()) {
+            BigDecimal subtotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
+            calculatedTotal = calculatedTotal.add(subtotal);
+            order.addItem(OrderItem.builder()
+                    .variantId(item.variantId())
+                    .sku(item.sku())
+                    .productName(item.productName())
+                    .variantName(item.variantName())
+                    .unitPrice(item.unitPrice())
+                    .quantity(item.quantity())
+                    .subtotal(subtotal)
+                    .build());
+        }
+        order.setTotalAmount(calculatedTotal);
+
+        Order savedOrder = orderRepository.save(order);
+
+        // 4. Clear cart.
+        cartService.clearCart(userId);
+
+        // 5. Publish OrderCreatedEvent (payment → notification; and downstream export bridge).
+        List<OrderCreatedEvent.OrderItemInfo> eventItems = savedOrder.getItems().stream()
+                .map(i -> new OrderCreatedEvent.OrderItemInfo(
+                        i.getVariantId(), i.getSku(), i.getProductName(),
+                        i.getUnitPrice(), i.getQuantity(), i.getSubtotal()))
+                .toList();
+
+        orderEventPublisher.publishOrderCreatedEvent(new OrderCreatedEvent(
+                UUID.randomUUID().toString(),
+                savedOrder.getId(),
+                userId,
+                user.getEmail(),
+                warehouseId,
+                savedOrder.getTotalAmount(),
+                LocalDateTime.now(),
+                eventItems));
+
+        log.info("Order created: orderId={}, userId={}, warehouseId={}, total={}",
+                savedOrder.getId(), userId, warehouseId, calculatedTotal);
+        return orderMapper.toResponse(savedOrder);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<OrderResponse> getUserOrders(Long userId, Pageable pageable) {
+        Page<Order> page = orderRepository.findByUserId(userId, pageable);
+        return PageResponse.from(page, orderMapper::toResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderResponse getUserOrderById(Long userId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+        if (!order.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You are not authorized to view this order");
+        }
+        return orderMapper.toResponse(order);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse cancelUserOrder(Long userId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+        if (!order.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You are not authorized to cancel this order");
+        }
+        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED) {
+            throw new BadRequestException("Cannot cancel order in status " + order.getStatus());
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+
+        // Release the reservation held while the order was PENDING/CONFIRMED.
+        if (order.getWarehouseId() != null) {
+            Map<Long, Integer> quantityByVariant = new LinkedHashMap<>();
+            for (OrderItem item : order.getItems()) {
+                quantityByVariant.merge(item.getVariantId(), item.getQuantity(), Integer::sum);
+            }
+            inventoryFacade.release(order.getWarehouseId(), quantityByVariant);
+        }
+
+        Order savedOrder = orderRepository.save(order);
+        log.info("User cancelled order {}: reservation released", orderId);
+        return orderMapper.toResponse(savedOrder);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardStatsResponse getDashboardStats() {
+        long totalOrders = orderRepository.count();
+        BigDecimal totalRevenue = orderRepository.calculateTotalRevenue();
+        long pendingOrders = orderRepository.countByStatus(OrderStatus.PENDING);
+        long completedOrders = orderRepository.countByStatus(OrderStatus.DELIVERED);
+        long totalProducts = productRepository.countByActiveTrue();
+        long totalCustomers = userRepository.countByRole(Role.CUSTOMER);
+        return new DashboardStatsResponse(
+                totalOrders, totalRevenue, pendingOrders, completedOrders, totalProducts, totalCustomers);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<OrderResponse> getAdminOrders(OrderStatus status, Pageable pageable) {
+        Page<Order> page = (status != null)
+                ? orderRepository.findAllByStatus(status, pageable)
+                : orderRepository.findAll(pageable);
+        return PageResponse.from(page, orderMapper::toResponse);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateOrderStatusByAdmin(Long orderId, UpdateOrderStatusRequest request) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+
+        validateStatusTransition(order.getStatus(), request.status());
+
+        // When the order ships, convert the reservation into an actual stock decrement.
+        if (request.status() == OrderStatus.SHIPPED && order.getWarehouseId() != null) {
+            Map<Long, Integer> quantityByVariant = new LinkedHashMap<>();
+            for (OrderItem item : order.getItems()) {
+                quantityByVariant.merge(item.getVariantId(), item.getQuantity(), Integer::sum);
+            }
+            inventoryFacade.fulfill(order.getWarehouseId(), quantityByVariant);
+        }
+
+        log.info("Admin updating order {} status {} -> {}", orderId, order.getStatus(), request.status());
+        order.setStatus(request.status());
+        if (request.note() != null && !request.note().isBlank()) {
+            order.setNote(request.note());
+        }
+        return orderMapper.toResponse(orderRepository.save(order));
+    }
+
+    public void validateStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {
+        if (currentStatus == newStatus) {
+            return;
+        }
+        boolean isValid = switch (currentStatus) {
+            case PENDING -> newStatus == OrderStatus.CONFIRMED || newStatus == OrderStatus.CANCELLED;
+            case CONFIRMED -> newStatus == OrderStatus.PROCESSING || newStatus == OrderStatus.CANCELLED;
+            case PROCESSING -> newStatus == OrderStatus.SHIPPED || newStatus == OrderStatus.CANCELLED;
+            case SHIPPED -> newStatus == OrderStatus.DELIVERED;
+            case DELIVERED, CANCELLED -> false;
+        };
+        if (!isValid) {
+            throw new BadRequestException(
+                    String.format("Cannot transition order status from %s to %s", currentStatus, newStatus));
+        }
+    }
+}
