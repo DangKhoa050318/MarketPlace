@@ -57,8 +57,10 @@ public class SecurityConfig {
                         // Admin
                         .requestMatchers("/api/v1/admin/dashboard/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/orders/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers("/api/v1/admin/reviews/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/users/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/reviews/**").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         // Warehouse back-office
                         .requestMatchers("/api/v1/warehouses/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/stock/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
