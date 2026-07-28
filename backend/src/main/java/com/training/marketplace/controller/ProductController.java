@@ -103,7 +103,7 @@ public class ProductController {
         return ApiResponse.success(PageResponse.from(result, r -> r));
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:[0-9]+}")
     @Operation(summary = "Get product by ID")
     public ApiResponse<ProductResponse> getById(@PathVariable Long id) {
         return ApiResponse.success(productService.getById(id));
@@ -116,7 +116,7 @@ public class ProductController {
         return ApiResponse.success("Product created", productService.create(request));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id:[0-9]+}")
     @Operation(summary = "Update an existing product (ADMIN only)")
     public ApiResponse<ProductResponse> update(
             @PathVariable Long id,
@@ -124,7 +124,7 @@ public class ProductController {
         return ApiResponse.success("Product updated", productService.update(id, request));
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:[0-9]+}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Soft delete a product (ADMIN only)")
     public void delete(@PathVariable Long id) {

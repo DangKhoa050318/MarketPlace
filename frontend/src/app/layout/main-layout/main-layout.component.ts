@@ -157,7 +157,7 @@ import { Observable } from 'rxjs';
     }
 
     .nav-container {
-      max-width: 1280px;
+      max-width: 1480px;
       height: 70px;
       margin: 0 auto;
       display: flex;
@@ -316,10 +316,10 @@ import { Observable } from 'rxjs';
 
     .page-content {
       flex: 1;
-      max-width: 1280px;
+      max-width: 1480px;
       width: 100%;
       margin: 0 auto;
-      padding: 32px 24px;
+      padding: 24px 20px;
       box-sizing: border-box;
     }
 
@@ -331,7 +331,7 @@ import { Observable } from 'rxjs';
     }
 
     .footer-content {
-      max-width: 1280px;
+      max-width: 1480px;
       margin: 0 auto;
       display: flex;
       justify-content: space-between;
