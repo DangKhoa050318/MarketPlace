@@ -35,6 +35,13 @@ export interface ProductResponse {
   variants?: ProductVariant[];
 }
 
+export interface StorefrontVariantItem {
+  id: number;
+  variantName: string;
+  price: number;
+  imageUrl?: string;
+}
+
 export interface StorefrontProduct {
   id: number;
   slug: string;
@@ -49,6 +56,8 @@ export interface StorefrontProduct {
   availableStock: number;
   variantCount: number;
   createdAt: string;
+  variantNames?: string;
+  variants?: StorefrontVariantItem[];
 }
 
 export interface ProductCatalogQuery {

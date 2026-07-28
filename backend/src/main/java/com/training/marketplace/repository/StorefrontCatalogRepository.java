@@ -42,7 +42,8 @@ public class StorefrontCatalogRepository {
                        c.name AS category_name, p.unit, p.image_url,
                        MIN(v.price) AS min_price, MAX(v.price) AS max_price,
                        COALESCE(SUM(sl.quantity - sl.reserved_quantity), 0) AS available_stock,
-                       COUNT(DISTINCT v.id) AS variant_count, p.created_at
+                       COUNT(DISTINCT v.id) AS variant_count, p.created_at,
+                       STRING_AGG(DISTINCT COALESCE(NULLIF(TRIM(CONCAT(v.color, ' ', v.size)), ''), v.variant_name), ', ') AS variant_names
                   FROM products p
                   JOIN categories c ON c.id = p.category_id
                   JOIN product_variants v ON v.product_id = p.id AND v.active = TRUE
@@ -59,8 +60,40 @@ public class StorefrontCatalogRepository {
                         rs.getString("category_name"), rs.getString("unit"), rs.getString("image_url"),
                         rs.getBigDecimal("min_price"), rs.getBigDecimal("max_price"),
                         rs.getLong("available_stock"), rs.getLong("variant_count"),
-                        rs.getTimestamp("created_at").toLocalDateTime()),
+                        rs.getTimestamp("created_at").toLocalDateTime(),
+                        rs.getString("variant_names"),
+                        List.of()),
                 dataParams.toArray());
+
+        if (!content.isEmpty()) {
+            List<Long> productIds = content.stream().map(StorefrontProductResponse::id).toList();
+            String inSql = String.join(",", java.util.Collections.nCopies(productIds.size(), "?"));
+            String variantSelect = String.format("""
+                SELECT id, product_id,
+                       COALESCE(NULLIF(TRIM(CONCAT(color, ' ', size)), ''), variant_name) AS variant_name,
+                       price, image_url
+                  FROM product_variants
+                 WHERE product_id IN (%s) AND active = TRUE
+                 ORDER BY id ASC
+                """, inSql);
+
+            Map<Long, List<StorefrontProductResponse.StorefrontVariantItem>> variantMap = new java.util.HashMap<>();
+            jdbcTemplate.query(variantSelect, rs -> {
+                Long productId = rs.getLong("product_id");
+                variantMap.computeIfAbsent(productId, k -> new ArrayList<>()).add(
+                        new StorefrontProductResponse.StorefrontVariantItem(
+                                rs.getLong("id"),
+                                rs.getString("variant_name"),
+                                rs.getBigDecimal("price"),
+                                rs.getString("image_url")
+                        )
+                );
+            }, productIds.toArray());
+
+            content = content.stream()
+                    .map(p -> p.withVariants(variantMap.getOrDefault(p.id(), List.of())))
+                    .toList();
+        }
 
         String countSql = "SELECT COUNT(*) FROM (SELECT p.id FROM products p " +
                 "JOIN categories c ON c.id = p.category_id " +
