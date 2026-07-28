@@ -10,6 +10,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { CartService } from '../../core/services/cart.service';
 import { OrderService } from '../../core/services/order.service';
+import { AnalyticsEventType } from '../../core/models/analytics-event.model';
+import { AnalyticsService } from '../../core/services/analytics.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { Cart, CartItem } from '../../core/models/cart.model';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -428,6 +430,7 @@ export class CartComponent implements OnInit {
   constructor(
     private cartService: CartService,
     private orderService: OrderService,
+    private analyticsService: AnalyticsService,
     private notification: NotificationService,
     private dialog: MatDialog,
     private router: Router
@@ -514,6 +517,17 @@ export class CartComponent implements OnInit {
   onCheckout(): void {
     if (!this.cart || this.cart.items.length === 0) return;
 
+    this.analyticsService.track(AnalyticsEventType.BeginCheckout, {
+      totalItems: this.cart.totalItems,
+      totalAmount: this.cart.totalAmount,
+      items: this.cart.items.map(item => ({
+        productName: item.productName,
+        variantId: item.variantId,
+        quantity: item.quantity,
+        subtotal: item.subtotal
+      }))
+    });
+
     const dialogRef = this.dialog.open(CheckoutDialogComponent, {
       width: '500px',
       data: { cart: this.cart }
@@ -525,6 +539,11 @@ export class CartComponent implements OnInit {
         this.orderService.createOrder(result).subscribe({
           next: (res) => {
             this.actionLoading = false;
+            this.analyticsService.track(AnalyticsEventType.OrderCreated, {
+              orderId: res.data?.id,
+              totalAmount: res.data?.totalAmount,
+              itemCount: res.data?.items?.length
+            });
             this.notification.success(`Order #${res.data?.id || ''} placed successfully! Confirmation email has been dispatched.`);
             this.loadCart();
             this.router.navigate(['/orders']);

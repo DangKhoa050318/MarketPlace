@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,6 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PageEvent } from '@angular/material/paginator';
 import { Subject } from 'rxjs';
 import { finalize, takeUntil } from 'rxjs/operators';
+import { AnalyticsEventType } from '../../../core/models/analytics-event.model';
 import { ProductResponse, ProductVariant } from '../../../core/models/product.model';
 import {
   ProductReview, RatingSummary, ReviewEligibility, ReviewPayload
@@ -17,6 +19,9 @@ import { ReviewService, ReviewSort } from '../../../core/services/review.service
 import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AnalyticsService } from '../../../core/services/analytics.service';
+import { RecentlyViewedService } from '../../../core/services/recently-viewed.service';
+import { WishlistService } from '../../../core/services/wishlist.service';
 import { RatingSummaryComponent } from '../../reviews/rating-summary/rating-summary.component';
 import { ReviewFormComponent } from '../../reviews/review-form/review-form.component';
 import { ReviewListComponent } from '../../reviews/review-list/review-list.component';
@@ -40,8 +45,23 @@ import { ReviewListComponent } from '../../reviews/review-list/review-list.compo
           <img [src]="(selectedVariant?.imageUrl || product.imageUrl) || fallbackImage" [alt]="product.name">
         </div>
         <div class="product-info">
-          <span class="eyebrow">{{ product.categoryName }}</span>
-          <h1>{{ product.name }}</h1>
+          <div class="title-row">
+            <div>
+              <span class="eyebrow">{{ product.categoryName }}</span>
+              <h1>{{ product.name }}</h1>
+            </div>
+            <button
+              mat-icon-button
+              type="button"
+              class="wishlist-btn"
+              [class.active]="wishlisted"
+              [disabled]="wishlistBusy"
+              (click)="toggleWishlist()"
+              [attr.aria-label]="wishlisted ? 'Remove from wishlist' : 'Add to wishlist'">
+              <mat-icon>{{ wishlisted ? 'favorite' : 'favorite_border' }}</mat-icon>
+            </button>
+          </div>
+          
           <p class="description">{{ product.description }}</p>
 
           <div class="price-row">
@@ -131,9 +151,12 @@ import { ReviewListComponent } from '../../reviews/review-list/review-list.compo
     .product { display:grid; grid-template-columns:minmax(240px,380px) 1fr; gap:36px; background:#fff; border:1px solid #e2e8f0; }
     .product-media img { width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:14px; background:#f8fafc; }
     .product-info { display:flex; flex-direction:column; }
+    .title-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
     h1 { margin:6px 0 12px; font-size: 1.8rem; font-weight: 800; color: #0f172a; }
     h2 { margin-top:0; font-weight: 800; color: #0f172a; }
     .eyebrow { color:#0284c7; font-weight:800; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; }
+    .wishlist-btn { flex: 0 0 auto; background: #fff; color: #64748b; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12); }
+    .wishlist-btn.active { color: #e11d48; background: #fff1f2; }
     .description { color: #475569; font-size: 0.95rem; line-height: 1.6; margin-bottom: 20px; }
     .price-row { display: flex; align-items: baseline; gap: 14px; margin-bottom: 22px; }
     .main-price { font-size: 2rem; font-weight: 900; color: #0369a1; }
@@ -177,6 +200,8 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
   quantity = 1;
   variantsLoading = true;
   addingToCart = false;
+  wishlisted = false;
+  wishlistBusy = false;
   summary?: RatingSummary;
   eligibility?: ReviewEligibility;
   reviews: ProductReview[] = [];
@@ -203,16 +228,23 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     private reviewService: ReviewService,
     private authService: AuthService,
     private cartService: CartService,
-    private notification: NotificationService
+    private notification: NotificationService,
+    private analyticsService: AnalyticsService,
+    private recentlyViewedService: RecentlyViewedService,
+    private wishlistService: WishlistService
   ) {}
 
   ngOnInit(): void {
     this.productId = Number(this.route.snapshot.paramMap.get('id'));
-    this.loadProduct();
-    this.loadVariants();
-    this.loadSummary();
-    this.loadReviews();
-    this.loadEligibility();
+    if (this.productId) {
+      this.loadProduct();
+      this.loadVariants();
+      this.loadSummary();
+      this.loadReviews();
+      this.loadEligibility();
+      this.loadWishlistStatus(this.productId);
+      this.recordRecentlyViewed(this.productId);
+    }
   }
 
   ngOnDestroy(): void {
@@ -226,7 +258,17 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     this.productService.getProductById(this.productId).pipe(
       takeUntil(this.destroy$), finalize(() => this.productLoading = false)
     ).subscribe({
-      next: response => this.product = response.data,
+      next: response => {
+        this.product = response.data;
+        if (this.product) {
+          this.analyticsService.track(AnalyticsEventType.ProductView, {
+            productId: this.product.id,
+            productName: this.product.name,
+            categoryId: this.product.categoryId,
+            categoryName: this.product.categoryName
+          });
+        }
+      },
       error: () => this.productError = 'Không thể tải thông tin sản phẩm này.'
     });
   }
@@ -272,6 +314,12 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
       finalize(() => this.addingToCart = false)
     ).subscribe({
       next: () => {
+        this.analyticsService.track(AnalyticsEventType.AddToCart, {
+          productId: this.product?.id,
+          productName: this.product?.name,
+          variantId: this.selectedVariant?.id,
+          quantity: this.quantity
+        });
         this.notification.success(`Đã thêm ${this.quantity} “${this.product?.name}” vào giỏ hàng!`);
         if (checkout) {
           this.router.navigate(['/cart']);
@@ -279,6 +327,38 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
       },
       error: err => this.notification.error(err.error?.message || 'Không thể thêm vào giỏ hàng.')
     });
+  }
+
+  toggleWishlist(): void {
+    if (!this.product || this.wishlistBusy) return;
+
+    const wasWishlisted = this.wishlisted;
+    this.wishlistBusy = true;
+    this.wishlisted = !wasWishlisted;
+
+    const observer = {
+      next: () => {
+        this.wishlistBusy = false;
+        if (!wasWishlisted) {
+          this.analyticsService.track(AnalyticsEventType.AddToWishlist, {
+            productId: this.product?.id,
+            productName: this.product?.name
+          });
+        }
+        this.notification.success(wasWishlisted ? 'Đã xóa khỏi yêu thích' : 'Đã thêm vào yêu thích');
+      },
+      error: (err: HttpErrorResponse) => {
+        this.wishlisted = wasWishlisted;
+        this.wishlistBusy = false;
+        this.notification.error(err.error?.message || 'Không thể cập nhật danh sách yêu thích');
+      }
+    };
+
+    if (wasWishlisted) {
+      this.wishlistService.remove(this.product.id).subscribe(observer);
+    } else {
+      this.wishlistService.add(this.product.id).subscribe(observer);
+    }
   }
 
   loadSummary(): void {
@@ -346,6 +426,19 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
         this.loadEligibility();
       },
       error: error => this.saveError = error.error?.message || 'Không thể lưu nhận xét của bạn.'
+    });
+  }
+
+  private loadWishlistStatus(productId: number): void {
+    this.wishlistService.status(productId).subscribe({
+      next: (res) => this.wishlisted = !!res.data?.wishlisted,
+      error: () => this.wishlisted = false
+    });
+  }
+
+  private recordRecentlyViewed(productId: number): void {
+    this.recentlyViewedService.record(productId).subscribe({
+      error: () => {}
     });
   }
 }
