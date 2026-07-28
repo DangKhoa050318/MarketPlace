@@ -5,8 +5,10 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { AnalyticsEventType } from '../../../core/models/analytics-event.model';
 import { ProductResponse } from '../../../core/models/product.model';
 import { CartService } from '../../../core/services/cart.service';
+import { AnalyticsService } from '../../../core/services/analytics.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ProductService } from '../../../core/services/product.service';
 import { RecentlyViewedService } from '../../../core/services/recently-viewed.service';
@@ -290,6 +292,7 @@ export class ProductDetailComponent implements OnInit {
     private route: ActivatedRoute,
     private productService: ProductService,
     private cartService: CartService,
+    private analyticsService: AnalyticsService,
     private recentlyViewedService: RecentlyViewedService,
     private wishlistService: WishlistService,
     private notification: NotificationService
@@ -316,7 +319,15 @@ export class ProductDetailComponent implements OnInit {
     }
 
     this.cartService.addToCart(variant.id, 1).subscribe({
-      next: () => this.notification.success(`Added "${this.product?.name}" to cart!`),
+      next: () => {
+        this.analyticsService.track(AnalyticsEventType.AddToCart, {
+          productId: this.product?.id,
+          productName: this.product?.name,
+          variantId: variant.id,
+          quantity: 1
+        });
+        this.notification.success(`Added "${this.product?.name}" to cart!`);
+      },
       error: (err) => this.notification.error(err.error?.message || 'Failed to add item to cart')
     });
   }
@@ -331,6 +342,12 @@ export class ProductDetailComponent implements OnInit {
     const observer = {
       next: () => {
         this.wishlistBusy = false;
+        if (!wasWishlisted) {
+          this.analyticsService.track(AnalyticsEventType.AddToWishlist, {
+            productId: this.product?.id,
+            productName: this.product?.name
+          });
+        }
         this.notification.success(wasWishlisted ? 'Removed from wishlist' : 'Added to wishlist');
       },
       error: (err: HttpErrorResponse) => {
@@ -371,6 +388,12 @@ export class ProductDetailComponent implements OnInit {
         this.product = res.success ? res.data : null;
         if (this.product) {
           this.recordRecentlyViewed(this.product.id);
+          this.analyticsService.track(AnalyticsEventType.ProductView, {
+            productId: this.product.id,
+            productName: this.product.name,
+            categoryId: this.product.categoryId,
+            categoryName: this.product.categoryName
+          });
         }
       },
       error: () => {
