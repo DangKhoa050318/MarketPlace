@@ -9,7 +9,9 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { AnalyticsEventType } from '../../../core/models/analytics-event.model';
 import { ProductResponse } from '../../../core/models/product.model';
+import { AnalyticsService } from '../../../core/services/analytics.service';
 import { ProductService } from '../../../core/services/product.service';
 import { CartService } from '../../../core/services/cart.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
@@ -498,6 +500,7 @@ export class ProductListComponent implements OnInit {
 
   constructor(
     private productService: ProductService,
+    private analyticsService: AnalyticsService,
     private cartService: CartService,
     private wishlistService: WishlistService,
     private recentlyViewedService: RecentlyViewedService,
@@ -536,6 +539,10 @@ export class ProductListComponent implements OnInit {
     if (this.paginator) {
       this.paginator.pageIndex = 0;
     }
+    const query = this.searchQuery.trim();
+    if (query) {
+      this.analyticsService.track(AnalyticsEventType.Search, { query });
+    }
     this.loadProducts();
   }
 
@@ -571,6 +578,12 @@ export class ProductListComponent implements OnInit {
       this.cartService.addToCart(defaultVariant.id, 1).subscribe({
         next: (res) => {
           if (res.success) {
+            this.analyticsService.track(AnalyticsEventType.AddToCart, {
+              productId: product.id,
+              productName: product.name,
+              variantId: defaultVariant.id,
+              quantity: 1
+            });
             this.notification.success(`Added "${product.name} (${defaultVariant.variantName || defaultVariant.sku})" to cart!`);
           }
         },
@@ -584,7 +597,15 @@ export class ProductListComponent implements OnInit {
           if (res.success && res.data && res.data.variants && res.data.variants.length > 0) {
             const v = res.data.variants[0];
             this.cartService.addToCart(v.id, 1).subscribe({
-              next: () => this.notification.success(`Added "${product.name}" to cart!`),
+              next: () => {
+                this.analyticsService.track(AnalyticsEventType.AddToCart, {
+                  productId: product.id,
+                  productName: product.name,
+                  variantId: v.id,
+                  quantity: 1
+                });
+                this.notification.success(`Added "${product.name}" to cart!`);
+              },
               error: (err) => this.notification.error(err.error?.message || 'Failed to add item to cart')
             });
           } else {
@@ -609,6 +630,12 @@ export class ProductListComponent implements OnInit {
     const observer = {
       next: () => {
         this.setWishlistBusy(product.id, false);
+        if (!wasWishlisted) {
+          this.analyticsService.track(AnalyticsEventType.AddToWishlist, {
+            productId: product.id,
+            productName: product.name
+          });
+        }
         this.notification.success(wasWishlisted ? 'Removed from wishlist' : 'Added to wishlist');
       },
       error: (err: HttpErrorResponse) => {
