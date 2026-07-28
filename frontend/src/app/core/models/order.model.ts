@@ -18,6 +18,8 @@ export interface Order {
   userEmail: string;
   shippingAddress?: string;
   totalAmount: number;
+  discountAmount?: number;
+  couponCode?: string;
   status: OrderStatus;
   warehouseId?: number;
   note?: string;

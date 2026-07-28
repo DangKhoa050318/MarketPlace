@@ -63,6 +63,18 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/orders/admin-order-list/admin-order-list.component').then(m => m.AdminOrderListComponent)
       },
       {
+        path: 'admin/coupons',
+        loadComponent: () => import('./features/admin/promotions/promotion-list/promotion-list.component').then(m => m.PromotionListComponent)
+      },
+      {
+        path: 'admin/coupons/new',
+        loadComponent: () => import('./features/admin/promotions/promotion-form/promotion-form.component').then(m => m.PromotionFormComponent)
+      },
+      {
+        path: 'admin/coupons/:id/edit',
+        loadComponent: () => import('./features/admin/promotions/promotion-form/promotion-form.component').then(m => m.PromotionFormComponent)
+      },
+      {
         path: 'admin/users',
         loadComponent: () => import('./features/users/user-list/user-list.component').then(m => m.UserListComponent)
       },

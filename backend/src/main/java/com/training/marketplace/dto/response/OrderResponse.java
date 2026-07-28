@@ -12,6 +12,8 @@ public record OrderResponse(
         String userEmail,
         String shippingAddress,
         BigDecimal totalAmount,
+        BigDecimal discountAmount,
+        String couponCode,
         OrderStatus status,
         String note,
         List<OrderItemResponse> items,

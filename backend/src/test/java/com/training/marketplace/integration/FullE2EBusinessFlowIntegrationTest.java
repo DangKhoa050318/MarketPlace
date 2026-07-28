@@ -85,7 +85,7 @@ class FullE2EBusinessFlowIntegrationTest extends BaseIntegrationTest {
         assertThat(unauthorizedAdminResp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
 
         // Step 6: Login as Admin
-        LoginRequest adminLoginReq = new LoginRequest("admin@orderflow.com", "admin123");
+        LoginRequest adminLoginReq = new LoginRequest("admin@marketplace.com", "admin123");
         ResponseEntity<AuthResponse> adminLoginResp = restTemplate.postForEntity(
                 "/api/v1/auth/login",
                 adminLoginReq,
