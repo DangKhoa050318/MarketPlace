@@ -12,7 +12,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ProductResponse } from '../../../core/models/product.model';
 import { ProductService } from '../../../core/services/product.service';
 import { CartService } from '../../../core/services/cart.service';
+import { WishlistService } from '../../../core/services/wishlist.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({
   selector: 'app-product-list',
@@ -73,13 +75,26 @@ import { NotificationService } from '../../../core/services/notification.service
             <div class="tilt-card-container">
               <div class="tilt-card surface-card surface-card-hover product-card">
                 <div class="product-image-box">
+                  <a class="product-detail-link" [routerLink]="['/products', product.id]" [attr.aria-label]="'View ' + product.name + ' details'"></a>
                   <img [src]="product.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500'"
                        (error)="onImageError($event)" [alt]="product.name" class="product-img" />
                   <div class="category-pill-badge">{{ product.categoryName || 'General' }}</div>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    class="wishlist-btn"
+                    [class.active]="isWishlisted(product.id)"
+                    [disabled]="isWishlistBusy(product.id)"
+                    (click)="toggleWishlist(product, $event)"
+                    [attr.aria-label]="isWishlisted(product.id) ? 'Remove from wishlist' : 'Add to wishlist'">
+                    <mat-icon>{{ isWishlisted(product.id) ? 'favorite' : 'favorite_border' }}</mat-icon>
+                  </button>
                 </div>
 
                 <div class="product-info">
-                  <h3 class="product-title">{{ product.name }}</h3>
+                  <h3 class="product-title">
+                    <a [routerLink]="['/products', product.id]">{{ product.name }}</a>
+                  </h3>
                   <p class="product-slug-text">{{ product.slug }}</p>
 
                   <div class="price-stock-row">
@@ -224,6 +239,27 @@ import { NotificationService } from '../../../core/services/notification.service
       box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
     }
 
+    .product-detail-link {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+
+    .wishlist-btn {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 2;
+      background: rgba(255, 255, 255, 0.92);
+      color: #64748b;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.14);
+    }
+
+    .wishlist-btn.active {
+      color: #e11d48;
+      background: #fff1f2;
+    }
+
     .product-info {
       display: flex;
       flex-direction: column;
@@ -236,6 +272,15 @@ import { NotificationService } from '../../../core/services/notification.service
       font-size: 1.15rem;
       font-weight: 700;
       color: var(--text-main);
+    }
+
+    .product-title a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .product-title a:hover {
+      color: #0284c7;
     }
 
     .product-slug-text {
@@ -313,12 +358,15 @@ export class ProductListComponent implements OnInit {
   currentPage = 0;
   searchQuery = '';
   loading = false;
+  wishlistIds = new Set<number>();
+  wishlistBusyIds = new Set<number>();
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   constructor(
     private productService: ProductService,
     private cartService: CartService,
+    private wishlistService: WishlistService,
     private notification: NotificationService
   ) {}
 
@@ -338,6 +386,7 @@ export class ProductListComponent implements OnInit {
         if (res.success && res.data) {
           this.products = res.data.content;
           this.totalElements = res.data.totalElements;
+          this.loadWishlistStatuses();
         }
       },
       error: () => {
@@ -395,6 +444,35 @@ export class ProductListComponent implements OnInit {
     }
   }
 
+  toggleWishlist(product: ProductResponse, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (this.isWishlistBusy(product.id)) return;
+
+    const wasWishlisted = this.isWishlisted(product.id);
+    this.setWishlistBusy(product.id, true);
+    this.setWishlisted(product.id, !wasWishlisted);
+
+    const observer = {
+      next: () => {
+        this.setWishlistBusy(product.id, false);
+        this.notification.success(wasWishlisted ? 'Removed from wishlist' : 'Added to wishlist');
+      },
+      error: (err: HttpErrorResponse) => {
+        this.setWishlisted(product.id, wasWishlisted);
+        this.setWishlistBusy(product.id, false);
+        this.notification.error(err.error?.message || 'Failed to update wishlist');
+      }
+    };
+
+    if (wasWishlisted) {
+      this.wishlistService.remove(product.id).subscribe(observer);
+    } else {
+      this.wishlistService.add(product.id).subscribe(observer);
+    }
+  }
+
   onPageChange(event: PageEvent): void {
     this.currentPage = event.pageIndex;
     this.pageSize = event.pageSize;
@@ -415,5 +493,30 @@ export class ProductListComponent implements OnInit {
     if (product.stock !== undefined && product.stock !== null) return product.stock;
     if (product.variants && product.variants.length > 0) return 10;
     return 1;
+  }
+
+  isWishlisted(productId: number): boolean {
+    return this.wishlistIds.has(productId);
+  }
+
+  isWishlistBusy(productId: number): boolean {
+    return this.wishlistBusyIds.has(productId);
+  }
+
+  private loadWishlistStatuses(): void {
+    this.products.forEach(product => {
+      this.wishlistService.status(product.id).subscribe({
+        next: (res) => this.setWishlisted(product.id, !!res.data?.wishlisted),
+        error: () => this.setWishlisted(product.id, false)
+      });
+    });
+  }
+
+  private setWishlisted(productId: number, wishlisted: boolean): void {
+    wishlisted ? this.wishlistIds.add(productId) : this.wishlistIds.delete(productId);
+  }
+
+  private setWishlistBusy(productId: number, busy: boolean): void {
+    busy ? this.wishlistBusyIds.add(productId) : this.wishlistBusyIds.delete(productId);
   }
 }
