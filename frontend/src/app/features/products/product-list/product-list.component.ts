@@ -13,8 +13,10 @@ import { ProductResponse } from '../../../core/models/product.model';
 import { ProductService } from '../../../core/services/product.service';
 import { CartService } from '../../../core/services/cart.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
+import { RecentlyViewedService } from '../../../core/services/recently-viewed.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { HttpErrorResponse } from '@angular/common/http';
+import { RecentlyViewedProductResponse } from '../../../core/models/recently-viewed.model';
 
 @Component({
   selector: 'app-product-list',
@@ -66,6 +68,40 @@ import { HttpErrorResponse } from '@angular/common/http';
         <div class="loading-container">
           <mat-spinner diameter="44"></mat-spinner>
         </div>
+      }
+
+      @if (!loading && recentlyViewed.length > 0) {
+        <section class="recently-viewed-section">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Browsing History</span>
+              <h2>Recently Viewed</h2>
+            </div>
+            <button
+              mat-stroked-button
+              type="button"
+              class="clear-history-btn"
+              [disabled]="clearingRecentlyViewed"
+              (click)="clearRecentlyViewed()">
+              <mat-icon>delete_sweep</mat-icon>
+              Clear History
+            </button>
+          </div>
+
+          <div class="recently-viewed-list">
+            @for (item of recentlyViewed; track item.id) {
+              <a class="recently-viewed-item" [routerLink]="['/products', item.product.id]">
+                <img
+                  [src]="item.product.imageUrl || fallbackImage"
+                  (error)="onImageError($event)"
+                  [alt]="item.product.name"
+                />
+                <span>{{ item.product.name }}</span>
+                <strong>\${{ getProductPrice(item.product) | number:'1.2-2' }}</strong>
+              </a>
+            }
+          </div>
+        </section>
       }
 
       <!-- USER VIEW: Solid Clean Product Grid -->
@@ -188,6 +224,89 @@ import { HttpErrorResponse } from '@angular/common/http';
 
     .search-icon {
       color: #4f46e5;
+    }
+
+    .recently-viewed-section {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 18px 0 4px;
+      border-top: 1px solid rgba(148, 163, 184, 0.22);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .section-heading h2 {
+      margin: 3px 0 0;
+      color: var(--text-main);
+      font-size: 1.25rem;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .clear-history-btn {
+      flex: 0 0 auto;
+      border-radius: 8px;
+    }
+
+    .recently-viewed-list {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(180px, 220px);
+      gap: 12px;
+      overflow-x: auto;
+      padding: 0 0 14px;
+    }
+
+    .recently-viewed-item {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      grid-template-rows: auto auto;
+      gap: 4px 10px;
+      align-items: center;
+      min-height: 72px;
+      padding: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 8px;
+      background: #fff;
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .recently-viewed-item:hover {
+      border-color: rgba(2, 132, 199, 0.45);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    }
+
+    .recently-viewed-item img {
+      grid-row: 1 / span 2;
+      width: 56px;
+      height: 56px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #f1f5f9;
+    }
+
+    .recently-viewed-item span {
+      overflow: hidden;
+      color: var(--text-main);
+      font-size: 0.86rem;
+      font-weight: 700;
+      line-height: 1.25;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .recently-viewed-item strong {
+      color: #4f46e5;
+      font-size: 0.84rem;
     }
 
     /* Storefront Grid & Solid Cards */
@@ -349,6 +468,17 @@ import { HttpErrorResponse } from '@angular/common/http';
       height: 48px;
       color: #0284c7;
     }
+
+    @media (max-width: 640px) {
+      .section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .clear-history-btn {
+        width: 100%;
+      }
+    }
   `]
 })
 export class ProductListComponent implements OnInit {
@@ -360,6 +490,9 @@ export class ProductListComponent implements OnInit {
   loading = false;
   wishlistIds = new Set<number>();
   wishlistBusyIds = new Set<number>();
+  recentlyViewed: RecentlyViewedProductResponse[] = [];
+  clearingRecentlyViewed = false;
+  fallbackImage = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
 
@@ -367,11 +500,13 @@ export class ProductListComponent implements OnInit {
     private productService: ProductService,
     private cartService: CartService,
     private wishlistService: WishlistService,
+    private recentlyViewedService: RecentlyViewedService,
     private notification: NotificationService
   ) {}
 
   ngOnInit(): void {
     this.loadProducts();
+    this.loadRecentlyViewed();
   }
 
   loadProducts(): void {
@@ -411,6 +546,23 @@ export class ProductListComponent implements OnInit {
       this.paginator.pageIndex = 0;
     }
     this.loadProducts();
+  }
+
+  clearRecentlyViewed(): void {
+    if (this.clearingRecentlyViewed) return;
+
+    this.clearingRecentlyViewed = true;
+    this.recentlyViewedService.clear().subscribe({
+      next: () => {
+        this.recentlyViewed = [];
+        this.clearingRecentlyViewed = false;
+        this.notification.success('Recently viewed history cleared');
+      },
+      error: (err: HttpErrorResponse) => {
+        this.clearingRecentlyViewed = false;
+        this.notification.error(err.error?.message || 'Failed to clear recently viewed history');
+      }
+    });
   }
 
   onAddToCart(product: ProductResponse): void {
@@ -480,7 +632,7 @@ export class ProductListComponent implements OnInit {
   }
 
   onImageError(event: Event): void {
-    (event.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
+    (event.target as HTMLImageElement).src = this.fallbackImage;
   }
 
   getProductPrice(product: ProductResponse): number {
@@ -518,5 +670,12 @@ export class ProductListComponent implements OnInit {
 
   private setWishlistBusy(productId: number, busy: boolean): void {
     busy ? this.wishlistBusyIds.add(productId) : this.wishlistBusyIds.delete(productId);
+  }
+
+  private loadRecentlyViewed(): void {
+    this.recentlyViewedService.list(8).subscribe({
+      next: (res) => this.recentlyViewed = res.success && res.data ? res.data : [],
+      error: () => this.recentlyViewed = []
+    });
   }
 }

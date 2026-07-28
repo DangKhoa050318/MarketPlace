@@ -9,6 +9,7 @@ import { ProductResponse } from '../../../core/models/product.model';
 import { CartService } from '../../../core/services/cart.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ProductService } from '../../../core/services/product.service';
+import { RecentlyViewedService } from '../../../core/services/recently-viewed.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 
 @Component({
@@ -289,6 +290,7 @@ export class ProductDetailComponent implements OnInit {
     private route: ActivatedRoute,
     private productService: ProductService,
     private cartService: CartService,
+    private recentlyViewedService: RecentlyViewedService,
     private wishlistService: WishlistService,
     private notification: NotificationService
   ) {}
@@ -367,6 +369,9 @@ export class ProductDetailComponent implements OnInit {
       next: (res) => {
         this.loading = false;
         this.product = res.success ? res.data : null;
+        if (this.product) {
+          this.recordRecentlyViewed(this.product.id);
+        }
       },
       error: () => {
         this.loading = false;
@@ -380,6 +385,14 @@ export class ProductDetailComponent implements OnInit {
     this.wishlistService.status(productId).subscribe({
       next: (res) => this.wishlisted = !!res.data?.wishlisted,
       error: () => this.wishlisted = false
+    });
+  }
+
+  private recordRecentlyViewed(productId: number): void {
+    this.recentlyViewedService.record(productId).subscribe({
+      error: () => {
+        // Viewing history is helpful but should never block product browsing.
+      }
     });
   }
 }
