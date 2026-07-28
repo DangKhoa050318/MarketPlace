@@ -1,0 +1,112 @@
+import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
+import { ProductReview } from '../../../core/models/review.model';
+import { ReviewSort } from '../../../core/services/review.service';
+
+@Component({
+  selector: 'app-review-list',
+  standalone: true,
+  imports: [
+    CommonModule, FormsModule, MatButtonModule, MatIconModule, MatPaginatorModule,
+    MatProgressSpinnerModule, MatSelectModule
+  ],
+  template: `
+    <section>
+      <div class="toolbar">
+        <h3>Customer reviews</h3>
+        <div>
+          <mat-select aria-label="Filter by stars" [(ngModel)]="rating" (selectionChange)="filtersChanged()">
+            <mat-option [value]="undefined">All ratings</mat-option>
+            @for (star of stars; track star) { <mat-option [value]="star">{{ star }} stars</mat-option> }
+          </mat-select>
+          <mat-select aria-label="Sort reviews" [(ngModel)]="sort" (selectionChange)="filtersChanged()">
+            <mat-option value="newest">Newest</mat-option>
+            <mat-option value="helpful">Most helpful</mat-option>
+          </mat-select>
+        </div>
+      </div>
+
+      @if (loading) {
+        <div class="state"><mat-spinner diameter="36"></mat-spinner><span>Loading reviews…</span></div>
+      } @else if (error) {
+        <div class="state error" role="alert">
+          <mat-icon>error_outline</mat-icon><span>{{ error }}</span>
+          <button mat-stroked-button (click)="retry.emit()">Retry</button>
+        </div>
+      } @else {
+        @for (review of reviews; track review.id) {
+          <article class="review">
+            <div class="review-head">
+              <div>
+                <strong>{{ review.userFullName || review.username }}</strong>
+                <div class="stars" [attr.aria-label]="review.rating + ' out of 5 stars'">
+                  @for (star of stars; track star) {
+                    <mat-icon>{{ star <= review.rating ? 'star' : 'star_border' }}</mat-icon>
+                  }
+                </div>
+              </div>
+              <time [attr.datetime]="review.createdAt">{{ review.createdAt | date:'mediumDate' }}</time>
+            </div>
+            <div class="badges">
+              @if (review.isVerifiedPurchase) {
+                <span class="verified"><mat-icon>verified</mat-icon>Verified Purchase</span>
+              }
+              @if (review.isEdited) { <span>Edited</span> }
+            </div>
+            <h4>{{ review.title }}</h4>
+            <p>{{ review.content }}</p>
+            @if (review.id === editableReviewId) {
+              <button mat-button color="primary" (click)="edit.emit(review)">Edit review</button>
+            }
+          </article>
+        } @empty {
+          <div class="state"><mat-icon>rate_review</mat-icon><span>No reviews match this filter yet.</span></div>
+        }
+        @if (totalElements > pageSize) {
+          <mat-paginator [length]="totalElements" [pageIndex]="page" [pageSize]="pageSize"
+                         [hidePageSize]="true" (page)="pageChange.emit($event)"></mat-paginator>
+        }
+      }
+    </section>
+  `,
+  styles: [`
+    .toolbar,.review-head { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+    .toolbar > div { display:flex; gap:12px; } mat-select { width:140px; }
+    .review { border-top:1px solid #e2e8f0; padding:20px 0; }
+    .review h4 { margin:10px 0 4px; } .review p { margin:0; white-space:pre-wrap; }
+    .stars { display:flex; color:#f59e0b; } .stars mat-icon { font-size:18px; width:18px; height:18px; }
+    time,.badges { color:var(--text-muted); font-size:.8rem; }
+    .badges { display:flex; gap:10px; margin-top:8px; }
+    .verified { display:inline-flex; align-items:center; color:#047857; font-weight:700; }
+    .verified mat-icon { font-size:16px; width:16px; height:16px; margin-right:3px; }
+    .state { min-height:150px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; color:var(--text-muted); }
+    .error { color:#b91c1c; }
+    @media (max-width:600px) { .toolbar { align-items:flex-start; flex-direction:column; } }
+  `]
+})
+export class ReviewListComponent {
+  @Input() reviews: ProductReview[] = [];
+  @Input() loading = false;
+  @Input() error = '';
+  @Input() totalElements = 0;
+  @Input() page = 0;
+  @Input() pageSize = 5;
+  @Input() editableReviewId?: number;
+  @Output() filterChange = new EventEmitter<{ rating?: number; sort: ReviewSort }>();
+  @Output() pageChange = new EventEmitter<PageEvent>();
+  @Output() retry = new EventEmitter<void>();
+  @Output() edit = new EventEmitter<ProductReview>();
+  rating?: number;
+  sort: ReviewSort = 'newest';
+  readonly stars = [1, 2, 3, 4, 5];
+
+  filtersChanged(): void {
+    this.filterChange.emit({ rating: this.rating, sort: this.sort });
+  }
+}

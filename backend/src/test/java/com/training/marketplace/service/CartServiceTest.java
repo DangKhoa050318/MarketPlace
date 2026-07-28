@@ -108,6 +108,48 @@ class CartServiceTest {
         verify(redisTemplate).delete("cart:1");
     }
 
+    @Test
+    void testCartItemResponseRedisSerializationWithDefaultTyping() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+        mapper.activateDefaultTyping(
+                com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator.builder()
+                        .allowIfSubType("com.training.marketplace.")
+                        .allowIfSubType("java.lang.")
+                        .allowIfSubType("java.util.")
+                        .allowIfSubType("java.time.")
+                        .allowIfSubType("java.math.")
+                        .build(),
+                ObjectMapper.DefaultTyping.EVERYTHING,
+                com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY
+        );
+        org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer serializer =
+                new org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer(mapper);
+
+        CartItemResponse item = new CartItemResponse(
+                10L, "SKU-10", "Phone", "Silver",
+                BigDecimal.valueOf(500), 2, BigDecimal.valueOf(1000), "http://img.jpg"
+        );
+
+        byte[] bytes = serializer.serialize(item);
+        Object deserialized = serializer.deserialize(bytes);
+        System.out.println("Deserialized class: " + deserialized.getClass());
+
+        Map<String, Object> map = new java.util.HashMap<>();
+        map.put("@class", "com.training.marketplace.dto.response.CartItemResponse");
+        map.put("variantId", 10L);
+        map.put("sku", "SKU-10");
+        map.put("productName", "Phone");
+        map.put("variantName", "Silver");
+        map.put("unitPrice", BigDecimal.valueOf(500));
+        map.put("quantity", 2);
+        map.put("subtotal", BigDecimal.valueOf(1000));
+        map.put("imageUrl", "http://img.jpg");
+
+        CartItemResponse converted = new ObjectMapper().convertValue(map, CartItemResponse.class);
+        assertThat(converted).isNotNull();
+    }
+
     private ProductVariant buildVariant(Long id, String variantName, BigDecimal price, boolean active) {
         ProductVariant variant = ProductVariant.builder()
                 .productId(1L).sku("SKU-" + id).variantName(variantName).price(price).active(active).build();

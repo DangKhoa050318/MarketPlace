@@ -7,7 +7,6 @@ export const routes: Routes = [
   {
     path: '',
     loadComponent: () => import('./layout/main-layout/main-layout.component').then(m => m.MainLayoutComponent),
-    canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'products', pathMatch: 'full' },
       {
@@ -15,15 +14,22 @@ export const routes: Routes = [
         loadComponent: () => import('./features/products/product-list/product-list.component').then(m => m.ProductListComponent)
       },
       {
+        path: 'products/:id',
+        loadComponent: () => import('./features/products/product-detail/product-detail.component').then(m => m.ProductDetailComponent)
+      },
+      {
         path: 'cart',
+        canActivate: [authGuard],
         loadComponent: () => import('./features/cart/cart.component').then(m => m.CartComponent)
       },
       {
         path: 'orders',
+        canActivate: [authGuard],
         loadComponent: () => import('./features/orders/order-list/order-list.component').then(m => m.OrderListComponent)
       },
       {
         path: 'orders/:id',
+        canActivate: [authGuard],
         loadComponent: () => import('./features/orders/order-detail/order-detail.component').then(m => m.OrderDetailComponent)
       }
     ]

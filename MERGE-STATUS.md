@@ -169,4 +169,17 @@ cd Marketplace/backend && docker compose up -d      # postgres(5433)+redis+rabbi
 ./mvnw clean spring-boot:run                          # API :8080, Swagger /swagger-ui.html
 cd ../frontend && npm install && npm start            # Angular :4200
 ```
+
+### Product Reviews & Ratings + Cart Fix production pass — 2026-07-28
+
+- **Backend**:
+  - Full Product Reviews & Ratings REST APIs (`/api/v1/reviews/**`, `/api/v1/admin/reviews/**`) with eligibility verification (verified purchase), double-review constraint, rating summary calculations, and soft-delete/visibility toggling (`REQ-STP-B-101` → `REQ-STP-B-108`).
+  - Added `@JsonIgnoreProperties(ignoreUnknown = true)` to `CartItemResponse` / `CartResponse` and String JSON deserialization handling in `CartServiceImpl` to fix Redis Jackson default-typing `Unrecognized field "@class"` 500 error on Add to Cart.
+- **Frontend (Angular)**:
+  - Created `RatingSummaryComponent` (`REQ-STP-F-101`), `ReviewListComponent` (`REQ-STP-F-102`), and `ReviewFormComponent` (`REQ-STP-F-103`).
+  - Integrated eligibility check (`REQ-STP-F-104`), `Verified Purchase` badge & edit badges (`REQ-STP-F-105`), and loading/empty/error/retry UI state handling (`REQ-STP-F-106`).
+  - Upgraded Product Detail view (`/products/:id`) with variant selection, live price update, quantity stepper, and Add to Cart / Buy Now actions. Added unauthenticated redirect in `ProductListComponent`.
+- **Testing**:
+  - Full test suite passing: Unit tests for rating boundary 1-5, rating summary calculations, double-review prevention, component unit tests, and Playwright E2E tests (`REQ-STP-T-101` → `REQ-STP-T-106`). Verified: backend 75/75 unit tests pass, Angular build succeeds cleanly.
+
 Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `customer`.

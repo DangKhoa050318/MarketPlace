@@ -80,7 +80,7 @@ public class CartController {
 
     private Long getUserId(Authentication authentication) {
         Authentication auth = authentication != null ? authentication : SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null) {
+        if (auth == null || auth.getName() == null || "anonymousUser".equalsIgnoreCase(auth.getName())) {
             throw new ResourceNotFoundException("Unauthenticated user context");
         }
         String identifier = auth.getName();

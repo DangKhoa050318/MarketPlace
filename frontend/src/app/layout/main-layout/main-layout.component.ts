@@ -61,10 +61,10 @@ import { Observable } from 'rxjs';
 
           <!-- User Profile & Actions -->
           <div class="user-controls">
+            @if (authService.isAuthenticated()) {
             <a mat-icon-button routerLink="/cart" class="cart-btn" title="View Cart">
               <mat-icon [matBadge]="cartCount$ | async" [matBadgeHidden]="(cartCount$ | async) === 0" matBadgeColor="warn">shopping_bag</mat-icon>
             </a>
-
             <div class="user-profile-menu" [matMenuTriggerFor]="userMenu">
               <div class="avatar-ring">
                 <span class="avatar-initial">{{ (authService.getUsername() || 'U')[0].toUpperCase() }}</span>
@@ -74,6 +74,10 @@ import { Observable } from 'rxjs';
               </div>
               <mat-icon class="dropdown-icon">expand_more</mat-icon>
             </div>
+            } @else {
+              <a mat-stroked-button routerLink="/login">Đăng nhập</a>
+              <a mat-flat-button routerLink="/register" class="signup-button">Tạo tài khoản</a>
+            }
 
             <mat-menu #userMenu="matMenu" class="glass-menu">
               <div class="menu-header">
@@ -367,8 +371,8 @@ export class MainLayoutComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.cartService.getCart().subscribe({
-      error: () => {}
-    });
+    if (this.authService.isAuthenticated()) {
+      this.cartService.getCart().subscribe({ error: () => {} });
+    }
   }
 }

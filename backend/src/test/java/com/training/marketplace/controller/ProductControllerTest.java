@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.training.marketplace.dto.request.CreateProductRequest;
 import com.training.marketplace.dto.request.UpdateProductRequest;
 import com.training.marketplace.dto.response.ProductResponse;
+import com.training.marketplace.dto.response.StorefrontProductResponse;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.security.JwtAuthenticationFilter;
 import com.training.marketplace.security.RateLimitingFilter;
@@ -20,6 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -59,6 +61,28 @@ class ProductControllerTest {
                 .andExpect(jsonPath("$.data.content[0].name").value("Laptop"))
                 .andExpect(jsonPath("$.data.content[0].slug").value("laptop"))
                 .andExpect(jsonPath("$.data.totalElements").value(1));
+    }
+
+    @Test
+    void browseCatalog_returnsPriceAndAvailability() throws Exception {
+        var item = new StorefrontProductResponse(1L, "laptop", "Laptop", "A laptop",
+                1L, "Computers", "PCS", "http://example.com/image.png",
+                BigDecimal.valueOf(999), BigDecimal.valueOf(1299), 12, 2, LocalDateTime.now());
+        var page = new PageImpl<>(List.of(item), PageRequest.of(0, 12), 1);
+        when(productService.browse(any(), any(Pageable.class))).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/products/catalog").param("inStock", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].minPrice").value(999))
+                .andExpect(jsonPath("$.data.content[0].availableStock").value(12));
+    }
+
+    @Test
+    void browseCatalog_invalidPriceRange_returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/products/catalog")
+                        .param("minPrice", "500").param("maxPrice", "100"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test

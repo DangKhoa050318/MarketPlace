@@ -35,6 +35,34 @@ export interface ProductResponse {
   variants?: ProductVariant[];
 }
 
+export interface StorefrontProduct {
+  id: number;
+  slug: string;
+  name: string;
+  description?: string;
+  categoryId: number;
+  categoryName: string;
+  unit: string;
+  imageUrl?: string;
+  minPrice: number;
+  maxPrice: number;
+  availableStock: number;
+  variantCount: number;
+  createdAt: string;
+}
+
+export interface ProductCatalogQuery {
+  q?: string;
+  categoryId?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  inStock?: boolean;
+  page: number;
+  size: number;
+  sortBy: 'createdAt' | 'name' | 'price' | 'stock';
+  sortDir: 'ASC' | 'DESC';
+}
+
 export interface CreateProductRequest {
   name: string;
   slug?: string;
