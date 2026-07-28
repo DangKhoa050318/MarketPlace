@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/categories/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/variants/**").permitAll()
+                        .requestMatchers("/api/v1/recently-viewed", "/api/v1/recently-viewed/**").permitAll()
                         // Catalog writes: MANAGER/ADMIN (hard delete ADMIN only)
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/products/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/products/**").hasAnyRole("MANAGER", "ADMIN")
