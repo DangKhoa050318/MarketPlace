@@ -17,12 +17,14 @@ import com.training.marketplace.entity.ProductVariant;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.enums.OrderStatus;
 import com.training.marketplace.enums.Role;
+import com.training.marketplace.enums.ReviewStatus;
 import com.training.marketplace.repository.OrderItemRepository;
 import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.repository.ProductRepository;
 import com.training.marketplace.repository.ProductReviewRepository;
 import com.training.marketplace.repository.ProductVariantRepository;
 import com.training.marketplace.repository.UserRepository;
+import com.training.marketplace.service.ReviewService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -66,6 +69,9 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private ReviewService reviewService;
 
     private User testUser;
     private Product testProduct;
@@ -130,6 +136,27 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
         assertThat(eligBeforeResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(eligBeforeResp.getBody().getData().isEligible()).isTrue();
         assertThat(eligBeforeResp.getBody().getData().isVerifiedPurchase()).isFalse();
+
+        // A client cannot forge the server-owned verified purchase flag.
+        Product spoofProduct = productRepository.save(Product.builder()
+                .name("Spoof Target " + UUID.randomUUID())
+                .slug("spoof-target-" + UUID.randomUUID())
+                .active(true)
+                .build());
+        HttpEntity<Map<String, Object>> spoofEntity = new HttpEntity<>(Map.of(
+                "rating", 5,
+                "title", "Unverified review",
+                "content", "The client attempts to forge verification.",
+                "isVerifiedPurchase", true
+        ), headers);
+        ResponseEntity<ApiResponse<ProductReviewResponse>> spoofResp = restTemplate.exchange(
+                "/api/v1/products/" + spoofProduct.getId() + "/reviews",
+                HttpMethod.POST,
+                spoofEntity,
+                new ParameterizedTypeReference<>() {}
+        );
+        assertThat(spoofResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(spoofResp.getBody().getData().getIsVerifiedPurchase()).isFalse();
 
         // 2. Create a completed order for verified purchase check
         Order order = orderRepository.save(Order.builder()
@@ -206,7 +233,15 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
         assertThat(updateResp.getBody().getData().getRating()).isEqualTo(4);
         assertThat(updateResp.getBody().getData().getIsEdited()).isTrue();
 
-        // 8. Soft Delete Review
+        // 8. Hidden reviews leave the summary; re-approved reviews return.
+        reviewService.adminUpdateStatus(createdReview.getId(), ReviewStatus.HIDDEN);
+        assertThat(reviewService.getRatingSummary(testProduct.getId()).getTotalReviews()).isZero();
+        reviewService.adminUpdateStatus(createdReview.getId(), ReviewStatus.APPROVED);
+        RatingSummaryResponse restoredSummary = reviewService.getRatingSummary(testProduct.getId());
+        assertThat(restoredSummary.getTotalReviews()).isEqualTo(1L);
+        assertThat(restoredSummary.getAverageRating()).isEqualTo(4.0);
+
+        // 9. Soft Delete Review
         ResponseEntity<ApiResponse<Void>> deleteResp = restTemplate.exchange(
                 "/api/v1/reviews/" + createdReview.getId(),
                 HttpMethod.DELETE,
@@ -215,7 +250,7 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
         );
         assertThat(deleteResp.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        // 9. Summary after soft delete -> total 0
+        // 10. Summary after soft delete -> total 0
         ResponseEntity<ApiResponse<RatingSummaryResponse>> summaryAfterDelResp = restTemplate.exchange(
                 "/api/v1/products/" + testProduct.getId() + "/reviews/summary",
                 HttpMethod.GET,

@@ -12,6 +12,7 @@ import com.training.marketplace.repository.ProductRepository;
 import com.training.marketplace.repository.ProductVariantRepository;
 import com.training.marketplace.service.CartService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +27,7 @@ import java.util.concurrent.TimeUnit;
  * (+ product for display name). Stock is NOT enforced here — it is validated & reserved when the
  * order is placed (see OrderService / InventoryFacade), which is the authoritative no-oversell point.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CartServiceImpl implements CartService {
@@ -124,7 +126,7 @@ public class CartServiceImpl implements CartService {
         String imageUrl = variant.getImageUrl() != null
                 ? variant.getImageUrl()
                 : (product != null ? product.getImageUrl() : null);
-        BigDecimal unitPrice = variant.getPrice();
+        BigDecimal unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
         BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
         return new CartItemResponse(variant.getId(), variant.getSku(), productName,
                 variant.getVariantName(), unitPrice, quantity, subtotal, imageUrl);
@@ -143,6 +145,14 @@ public class CartServiceImpl implements CartService {
         if (obj instanceof CartItemResponse cartItemResponse) {
             return cartItemResponse;
         }
-        return objectMapper.convertValue(obj, CartItemResponse.class);
+        try {
+            if (obj instanceof String jsonString) {
+                return objectMapper.readValue(jsonString, CartItemResponse.class);
+            }
+            return objectMapper.convertValue(obj, CartItemResponse.class);
+        } catch (Exception e) {
+            log.error("Failed to convert object to CartItemResponse: {}", obj, e);
+            return null;
+        }
     }
 }

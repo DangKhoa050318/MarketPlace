@@ -1,7 +1,9 @@
 package com.training.marketplace.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.math.BigDecimal;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record CartItemResponse(
         Long variantId,
         String sku,

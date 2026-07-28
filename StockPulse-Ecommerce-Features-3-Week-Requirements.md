@@ -140,21 +140,21 @@ Khách hàng chọn nhiều sản phẩm và xem bảng so sánh chuẩn hóa, c
 
 #### Angular
 
-- [ ] REQ-STP-F-101: Tạo `RatingSummaryComponent` hiển thị điểm trung bình, tổng lượt đánh giá và phân bố 1–5 sao.
-- [ ] REQ-STP-F-102: Tạo `ReviewListComponent` có phân trang, lọc theo số sao và sắp xếp mới nhất/hữu ích.
-- [ ] REQ-STP-F-103: Tạo form đánh giá với star selector, tiêu đề, nội dung, bộ đếm ký tự và validation.
-- [ ] REQ-STP-F-104: Chỉ hiển thị hành động tạo/sửa đánh giá dựa trên eligibility do backend trả về.
-- [ ] REQ-STP-F-105: Hiển thị nhãn `Verified Purchase`, thời điểm và trạng thái đã chỉnh sửa trên đánh giá.
-- [ ] REQ-STP-F-106: Hiển thị loading, empty state, lỗi tải dữ liệu và retry mà không làm lỗi toàn bộ trang sản phẩm.
+- [x] REQ-STP-F-101: Tạo `RatingSummaryComponent` hiển thị điểm trung bình, tổng lượt đánh giá và phân bố 1–5 sao.
+- [x] REQ-STP-F-102: Tạo `ReviewListComponent` có phân trang, lọc theo số sao và sắp xếp mới nhất/hữu ích.
+- [x] REQ-STP-F-103: Tạo form đánh giá với star selector, tiêu đề, nội dung, bộ đếm ký tự và validation.
+- [x] REQ-STP-F-104: Chỉ hiển thị hành động tạo/sửa đánh giá dựa trên eligibility do backend trả về.
+- [x] REQ-STP-F-105: Hiển thị nhãn `Verified Purchase`, thời điểm và trạng thái đã chỉnh sửa trên đánh giá.
+- [x] REQ-STP-F-106: Hiển thị loading, empty state, lỗi tải dữ liệu và retry mà không làm lỗi toàn bộ trang sản phẩm.
 
 #### Testing
 
-- [ ] REQ-STP-T-101: Viết unit test cho rating biên 1/5, rating ngoài phạm vi và validation nội dung.
-- [ ] REQ-STP-T-102: Viết integration test cho người dùng đủ/không đủ điều kiện đánh giá và client giả mạo verified purchase.
-- [ ] REQ-STP-T-103: Viết test cho ràng buộc đánh giá trùng và hành vi cập nhật theo chính sách.
-- [ ] REQ-STP-T-104: Viết test rating summary khi tạo, sửa, xóa mềm, ẩn và hiện đánh giá.
-- [ ] REQ-STP-T-105: Viết Angular component test cho summary, filter, form validation và các trạng thái UI.
-- [ ] REQ-STP-T-106: Viết E2E test khách đã mua tạo đánh giá, sửa đánh giá và thấy dữ liệu cập nhật trên trang sản phẩm.
+- [x] REQ-STP-T-101: Viết unit test cho rating biên 1/5, rating ngoài phạm vi và validation nội dung.
+- [x] REQ-STP-T-102: Viết integration test cho người dùng đủ/không đủ điều kiện đánh giá và client giả mạo verified purchase.
+- [x] REQ-STP-T-103: Viết test cho ràng buộc đánh giá trùng và hành vi cập nhật theo chính sách.
+- [x] REQ-STP-T-104: Viết test rating summary khi tạo, sửa, xóa mềm, ẩn và hiện đánh giá.
+- [x] REQ-STP-T-105: Viết Angular component test cho summary, filter, form validation và các trạng thái UI.
+- [x] REQ-STP-T-106: Viết E2E test khách đã mua tạo đánh giá, sửa đánh giá và thấy dữ liệu cập nhật trên trang sản phẩm.
 
 #### Assignment
 

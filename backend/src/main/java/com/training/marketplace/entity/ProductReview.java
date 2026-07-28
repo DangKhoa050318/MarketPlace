@@ -64,6 +64,10 @@ public class ProductReview extends BaseEntity {
     @Builder.Default
     private Boolean isEdited = false;
 
+    @Column(name = "helpful_count", nullable = false)
+    @Builder.Default
+    private Long helpfulCount = 0L;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 }

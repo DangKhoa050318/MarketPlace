@@ -6,6 +6,8 @@ import { ApiResponse } from '../models/api-response.model';
 import { PageResponse } from '../models/page-response.model';
 import {
   ProductResponse,
+  StorefrontProduct,
+  ProductCatalogQuery,
   ProductVariant,
   CreateProductRequest,
   UpdateProductRequest,
@@ -30,6 +32,20 @@ export class ProductService {
     }
 
     return this.http.get<ApiResponse<PageResponse<ProductResponse>>>(this.apiUrl, { params });
+  }
+
+  browseProducts(query: ProductCatalogQuery): Observable<ApiResponse<PageResponse<StorefrontProduct>>> {
+    let params = new HttpParams()
+      .set('page', query.page)
+      .set('size', query.size)
+      .set('sortBy', query.sortBy)
+      .set('sortDir', query.sortDir);
+    if (query.q) params = params.set('q', query.q);
+    if (query.categoryId !== undefined) params = params.set('categoryId', query.categoryId);
+    if (query.minPrice !== undefined) params = params.set('minPrice', query.minPrice);
+    if (query.maxPrice !== undefined) params = params.set('maxPrice', query.maxPrice);
+    if (query.inStock) params = params.set('inStock', true);
+    return this.http.get<ApiResponse<PageResponse<StorefrontProduct>>>(`${this.apiUrl}/catalog`, { params });
   }
 
   searchProducts(query: string, page = 0, size = 10): Observable<ApiResponse<PageResponse<ProductResponse>>> {
