@@ -37,6 +37,7 @@ CREATE TABLE content_helpful_votes (
     target_type VARCHAR(20) NOT NULL,
     target_id BIGINT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT uk_user_target UNIQUE (user_id, target_type, target_id)
 );
 
@@ -51,7 +52,8 @@ CREATE TABLE moderation_audit_logs (
     old_status VARCHAR(20),
     new_status VARCHAR(20) NOT NULL,
     reason TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_moderation_target ON moderation_audit_logs(target_type, target_id, created_at DESC);

@@ -19,15 +19,17 @@ import com.training.marketplace.repository.ProductQuestionRepository;
 import com.training.marketplace.repository.ProductReviewRepository;
 import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.ContentModerationService;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -53,7 +55,16 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         ContentType typeToQuery = targetType != null ? targetType : ContentType.QUESTION;
 
         if (typeToQuery == ContentType.QUESTION) {
-            Page<ProductQuestion> questions = questionRepository.findForModeration(status, productId, startDate, endDate, pageable);
+            Specification<ProductQuestion> spec = (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                if (status != null) predicates.add(cb.equal(root.get("status"), status));
+                if (productId != null) predicates.add(cb.equal(root.get("product").get("id"), productId));
+                if (startDate != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), startDate));
+                if (endDate != null) predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), endDate));
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
+
+            Page<ProductQuestion> questions = questionRepository.findAll(spec, pageable);
             List<ModerationItemResponse> content = questions.getContent().stream().map(q -> new ModerationItemResponse(
                     q.getId(),
                     ContentType.QUESTION,
@@ -70,7 +81,16 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         }
 
         if (typeToQuery == ContentType.ANSWER) {
-            Page<ProductAnswer> answers = answerRepository.findForModeration(status, productId, startDate, endDate, pageable);
+            Specification<ProductAnswer> spec = (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                if (status != null) predicates.add(cb.equal(root.get("status"), status));
+                if (productId != null) predicates.add(cb.equal(root.get("question").get("product").get("id"), productId));
+                if (startDate != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), startDate));
+                if (endDate != null) predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), endDate));
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
+
+            Page<ProductAnswer> answers = answerRepository.findAll(spec, pageable);
             List<ModerationItemResponse> content = answers.getContent().stream().map(a -> new ModerationItemResponse(
                     a.getId(),
                     ContentType.ANSWER,
@@ -92,7 +112,19 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         else if (status == ModerationStatus.HIDDEN) reviewStatus = ReviewStatus.HIDDEN;
         else if (status == ModerationStatus.REJECTED) reviewStatus = ReviewStatus.DELETED;
 
-        Page<ProductReview> reviews = reviewRepository.findForModeration(reviewStatus, productId, startDate, endDate, pageable);
+        final ReviewStatus targetReviewStatus = reviewStatus;
+
+        Specification<ProductReview> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.isNull(root.get("deletedAt")));
+            if (targetReviewStatus != null) predicates.add(cb.equal(root.get("status"), targetReviewStatus));
+            if (productId != null) predicates.add(cb.equal(root.get("product").get("id"), productId));
+            if (startDate != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), startDate));
+            if (endDate != null) predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), endDate));
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Page<ProductReview> reviews = reviewRepository.findAll(spec, pageable);
         List<ModerationItemResponse> content = reviews.getContent().stream().map(r -> {
             ModerationStatus mStatus = ModerationStatus.VISIBLE;
             if (r.getStatus() == ReviewStatus.HIDDEN) mStatus = ModerationStatus.HIDDEN;

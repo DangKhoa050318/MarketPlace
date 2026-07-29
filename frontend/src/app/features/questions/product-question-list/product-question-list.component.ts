@@ -93,14 +93,14 @@ import { ContentType } from '../../../core/models/vote.model';
                         <div class="a-user">
                           <span class="user-name">{{ a.userName }}</span>
                           @if (a.isOfficial) {
-                            <span class="official-badge"><mat-icon>verified</mat-icon> Tác giả chính thức</span>
+                            <span class="official-badge"><mat-icon>verified</mat-icon> Đã xác minh</span>
                           }
                           <span class="date">{{ a.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
                         </div>
                         <div class="a-actions">
                           @if (isStaffOrAdmin && !a.isOfficial) {
                             <button mat-button color="accent" class="mark-btn" (click)="markOfficial(a)">
-                              <mat-icon>star</mat-icon> Đánh dấu chính thức
+                              <mat-icon>verified</mat-icon> Xác minh câu trả lời
                             </button>
                           }
                           <button
@@ -311,7 +311,7 @@ export class ProductQuestionListComponent implements OnInit {
     this.questionService.markOfficial(answer.id).subscribe({
       next: () => {
         answer.isOfficial = true;
-        this.notificationService.success('Đã đánh dấu câu trả lời chính thức');
+        this.notificationService.success('Đã xác minh câu trả lời');
       },
       error: (err) => {
         this.notificationService.error(err?.error?.message || 'Lỗi khi đánh dấu');
