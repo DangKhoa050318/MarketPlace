@@ -326,3 +326,26 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
 - ✅ Verify: focused API/orchestration/filter tests **20/20 PASS**; toàn bộ backend unit
   tests **155/155 PASS**; Angular unit tests **8/8 PASS**; Angular production build
   **SUCCESS**. Không chạy Docker/PostgreSQL.
+
+### Recommendation storefront frontend — 2026-07-29
+
+- ✅ Hoàn thành `REQ-STP-F-501` → `REQ-STP-F-506`: reusable
+  `RecommendationCarouselComponent`, tích hợp similar/co-viewed trên product detail và
+  best-seller trên storefront/category.
+- ✅ Impression chỉ được gửi khi card đạt 50% vùng nhìn; click gửi đủ source, placement,
+  request ID, strategy và position. Attribution được validate, chỉ consume một lần cho
+  `PRODUCT_VIEW`, tiếp tục giữ journey context cho cart/wishlist và được xóa khi truy cập
+  trực tiếp.
+- ✅ Có skeleton, retry/error state, ẩn section khi API trả rỗng, horizontal scroll,
+  keyboard controls, carousel/group semantics, ARIA labelling, screen-reader
+  announcements, responsive layout và reduced-motion support.
+- ✅ Product detail hủy request cũ khi Angular tái sử dụng route, bật scroll restoration
+  và ngăn response của sản phẩm trước ghi đè state sản phẩm mới.
+- ✅ Hoàn thành `REQ-STP-T-505` với tests cho render/accessibility, ngưỡng observer 50%,
+  impression deduplication, click correlation, observer cleanup, attribution lifecycle,
+  stale-response cancellation, empty result và keyboard navigation.
+- ✅ Verify: focused recommendation frontend tests **10/10 PASS**; toàn bộ Angular unit
+  tests **18/18 PASS**; Angular production build **SUCCESS**.
+- ⚠️ Visual smoke test desktop/mobile đã thực hiện với frontend local. Môi trường không
+  có Docker nên chưa chạy backend/PostgreSQL thật và chưa đóng Playwright E2E
+  `REQ-STP-T-506`.
