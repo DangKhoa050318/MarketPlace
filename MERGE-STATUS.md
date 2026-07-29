@@ -11,6 +11,21 @@ monolith, per `../Project - Marketplace (Merged Spec).md` (v0.2: monolith · sin
 
 ---
 
+### Customer experience event ingestion pipeline - 2026-07-29
+
+- Done `REQ-STP-B-702`: `POST /api/v1/analytics/events` and
+  `POST /api/v1/analytics/events/batch` ingest canonical storefront events.
+- Validates `schemaVersion`, event type, timestamp window, required fields per event type,
+  batch size 1-50, product existence, and add-to-cart variant/quantity.
+- Deduplicates by client `eventId` with unique `analytics_events.event_id`; duplicate retry returns
+  `DUPLICATE_IGNORED` without overwriting the original event.
+- Persists raw event metadata in `analytics_events` via migration
+  `V12__create_analytics_events.sql`; responses include per-event ingestion status:
+  `ACCEPTED`, `DUPLICATE_IGNORED`, or `REJECTED`.
+- Verify: focused analytics tests 4/4 PASS; backend non-integration unit suite 78/78 PASS;
+  Angular production build SUCCESS. Local smoke test against running backend confirmed single
+  event accepted, duplicate ignored, and batch accepted/rejected summary.
+
 ## ✅ Stage 1 — ĐÃ XONG (physical merge + foundation)
 
 - [x] Tạo folder `Marketplace/` (base = OrderFlow); copy `backend/` + `frontend/`.
