@@ -226,12 +226,12 @@ Khách hàng chọn nhiều sản phẩm và xem bảng so sánh chuẩn hóa, c
 
 #### Angular
 
-- [ ] REQ-STP-F-501: Tạo `RecommendationCarouselComponent` dùng lại được với tiêu đề, placement và danh sách sản phẩm.
-- [ ] REQ-STP-F-502: Tích hợp khối sản phẩm tương tự và thường xem cùng trên trang chi tiết sản phẩm.
-- [ ] REQ-STP-F-503: Tích hợp khối bán chạy trên trang chủ và trang danh mục.
-- [ ] REQ-STP-F-504: Gửi impression khi item đạt điều kiện hiển thị và click kèm placement/source.
-- [ ] REQ-STP-F-505: Hiển thị skeleton, empty state và ẩn toàn bộ khối khi API không có kết quả.
-- [ ] REQ-STP-F-506: Bảo đảm carousel hỗ trợ bàn phím, screen reader và responsive.
+- [x] REQ-STP-F-501: Tạo `RecommendationCarouselComponent` dùng lại được với tiêu đề, placement và danh sách sản phẩm.
+- [x] REQ-STP-F-502: Tích hợp khối sản phẩm tương tự và thường xem cùng trên trang chi tiết sản phẩm.
+- [x] REQ-STP-F-503: Tích hợp khối bán chạy trên trang chủ và trang danh mục.
+- [x] REQ-STP-F-504: Gửi impression khi item đạt điều kiện hiển thị và click kèm placement/source.
+- [x] REQ-STP-F-505: Hiển thị skeleton, empty state và ẩn toàn bộ khối khi API không có kết quả.
+- [x] REQ-STP-F-506: Bảo đảm carousel hỗ trợ bàn phím, screen reader và responsive.
 
 #### Testing
 
@@ -239,7 +239,7 @@ Khách hàng chọn nhiều sản phẩm và xem bảng so sánh chuẩn hóa, c
 - [ ] REQ-STP-T-502: Viết unit test cho chiến lược similar products với danh mục, thuộc tính và khoảng giá.
 - [ ] REQ-STP-T-503: Viết unit test cho best sellers, co-view và co-purchase với dữ liệu rỗng/ít/nhiều.
 - [ ] REQ-STP-T-504: Viết test xác nhận kết quả loại sản phẩm ẩn, ngừng bán, nguồn và sản phẩm trùng.
-- [ ] REQ-STP-T-505: Viết Angular component test cho carousel, tracking, empty state và accessibility.
+- [x] REQ-STP-T-505: Viết Angular component test cho carousel, tracking, empty state và accessibility.
 - [ ] REQ-STP-T-506: Viết E2E test mở sản phẩm → thấy recommendation → click → add-to-cart và ghi nhận đúng chuỗi sự kiện.
 
 #### Assignment
