@@ -8,6 +8,10 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.util.Map;
 
 /**
  * SPU (Standard Product Unit) — the display-level product a customer sees.
@@ -35,6 +39,14 @@ public class Product extends BaseEntity {
 
     @Column(name = "category_id")
     private Long categoryId;
+
+    @Column(length = 120)
+    private String brand;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "jsonb")
+    @Builder.Default
+    private Map<String, String> attributes = Map.of();
 
     @Column(nullable = false, length = 20)
     @Builder.Default

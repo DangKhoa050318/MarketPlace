@@ -215,14 +215,14 @@ Khách hàng chọn nhiều sản phẩm và xem bảng so sánh chuẩn hóa, c
 
 #### Backend
 
-- [ ] REQ-STP-B-501: Định nghĩa schema sự kiện `PRODUCT_VIEW`, `RECOMMENDATION_IMPRESSION`, `RECOMMENDATION_CLICK`, `ADD_TO_CART`, `PURCHASE`.
-- [ ] REQ-STP-B-502: Tạo endpoint thu nhận sự kiện có event ID, session ID, user ID tùy chọn, product ID, source, placement và timestamp.
-- [ ] REQ-STP-B-503: Validation event type, product, placement và timestamp; chống ghi trùng theo event ID.
-- [ ] REQ-STP-B-504: Tạo interface `RecommendationStrategy` để tách thuật toán gợi ý khỏi API/controller.
-- [ ] REQ-STP-B-505: Xây dựng chiến lược sản phẩm tương tự dựa trên danh mục, thương hiệu, thuộc tính và khoảng giá.
-- [ ] REQ-STP-B-506: Xây dựng chiến lược sản phẩm bán chạy theo số đơn hợp lệ trong khoảng thời gian cấu hình được.
-- [ ] REQ-STP-B-507: Xây dựng chiến lược thường xem cùng/mua cùng từ dữ liệu đồng xuất hiện tối thiểu.
-- [ ] REQ-STP-B-508: Lọc sản phẩm bị ẩn, ngừng bán, chính sản phẩm nguồn và sản phẩm trùng trước khi trả kết quả.
+- [x] REQ-STP-B-501: Định nghĩa schema sự kiện `PRODUCT_VIEW`, `RECOMMENDATION_IMPRESSION`, `RECOMMENDATION_CLICK`, `ADD_TO_CART`, `PURCHASE`.
+- [x] REQ-STP-B-502: Tạo endpoint thu nhận sự kiện có event ID, session ID, user ID tùy chọn, product ID, source, placement và timestamp.
+- [x] REQ-STP-B-503: Validation event type, product, placement và timestamp; chống ghi trùng theo event ID.
+- [x] REQ-STP-B-504: Tạo interface `RecommendationStrategy` để tách thuật toán gợi ý khỏi API/controller.
+- [x] REQ-STP-B-505: Xây dựng chiến lược sản phẩm tương tự dựa trên danh mục, thương hiệu, thuộc tính và khoảng giá.
+- [x] REQ-STP-B-506: Xây dựng chiến lược sản phẩm bán chạy theo số đơn hợp lệ trong khoảng thời gian cấu hình được.
+- [x] REQ-STP-B-507: Xây dựng chiến lược thường xem cùng/mua cùng từ dữ liệu đồng xuất hiện tối thiểu.
+- [x] REQ-STP-B-508: Lọc sản phẩm bị ẩn, ngừng bán, chính sản phẩm nguồn và sản phẩm trùng trước khi trả kết quả.
 
 #### Angular
 

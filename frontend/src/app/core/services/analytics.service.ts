@@ -4,7 +4,11 @@ import { EMPTY } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api-response.model';
-import { AnalyticsEventType, TrackAnalyticsEventRequest } from '../models/analytics-event.model';
+import {
+  AnalyticsEventContext,
+  AnalyticsEventType,
+  TrackAnalyticsEventRequest
+} from '../models/analytics-event.model';
 
 @Injectable({ providedIn: 'root' })
 export class AnalyticsService {
@@ -13,10 +17,17 @@ export class AnalyticsService {
 
   constructor(private http: HttpClient) {}
 
-  track(type: AnalyticsEventType, properties: Record<string, unknown> = {}): void {
+  track(
+    type: AnalyticsEventType,
+    properties: Record<string, unknown> = {},
+    context: AnalyticsEventContext = {}
+  ): void {
     const payload: TrackAnalyticsEventRequest = {
+      eventId: this.randomId(),
+      schemaVersion: 1,
       type,
-      occurredAt: this.localIsoTimestamp(),
+      occurredAt: new Date().toISOString(),
+      ...context,
       properties
     };
 
@@ -31,16 +42,18 @@ export class AnalyticsService {
     const existing = localStorage.getItem(this.sessionStorageKey);
     if (existing) return existing;
 
-    const generated = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const generated = this.randomId();
     localStorage.setItem(this.sessionStorageKey, generated);
     return generated;
   }
 
-  private localIsoTimestamp(): string {
-    const now = new Date();
-    const timezoneOffsetMs = now.getTimezoneOffset() * 60000;
-    return new Date(now.getTime() - timezoneOffsetMs).toISOString().slice(0, 19);
+  private randomId(): string {
+    return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, character => {
+          const random = Math.floor(Math.random() * 16);
+          const value = character === 'x' ? random : (random & 0x3) | 0x8;
+          return value.toString(16);
+        });
   }
 }
