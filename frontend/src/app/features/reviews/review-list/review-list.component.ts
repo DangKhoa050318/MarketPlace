@@ -8,6 +8,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { ProductReview } from '../../../core/models/review.model';
 import { ReviewSort } from '../../../core/services/review.service';
+import { VoteService } from '../../../core/services/vote.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
   selector: 'app-review-list',
@@ -61,9 +64,19 @@ import { ReviewSort } from '../../../core/services/review.service';
             </div>
             <h4>{{ review.title }}</h4>
             <p>{{ review.content }}</p>
-            @if (review.id === editableReviewId) {
-              <button mat-button color="primary" (click)="edit.emit(review)">Edit review</button>
-            }
+            <div class="review-actions">
+              <button
+                mat-button
+                class="vote-btn sm"
+                [class.voted]="review.isVotedByCurrentUser"
+                (click)="vote(review)">
+                <mat-icon>{{ review.isVotedByCurrentUser ? 'thumb_up' : 'thumb_up_off_alt' }}</mat-icon>
+                <span>Hữu ích ({{ review.helpfulCount || 0 }})</span>
+              </button>
+              @if (review.id === editableReviewId) {
+                <button mat-button color="primary" (click)="edit.emit(review)">Edit review</button>
+              }
+            </div>
           </article>
         } @empty {
           <div class="state"><mat-icon>rate_review</mat-icon><span>No reviews match this filter yet.</span></div>
@@ -85,13 +98,16 @@ import { ReviewSort } from '../../../core/services/review.service';
     .badges { display:flex; gap:10px; margin-top:8px; }
     .verified { display:inline-flex; align-items:center; color:#047857; font-weight:700; }
     .verified mat-icon { font-size:16px; width:16px; height:16px; margin-right:3px; }
+    .review-actions { display:flex; justify-content:space-between; align-items:center; margin-top:12px; }
+    .vote-btn { border-radius:16px; font-size:.82rem; color:#64748b; }
+    .vote-btn.voted { color:#0284c7; background:#f0f9ff; }
     .state { min-height:150px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; color:var(--text-muted); }
     .error { color:#b91c1c; }
     @media (max-width:600px) { .toolbar { align-items:flex-start; flex-direction:column; } }
   `]
 })
 export class ReviewListComponent {
-  @Input() reviews: ProductReview[] = [];
+  @Input() reviews: (ProductReview & { isVotedByCurrentUser?: boolean })[] = [];
   @Input() loading = false;
   @Input() error = '';
   @Input() totalElements = 0;
@@ -102,11 +118,37 @@ export class ReviewListComponent {
   @Output() pageChange = new EventEmitter<PageEvent>();
   @Output() retry = new EventEmitter<void>();
   @Output() edit = new EventEmitter<ProductReview>();
+
   rating?: number;
   sort: ReviewSort = 'newest';
   readonly stars = [1, 2, 3, 4, 5];
 
+  constructor(
+    private voteService: VoteService,
+    private authService: AuthService,
+    private notificationService: NotificationService
+  ) {}
+
   filtersChanged(): void {
     this.filterChange.emit({ rating: this.rating, sort: this.sort });
+  }
+
+  vote(review: ProductReview & { isVotedByCurrentUser?: boolean }): void {
+    if (!this.authService.isAuthenticated()) {
+      this.notificationService.info('Vui lòng đăng nhập để bình chọn');
+      return;
+    }
+
+    this.voteService.toggleVote({ targetType: 'REVIEW', targetId: review.id }).subscribe({
+      next: (res) => {
+        if (res.data) {
+          review.isVotedByCurrentUser = res.data.isVoted;
+          review.helpfulCount = res.data.helpfulCount;
+        }
+      },
+      error: () => {
+        this.notificationService.error('Không thể thực hiện bình chọn');
+      }
+    });
   }
 }

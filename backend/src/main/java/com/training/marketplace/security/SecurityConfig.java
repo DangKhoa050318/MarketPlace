@@ -38,6 +38,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/actuator/**").permitAll()
+                        // Q&A and Content Moderation
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/products/*/questions").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/questions/*/answers").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/answers/*/official").hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers("/api/v1/content/vote").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers("/api/v1/admin/moderation/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
                         // Storefront catalog reads are public
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/categories/**").permitAll()

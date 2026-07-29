@@ -57,6 +57,10 @@ import { AuthService } from '../../core/services/auth.service';
             <mat-icon>receipt_long</mat-icon>
             <span>Order Processing</span>
           </a>
+          <a *ngIf="hasRole(['ADMIN', 'MANAGER', 'STAFF'])" routerLink="/admin/moderation" routerLinkActive="active">
+            <mat-icon>verified_user</mat-icon>
+            <span>Content Moderation</span>
+          </a>
           <a *ngIf="hasRole(['ADMIN'])" routerLink="/admin/coupons" routerLinkActive="active">
             <mat-icon>local_offer</mat-icon>
             <span>Coupons</span>
