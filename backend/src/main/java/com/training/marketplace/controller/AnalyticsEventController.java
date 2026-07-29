@@ -30,7 +30,13 @@ public class AnalyticsEventController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
-    @Operation(summary = "Track a canonical storefront analytics event")
+    @Operation(
+            summary = "Ingest a canonical storefront analytics event",
+            description = """
+                    Durably stores a schema-v1 browser event. Authenticated user identity is
+                    derived from JWT and anonymous session identity from X-Session-Id.
+                    PURCHASE is server-generated and is not accepted from this public endpoint.
+                    """)
     public ApiResponse<AnalyticsEventResponse> track(
             Authentication authentication,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,

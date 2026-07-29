@@ -6,6 +6,7 @@ import com.training.marketplace.dto.response.CategoryResponse;
 import com.training.marketplace.dto.response.MovementResponse;
 import com.training.marketplace.dto.response.ProductResponse;
 import com.training.marketplace.dto.response.ProductSummaryResponse;
+import com.training.marketplace.dto.response.RecommendationResponse;
 import com.training.marketplace.dto.response.StockLevelResponse;
 import com.training.marketplace.dto.response.StockSummaryResponse;
 import com.training.marketplace.dto.response.WarehouseResponse;
@@ -22,6 +23,11 @@ public final class OpenApiSchemas {
 
     @Schema(name = "ProductResponseEnvelope")
     public static class ProductResponseEnvelope extends ApiResponse<ProductResponse> {
+    }
+
+    @Schema(name = "RecommendationResponseEnvelope")
+    public static class RecommendationResponseEnvelope
+            extends ApiResponse<RecommendationResponse> {
     }
 
     @Schema(name = "ProductPageResponseEnvelope")
