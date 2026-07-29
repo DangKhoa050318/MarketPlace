@@ -26,6 +26,8 @@ export interface ProductResponse {
   stock?: number;
   categoryId: number;
   categoryName?: string;
+  brand?: string;
+  attributes?: Record<string, string>;
   unit?: string;
   imageUrl?: string;
   active: boolean;
@@ -70,6 +72,8 @@ export interface CreateProductRequest {
   price?: number;
   stock?: number;
   categoryId: number;
+  brand?: string;
+  attributes?: Record<string, string>;
   unit?: string;
   imageUrl?: string;
 }
@@ -81,6 +85,8 @@ export interface UpdateProductRequest {
   price?: number;
   stock?: number;
   categoryId?: number;
+  brand?: string;
+  attributes?: Record<string, string>;
   unit?: string;
   imageUrl?: string;
   active?: boolean;
