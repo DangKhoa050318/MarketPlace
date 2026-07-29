@@ -10,7 +10,11 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { Subject, finalize, takeUntil } from 'rxjs';
-import { AnalyticsEventType } from '../../../core/models/analytics-event.model';
+import {
+  AnalyticsEventSource,
+  AnalyticsEventType,
+  RecommendationPlacement
+} from '../../../core/models/analytics-event.model';
 import { CategoryResponse } from '../../../core/models/category.model';
 import { ProductCatalogQuery, StorefrontProduct, StorefrontVariantItem } from '../../../core/models/product.model';
 import { RecentlyViewedProductResponse } from '../../../core/models/recently-viewed.model';
@@ -22,13 +26,16 @@ import { NotificationService } from '../../../core/services/notification.service
 import { ProductService } from '../../../core/services/product.service';
 import { RecentlyViewedService } from '../../../core/services/recently-viewed.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
+import {
+  RecommendationCarouselComponent
+} from '../../../shared/components/recommendation-carousel/recommendation-carousel.component';
 
 @Component({
   selector: 'app-product-list',
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatIconModule,
-    MatPaginatorModule, MatProgressSpinnerModule, MatSelectModule
+    MatPaginatorModule, MatProgressSpinnerModule, MatSelectModule, RecommendationCarouselComponent
   ],
   template: `
     <!-- Hero Banner Carousel -->
@@ -75,6 +82,15 @@ import { WishlistService } from '../../../core/services/wishlist.service';
         }
       </div>
     </section>
+
+    <app-recommendation-carousel
+      [title]="query.categoryId ? 'Bán chạy trong danh mục' : 'Sản phẩm bán chạy'"
+      [placement]="query.categoryId
+        ? recommendationPlacement.CategoryBestSellers
+        : recommendationPlacement.HomeBestSellers"
+      [categoryId]="query.categoryId"
+      [limit]="10">
+    </app-recommendation-carousel>
 
     <!-- Recently Viewed Section -->
     @if (!loading && recentlyViewed.length > 0) {
@@ -461,6 +477,7 @@ import { WishlistService } from '../../../core/services/wishlist.service';
 })
 export class ProductListComponent implements OnInit, OnDestroy {
   readonly fallbackImage = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800';
+  readonly recommendationPlacement = RecommendationPlacement;
   private readonly destroy$ = new Subject<void>();
   
   heroSlides = [
@@ -671,7 +688,11 @@ export class ProductListComponent implements OnInit, OnDestroy {
     this.priceError = '';
     this.appliedSearch = this.draftSearch.trim();
     if (this.appliedSearch) {
-      this.analyticsService.track(AnalyticsEventType.Search, { query: this.appliedSearch });
+      this.analyticsService.track(
+        AnalyticsEventType.Search,
+        { query: this.appliedSearch },
+        { source: AnalyticsEventSource.Search }
+      );
     }
     this.query.page = 0;
     this.filtersOpen = false;
@@ -712,10 +733,12 @@ export class ProductListComponent implements OnInit, OnDestroy {
       next: (res) => {
         if (res.success) {
           this.analyticsService.track(AnalyticsEventType.AddToCart, {
+            productName: product.name
+          }, {
             productId: product.id,
-            productName: product.name,
             variantId: targetVariantId,
-            quantity: 1
+            quantity: 1,
+            source: AnalyticsEventSource.Catalog
           });
           this.notification.success(`Đã thêm “${product.name}” (${selectedVariant?.variantName || 'Mặc định'}) vào giỏ`);
         } else {
@@ -741,8 +764,10 @@ export class ProductListComponent implements OnInit, OnDestroy {
         this.setWishlistBusy(product.id, false);
         if (!wasWishlisted) {
           this.analyticsService.track(AnalyticsEventType.AddToWishlist, {
-            productId: product.id,
             productName: product.name
+          }, {
+            productId: product.id,
+            source: AnalyticsEventSource.Catalog
           });
         }
         this.notification.success(wasWishlisted ? 'Đã xóa khỏi yêu thích' : 'Đã thêm vào yêu thích');
