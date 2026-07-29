@@ -74,6 +74,10 @@ export const routes: Routes = [
         path: 'admin/users/:id/edit',
         loadComponent: () => import('./features/users/user-form/user-form.component').then(m => m.UserFormComponent)
       },
+      {
+        path: 'admin/moderation',
+        loadComponent: () => import('./features/admin/moderation/moderation-queue/moderation-queue.component').then(m => m.ModerationQueueComponent)
+      },
 
       // Stock & Warehouse Features (Merged from StockPulse)
       {

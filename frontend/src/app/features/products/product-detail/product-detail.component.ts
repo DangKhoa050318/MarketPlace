@@ -25,13 +25,14 @@ import { WishlistService } from '../../../core/services/wishlist.service';
 import { RatingSummaryComponent } from '../../reviews/rating-summary/rating-summary.component';
 import { ReviewFormComponent } from '../../reviews/review-form/review-form.component';
 import { ReviewListComponent } from '../../reviews/review-list/review-list.component';
+import { ProductQuestionListComponent } from '../../questions/product-question-list/product-question-list.component';
 
 @Component({
   selector: 'app-product-detail',
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule,
-    RatingSummaryComponent, ReviewFormComponent, ReviewListComponent
+    RatingSummaryComponent, ReviewFormComponent, ReviewListComponent, ProductQuestionListComponent
   ],
   template: `
     <a mat-button routerLink="/products" class="back-link"><mat-icon>arrow_back</mat-icon>Sản phẩm</a>
@@ -142,6 +143,8 @@ import { ReviewListComponent } from '../../reviews/review-list/review-list.compo
                          (filterChange)="changeFilter($event)" (pageChange)="changePage($event)"
                          (retry)="loadReviews()" (edit)="editingReview = $event"></app-review-list>
       </section>
+
+      <app-product-question-list [productId]="product.id"></app-product-question-list>
     }
   `,
   styles: [`

@@ -29,4 +29,20 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, Lo
     List<Object[]> countReviewsGroupByRating(@Param("productId") Long productId);
 
     Page<ProductReview> findByUserIdAndDeletedAtIsNull(Long userId, Pageable pageable);
+
+    @Query("""
+        SELECT r FROM ProductReview r
+        WHERE (:status IS NULL OR r.status = :status)
+          AND (:productId IS NULL OR r.product.id = :productId)
+          AND (:startDate IS NULL OR r.createdAt >= :startDate)
+          AND (:endDate IS NULL OR r.createdAt <= :endDate)
+          AND r.deletedAt IS NULL
+    """)
+    Page<ProductReview> findForModeration(
+            @Param("status") ReviewStatus status,
+            @Param("productId") Long productId,
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate,
+            Pageable pageable
+    );
 }
