@@ -183,3 +183,169 @@ cd ../frontend && npm install && npm start            # Angular :4200
   - Full test suite passing: Unit tests for rating boundary 1-5, rating summary calculations, double-review prevention, component unit tests, and Playwright E2E tests (`REQ-STP-T-101` → `REQ-STP-T-106`). Verified: backend 75/75 unit tests pass, Angular build succeeds cleanly.
 
 Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `customer`.
+
+### Recommendation event schema foundation — 2026-07-28
+
+- ✅ Hoàn thành `REQ-STP-B-501`: canonical analytics schema v1 cho `PRODUCT_VIEW`,
+  `RECOMMENDATION_IMPRESSION`, `RECOMMENDATION_CLICK`, `ADD_TO_CART`, `PURCHASE`.
+- ✅ Bổ sung typed source/placement/strategy, `eventId`, `schemaVersion`, UTC `Instant`,
+  SPU `productId`, SKU `variantId` và recommendation correlation context.
+- ✅ Giữ tương thích các event cũ (`PAGE_VIEW`, `SEARCH`, `ADD_TO_WISHLIST`,
+  `BEGIN_CHECKOUT`, `ORDER_CREATED`) và chữ ký Angular `track(type, properties)`.
+- ✅ Contract được tài liệu hóa tại `docs/analytics-event-schema-v1.md`; persistence,
+  validation và deduplication vẫn thuộc `REQ-STP-B-502`/`REQ-STP-B-503`.
+- ✅ Verify: backend unit tests **87/87 PASS**, Angular unit tests **8/8 PASS**,
+  Angular production build **SUCCESS**.
+
+### Recommendation event ingestion — 2026-07-28
+
+- ✅ Hoàn tất phần code `REQ-STP-B-502`: `POST /api/v1/analytics/events` lưu raw event
+  qua `AnalyticsEventService` → `AnalyticsEventRepository` vào bảng `analytics_events`.
+- ✅ Hỗ trợ anonymous session và user từ JWT; không nhận user ID từ body. Response giữ
+  các field cũ và bổ sung `eventId`, `ACCEPTED`, `receivedAt`.
+- ✅ Giữ tương thích các frontend call cũ bằng cách tự sinh UUID và promote
+  `productId`/`variantId`/`quantity` từ legacy `properties` khi cần.
+- ✅ Public endpoint từ chối `PURCHASE`; loại event này chỉ dành cho trusted server flow.
+  Log không còn in raw properties hoặc session ID.
+- ✅ Migration mới: `V13__create_analytics_events.sql`; không sửa/đổi tên migration cũ.
+- ✅ Verify code: focused analytics tests **8/8 PASS**; toàn bộ backend unit tests
+  **91/91 PASS**.
+- ✅ Đóng `REQ-STP-B-502` theo phạm vi đã thống nhất: implementation, HTTP contract và
+  unit/controller regression đã xanh. Docker/PostgreSQL migration execution không thuộc
+  phạm vi xác minh của requirement này; không sửa/đổi tên các migration cũ.
+
+### Recommendation event validation and deduplication — 2026-07-28
+
+- ✅ Hoàn thành `REQ-STP-B-503`: validate schema/event type, product SPU, variant SKU,
+  recommendation placement context và timestamp tại API/service boundary.
+- ✅ Product và variant phải tồn tại, đang active; variant phải thuộc đúng product.
+  `ADD_TO_CART` bắt buộc có variant và số lượng dương.
+- ✅ Recommendation impression/click bắt buộc có source, placement, request ID, strategy,
+  position; strategy phải phù hợp với placement. Browser không được gửi `PURCHASE`.
+- ✅ Timestamp chỉ được lệch tương lai tối đa 5 phút và không cũ quá 7 ngày.
+- ✅ Chống ghi trùng atomically bằng unique `event_id` và
+  `INSERT ... ON CONFLICT DO NOTHING`; retry trả `DUPLICATE_IGNORED` và không ghi đè
+  event gốc.
+- ✅ Verify: focused analytics tests **18/18 PASS**; toàn bộ backend unit tests
+  **101/101 PASS**; Angular unit tests **8/8 PASS**; Angular production build
+  **SUCCESS**. Không chạy Docker/PostgreSQL theo phạm vi đã thống nhất.
+
+### Recommendation strategy contract — 2026-07-28
+
+- ✅ Hoàn thành `REQ-STP-B-504`: thêm interface `RecommendationStrategy` tách thuật toán
+  chọn/xếp hạng ứng viên khỏi controller, HTTP DTO và product response mapping.
+- ✅ Thêm immutable internal contract `RecommendationContext` và
+  `RecommendationCandidate`; strategy chỉ trả product ID, score và reason.
+- ✅ Thêm `RecommendationStrategyRegistry` resolve implementation theo
+  `RecommendationStrategyType`, fail-fast khi đăng ký trùng type và báo rõ type chưa
+  được triển khai.
+- ✅ Không thêm controller, repository, migration, frontend hoặc implementation giả;
+  B-505, B-506 và B-507 có thể đăng ký strategy độc lập bằng Spring bean.
+- ✅ Verify: strategy contract/registry tests **6/6 PASS**; toàn bộ backend unit tests
+  **107/107 PASS**. Không cần Docker/PostgreSQL cho requirement này.
+
+### Similar-product recommendation strategy — 2026-07-28
+
+- ✅ Hoàn thành `REQ-STP-B-505`: `SimilarProductRecommendationStrategy` đăng ký type
+  `SIMILAR` qua registry của B-504 và không phụ thuộc controller/API.
+- ✅ Scoring xác định, có trọng số: category 35%, normalized brand 25%, Jaccard
+  attributes 25%, khoảng giá min/max của SKU active 15%; tie-break theo product ID.
+- ✅ Candidate phải có ít nhất một tín hiệu ngữ nghĩa category/brand/attribute; gần giá
+  đơn thuần không đủ để xem là sản phẩm tương tự.
+- ✅ Mở rộng catalog theo hướng additive với `products.brand` và JSONB `attributes`;
+  create/update/response DTO giữ constructor cũ để không phá consumer hiện hữu. Giá vẫn
+  chỉ nằm ở `product_variants`.
+- ✅ Migration mới `V14__add_product_recommendation_metadata.sql`; không chỉnh sửa
+  migration đã áp dụng. Contract/scoring được ghi tại
+  `docs/similar-product-recommendation.md`.
+- ✅ Verify: B-505 strategy/metadata tests **10/10 PASS**; focused impacted tests
+  **33/33 PASS**; toàn bộ backend unit tests **117/117 PASS**; Angular unit tests
+  **8/8 PASS**; Angular production build **SUCCESS**. Không chạy Docker/PostgreSQL.
+
+### Best-seller recommendation strategy — 2026-07-29
+
+- ✅ Hoàn thành `REQ-STP-B-506`: `BestSellerRecommendationStrategy` đăng ký type
+  `BEST_SELLER` qua registry B-504; không thêm controller/API.
+- ✅ Aggregate từ order item SKU về product/SPU; xếp hạng theo số đơn distinct hợp lệ,
+  tie-break bằng tổng số lượng bán rồi product ID. Hỗ trợ category filter và limit.
+- ✅ Mặc định chỉ tính `CONFIRMED`, `PROCESSING`, `SHIPPED`, `DELIVERED` trong 30 ngày;
+  lookback và status cấu hình qua application properties/environment.
+- ✅ Configuration được validate fail-fast: lookback tối thiểu một ngày,
+  `PENDING`/`CANCELLED` không thể được xem là đơn bán hợp lệ.
+- ✅ Thêm index hỗ trợ aggregation tại
+  `V15__add_best_seller_query_indexes.sql`; không sửa migration đã áp dụng.
+- ✅ Contract/ranking được ghi tại `docs/best-seller-recommendation.md`.
+- ✅ Verify: B-506 strategy/configuration tests **10/10 PASS**; toàn bộ backend unit
+  tests **127/127 PASS**. B-506 không đổi frontend; không chạy Docker/PostgreSQL.
+
+### Co-occurrence recommendation strategies — 2026-07-29
+
+- ✅ Hoàn thành `REQ-STP-B-507`: `CoViewedRecommendationStrategy` và
+  `CoPurchasedRecommendationStrategy` đăng ký độc lập qua registry B-504; không thêm
+  controller/API.
+- ✅ `CO_VIEWED` đếm viewer distinct theo session (ưu tiên) hoặc user; loại lượt xem
+  lặp cùng product của cùng viewer trước khi tính đồng xuất hiện.
+- ✅ `CO_PURCHASED` aggregate từ SKU về product/SPU và đếm order distinct theo tập
+  trạng thái đơn hợp lệ dùng chung với B-506.
+- ✅ Cả hai strategy loại chính source, chỉ lấy product active có ít nhất một variant
+  active, dùng lookback 90 ngày và ngưỡng đồng xuất hiện tối thiểu 2 có thể cấu hình.
+- ✅ Bổ sung placement `PRODUCT_DETAIL_CO_PURCHASED`, index truy vấn tại
+  `V16__add_co_occurrence_query_indexes.sql` và contract tại
+  `docs/co-occurrence-recommendation.md`.
+- ✅ Verify: B-507 strategy/source validation tests **11/11 PASS**; focused related
+  tests **32/32 PASS**; toàn bộ backend unit tests **141/141 PASS**; Angular unit tests
+  **8/8 PASS**; Angular production build **SUCCESS**. Không chạy Docker/PostgreSQL.
+
+### Recommendation eligibility filtering — 2026-07-29
+
+- ✅ Hoàn thành `REQ-STP-B-508`: mọi strategy được resolve qua
+  `RecommendationStrategyRegistry` đều được decorate bằng
+  `RecommendationCandidateFilter` trước khi trả kết quả.
+- ✅ Bộ lọc loại source product, product ID trùng, product hidden/discontinued
+  (`active = false`) và product không còn SKU active; giữ nguyên thứ tự, score và reason
+  từ strategy.
+- ✅ Eligibility được tải bằng một batch query, không phát sinh truy vấn N+1; limit được
+  áp dụng sau bước lọc.
+- ✅ Không đổi controller, HTTP DTO, frontend, schema dữ liệu hoặc migration. Contract
+  được ghi tại `docs/recommendation-eligibility-filter.md`.
+- ✅ Verify: focused recommendation/filter tests **30/30 PASS**; toàn bộ backend unit
+  tests **146/146 PASS**. Không chạy Docker/PostgreSQL.
+
+### Recommendation storefront API — 2026-07-29
+
+- ✅ Bổ sung public `GET /api/v1/recommendations` điều phối theo placement sang
+  `SIMILAR`, `BEST_SELLER`, `CO_VIEWED` hoặc `CO_PURCHASED`.
+- ✅ Response trả `requestId`, placement, strategy, generated time và position 0-based
+  để frontend correlation impression/click; user lấy từ JWT, anonymous session lấy từ
+  `X-Session-Id`.
+- ✅ Hydrate product và active variants bằng batch query, giữ thứ tự strategy và kiểm
+  tra lại eligibility trước response; empty result trả `items: []`.
+- ✅ Validate context theo placement và giới hạn `limit` từ 1–24; OpenAPI DTO/schema và
+  typed Angular `RecommendationService` đã đồng bộ. Chưa triển khai carousel/UI F-501.
+- ✅ Contract được ghi tại `docs/recommendation-api.md`.
+- ✅ Verify: focused API/orchestration/filter tests **20/20 PASS**; toàn bộ backend unit
+  tests **155/155 PASS**; Angular unit tests **8/8 PASS**; Angular production build
+  **SUCCESS**. Không chạy Docker/PostgreSQL.
+
+### Recommendation storefront frontend — 2026-07-29
+
+- ✅ Hoàn thành `REQ-STP-F-501` → `REQ-STP-F-506`: reusable
+  `RecommendationCarouselComponent`, tích hợp similar/co-viewed trên product detail và
+  best-seller trên storefront/category.
+- ✅ Impression chỉ được gửi khi card đạt 50% vùng nhìn; click gửi đủ source, placement,
+  request ID, strategy và position. Attribution được validate, chỉ consume một lần cho
+  `PRODUCT_VIEW`, tiếp tục giữ journey context cho cart/wishlist và được xóa khi truy cập
+  trực tiếp.
+- ✅ Có skeleton, retry/error state, ẩn section khi API trả rỗng, horizontal scroll,
+  keyboard controls, carousel/group semantics, ARIA labelling, screen-reader
+  announcements, responsive layout và reduced-motion support.
+- ✅ Product detail hủy request cũ khi Angular tái sử dụng route, bật scroll restoration
+  và ngăn response của sản phẩm trước ghi đè state sản phẩm mới.
+- ✅ Hoàn thành `REQ-STP-T-505` với tests cho render/accessibility, ngưỡng observer 50%,
+  impression deduplication, click correlation, observer cleanup, attribution lifecycle,
+  stale-response cancellation, empty result và keyboard navigation.
+- ✅ Verify: focused recommendation frontend tests **10/10 PASS**; toàn bộ Angular unit
+  tests **18/18 PASS**; Angular production build **SUCCESS**.
+- ⚠️ Visual smoke test desktop/mobile đã thực hiện với frontend local. Môi trường không
+  có Docker nên chưa chạy backend/PostgreSQL thật và chưa đóng Playwright E2E
+  `REQ-STP-T-506`.

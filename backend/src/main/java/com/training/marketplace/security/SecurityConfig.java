@@ -48,6 +48,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/categories/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/variants/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/recommendations/**").permitAll()
                         .requestMatchers("/api/v1/recently-viewed", "/api/v1/recently-viewed/**").permitAll()
                         .requestMatchers("/api/v1/analytics/events", "/api/v1/analytics/events/**").permitAll()
                         // Catalog writes: MANAGER/ADMIN (hard delete ADMIN only)
@@ -62,6 +63,9 @@ public class SecurityConfig {
                         // Storefront (customer and back-office staff/manager/admin)
                         .requestMatchers("/api/v1/cart", "/api/v1/cart/**").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/orders", "/api/v1/orders/**").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
+                        // Coupons: shoppers can preview; management is ADMIN-only (preview matcher first).
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/coupons/preview").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers("/api/v1/coupons/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/wishlist", "/api/v1/wishlist/**").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         // Admin
                         .requestMatchers("/api/v1/admin/dashboard/**").hasAnyRole("MANAGER", "ADMIN")

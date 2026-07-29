@@ -61,6 +61,10 @@ import { AuthService } from '../../core/services/auth.service';
             <mat-icon>verified_user</mat-icon>
             <span>Content Moderation</span>
           </a>
+          <a *ngIf="hasRole(['ADMIN'])" routerLink="/admin/coupons" routerLinkActive="active">
+            <mat-icon>local_offer</mat-icon>
+            <span>Coupons</span>
+          </a>
 
           <span class="nav-heading">Warehouse & Stock</span>
           <a *ngIf="hasRole(['ADMIN', 'MANAGER', 'STAFF'])" routerLink="/warehouses" routerLinkActive="active">
@@ -319,8 +323,9 @@ import { AuthService } from '../../core/services/auth.service';
       font-weight: 700;
     }
 
-    .profile-copy strong { display: block; font-size: 0.85rem; color: var(--text-main); }
-    .profile-copy small { color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; }
+    .profile-copy { display: flex; flex-direction: column; justify-content: center; }
+    .profile-copy strong { display: block; font-size: 0.85rem; color: var(--text-main); line-height: 1.2; }
+    .profile-copy small { display: block; color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; line-height: 1.2; margin-top: 2px; }
 
     .logout-button { color: var(--text-secondary); }
     .logout-button:hover { color: var(--danger); }

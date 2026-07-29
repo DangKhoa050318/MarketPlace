@@ -48,6 +48,7 @@ class OrderServiceTest {
     @Mock private InventoryFacade inventoryFacade;
     @Mock private OrderMapper orderMapper;
     @Mock private OrderEventPublisher orderEventPublisher;
+    @Mock private PromotionService promotionService;
 
     @InjectMocks private OrderServiceImpl orderService;
 
@@ -77,14 +78,14 @@ class OrderServiceTest {
 
         testOrderResponse = new OrderResponse(
                 100L, 1L, "testuser", "test@example.com", "123 Main St",
-                BigDecimal.valueOf(200.00), OrderStatus.PENDING, null, List.of(),
+                BigDecimal.valueOf(200.00), BigDecimal.ZERO, null, OrderStatus.PENDING, null, List.of(),
                 LocalDateTime.now(), LocalDateTime.now());
     }
 
     @Test
     @DisplayName("createOrder: valid cart reserves stock, clears cart, publishes event")
     void createOrder_validCart_success() {
-        CreateOrderRequest request = new CreateOrderRequest("123 Main St", "Leave at door");
+        CreateOrderRequest request = new CreateOrderRequest("123 Main St", "Leave at door", null);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(cartService.getCart(1L)).thenReturn(cartResponse);
         when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
@@ -103,7 +104,7 @@ class OrderServiceTest {
     @Test
     @DisplayName("createOrder: empty cart throws BadRequestException")
     void createOrder_emptyCart_throwsException() {
-        CreateOrderRequest request = new CreateOrderRequest("123 Main St", null);
+        CreateOrderRequest request = new CreateOrderRequest("123 Main St", null, null);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(cartService.getCart(1L)).thenReturn(new CartResponse(1L, List.of(), BigDecimal.ZERO, 0));
 
@@ -115,7 +116,7 @@ class OrderServiceTest {
     @Test
     @DisplayName("createOrder: insufficient stock (facade throws) propagates BadRequestException")
     void createOrder_insufficientStock_throwsException() {
-        CreateOrderRequest request = new CreateOrderRequest("123 Main St", null);
+        CreateOrderRequest request = new CreateOrderRequest("123 Main St", null, null);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(cartService.getCart(1L)).thenReturn(cartResponse);
         when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);

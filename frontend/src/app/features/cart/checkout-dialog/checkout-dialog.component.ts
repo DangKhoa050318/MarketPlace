@@ -1,6 +1,6 @@
 import { Component, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -10,6 +10,8 @@ import { Cart } from '../../../core/models/cart.model';
 
 export interface CheckoutDialogData {
   cart: Cart;
+  couponCode?: string | null;   // applied on the cart page (F-306); shown read-only here
+  discountAmount?: number;
 }
 
 @Component({
@@ -17,7 +19,6 @@ export interface CheckoutDialogData {
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule,
     ReactiveFormsModule,
     MatDialogModule,
     MatFormFieldModule,
@@ -43,8 +44,16 @@ export interface CheckoutDialogData {
           </div>
           <div class="summary-item align-right">
             <span class="label">Total Payment</span>
-            <strong class="total-amount text-gradient-cyan">{{ data.cart.totalAmount | currency:'USD':'symbol':'1.2-2' }}</strong>
+            <span *ngIf="data.couponCode" class="strike">{{ data.cart.totalAmount | currency:'USD':'symbol':'1.2-2' }}</span>
+            <strong class="total-amount text-gradient-cyan">{{ payableTotal() | currency:'USD':'symbol':'1.2-2' }}</strong>
           </div>
+        </div>
+
+        <!-- Applied coupon (read-only; entered on the cart page) -->
+        <div *ngIf="data.couponCode" class="coupon-applied-line">
+          <mat-icon>local_offer</mat-icon>
+          Coupon <strong>{{ data.couponCode }}</strong> applied — you save
+          {{ (data.discountAmount || 0) | currency:'USD':'symbol':'1.2-2' }}.
         </div>
 
         <form [formGroup]="form" (ngSubmit)="onSubmit()" class="checkout-form">
@@ -67,10 +76,10 @@ export interface CheckoutDialogData {
 
       <mat-dialog-actions align="end" class="dialog-actions">
         <button mat-button (click)="onCancel()" [disabled]="submitting">Cancel</button>
-        <button 
-          mat-raised-button 
-          class="btn-glowing" 
-          (click)="onSubmit()" 
+        <button
+          mat-raised-button
+          class="btn-glowing"
+          (click)="onSubmit()"
           [disabled]="form.invalid || submitting">
           <mat-icon>shopping_bag</mat-icon> {{ submitting ? 'Processing...' : 'Confirm Order' }}
         </button>
@@ -154,6 +163,28 @@ export interface CheckoutDialogData {
       font-weight: 900;
     }
 
+    .strike {
+      text-decoration: line-through;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin-right: 8px;
+    }
+
+    .coupon-applied-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #16a34a;
+    }
+
+    .coupon-applied-line mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
     .checkout-form {
       display: flex;
       flex-direction: column;
@@ -186,13 +217,23 @@ export class CheckoutDialogComponent {
     });
   }
 
+  payableTotal(): number {
+    const subtotal = this.data.cart.totalAmount ?? 0;
+    const discount = this.data.couponCode ? (this.data.discountAmount || 0) : 0;
+    return Math.max(0, subtotal - discount);
+  }
+
   onCancel(): void {
     this.dialogRef.close();
   }
 
   onSubmit(): void {
     if (this.form.valid) {
-      this.dialogRef.close(this.form.value);
+      this.dialogRef.close({
+        shippingAddress: this.form.value.shippingAddress,
+        note: this.form.value.note,
+        couponCode: this.data.couponCode || undefined
+      });
     }
   }
 }

@@ -215,23 +215,23 @@ Khách hàng chọn nhiều sản phẩm và xem bảng so sánh chuẩn hóa, c
 
 #### Backend
 
-- [ ] REQ-STP-B-501: Định nghĩa schema sự kiện `PRODUCT_VIEW`, `RECOMMENDATION_IMPRESSION`, `RECOMMENDATION_CLICK`, `ADD_TO_CART`, `PURCHASE`.
-- [ ] REQ-STP-B-502: Tạo endpoint thu nhận sự kiện có event ID, session ID, user ID tùy chọn, product ID, source, placement và timestamp.
-- [ ] REQ-STP-B-503: Validation event type, product, placement và timestamp; chống ghi trùng theo event ID.
-- [ ] REQ-STP-B-504: Tạo interface `RecommendationStrategy` để tách thuật toán gợi ý khỏi API/controller.
-- [ ] REQ-STP-B-505: Xây dựng chiến lược sản phẩm tương tự dựa trên danh mục, thương hiệu, thuộc tính và khoảng giá.
-- [ ] REQ-STP-B-506: Xây dựng chiến lược sản phẩm bán chạy theo số đơn hợp lệ trong khoảng thời gian cấu hình được.
-- [ ] REQ-STP-B-507: Xây dựng chiến lược thường xem cùng/mua cùng từ dữ liệu đồng xuất hiện tối thiểu.
-- [ ] REQ-STP-B-508: Lọc sản phẩm bị ẩn, ngừng bán, chính sản phẩm nguồn và sản phẩm trùng trước khi trả kết quả.
+- [x] REQ-STP-B-501: Định nghĩa schema sự kiện `PRODUCT_VIEW`, `RECOMMENDATION_IMPRESSION`, `RECOMMENDATION_CLICK`, `ADD_TO_CART`, `PURCHASE`.
+- [x] REQ-STP-B-502: Tạo endpoint thu nhận sự kiện có event ID, session ID, user ID tùy chọn, product ID, source, placement và timestamp.
+- [x] REQ-STP-B-503: Validation event type, product, placement và timestamp; chống ghi trùng theo event ID.
+- [x] REQ-STP-B-504: Tạo interface `RecommendationStrategy` để tách thuật toán gợi ý khỏi API/controller.
+- [x] REQ-STP-B-505: Xây dựng chiến lược sản phẩm tương tự dựa trên danh mục, thương hiệu, thuộc tính và khoảng giá.
+- [x] REQ-STP-B-506: Xây dựng chiến lược sản phẩm bán chạy theo số đơn hợp lệ trong khoảng thời gian cấu hình được.
+- [x] REQ-STP-B-507: Xây dựng chiến lược thường xem cùng/mua cùng từ dữ liệu đồng xuất hiện tối thiểu.
+- [x] REQ-STP-B-508: Lọc sản phẩm bị ẩn, ngừng bán, chính sản phẩm nguồn và sản phẩm trùng trước khi trả kết quả.
 
 #### Angular
 
-- [ ] REQ-STP-F-501: Tạo `RecommendationCarouselComponent` dùng lại được với tiêu đề, placement và danh sách sản phẩm.
-- [ ] REQ-STP-F-502: Tích hợp khối sản phẩm tương tự và thường xem cùng trên trang chi tiết sản phẩm.
-- [ ] REQ-STP-F-503: Tích hợp khối bán chạy trên trang chủ và trang danh mục.
-- [ ] REQ-STP-F-504: Gửi impression khi item đạt điều kiện hiển thị và click kèm placement/source.
-- [ ] REQ-STP-F-505: Hiển thị skeleton, empty state và ẩn toàn bộ khối khi API không có kết quả.
-- [ ] REQ-STP-F-506: Bảo đảm carousel hỗ trợ bàn phím, screen reader và responsive.
+- [x] REQ-STP-F-501: Tạo `RecommendationCarouselComponent` dùng lại được với tiêu đề, placement và danh sách sản phẩm.
+- [x] REQ-STP-F-502: Tích hợp khối sản phẩm tương tự và thường xem cùng trên trang chi tiết sản phẩm.
+- [x] REQ-STP-F-503: Tích hợp khối bán chạy trên trang chủ và trang danh mục.
+- [x] REQ-STP-F-504: Gửi impression khi item đạt điều kiện hiển thị và click kèm placement/source.
+- [x] REQ-STP-F-505: Hiển thị skeleton, empty state và ẩn toàn bộ khối khi API không có kết quả.
+- [x] REQ-STP-F-506: Bảo đảm carousel hỗ trợ bàn phím, screen reader và responsive.
 
 #### Testing
 
@@ -239,7 +239,7 @@ Khách hàng chọn nhiều sản phẩm và xem bảng so sánh chuẩn hóa, c
 - [ ] REQ-STP-T-502: Viết unit test cho chiến lược similar products với danh mục, thuộc tính và khoảng giá.
 - [ ] REQ-STP-T-503: Viết unit test cho best sellers, co-view và co-purchase với dữ liệu rỗng/ít/nhiều.
 - [ ] REQ-STP-T-504: Viết test xác nhận kết quả loại sản phẩm ẩn, ngừng bán, nguồn và sản phẩm trùng.
-- [ ] REQ-STP-T-505: Viết Angular component test cho carousel, tracking, empty state và accessibility.
+- [x] REQ-STP-T-505: Viết Angular component test cho carousel, tracking, empty state và accessibility.
 - [ ] REQ-STP-T-506: Viết E2E test mở sản phẩm → thấy recommendation → click → add-to-cart và ghi nhận đúng chuỗi sự kiện.
 
 #### Assignment

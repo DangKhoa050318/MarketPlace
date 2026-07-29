@@ -20,15 +20,18 @@ import com.training.marketplace.publisher.OrderEventPublisher;
 import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.repository.ProductRepository;
 import com.training.marketplace.repository.UserRepository;
+import com.training.marketplace.service.AppliedCoupon;
 import com.training.marketplace.service.CartService;
 import com.training.marketplace.service.InventoryFacade;
 import com.training.marketplace.service.OrderService;
+import com.training.marketplace.service.PromotionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -49,6 +52,7 @@ public class OrderServiceImpl implements OrderService {
     private final InventoryFacade inventoryFacade;
     private final OrderMapper orderMapper;
     private final OrderEventPublisher orderEventPublisher;
+    private final PromotionService promotionService;
 
     @Override
     @Transactional
@@ -96,9 +100,27 @@ public class OrderServiceImpl implements OrderService {
                     .subtotal(subtotal)
                     .build());
         }
-        order.setTotalAmount(calculatedTotal);
+
+        // 3b. Apply coupon (optional). Locks the coupon row, validates against the cart, and
+        //     increments used_count inside this transaction (no oversell of usage_limit).
+        BigDecimal discount = BigDecimal.ZERO;
+        AppliedCoupon appliedCoupon = null;
+        if (StringUtils.hasText(request.couponCode())) {
+            appliedCoupon = promotionService.consume(request.couponCode(), userId, cart);
+            discount = appliedCoupon.discountAmount();
+            order.setPromotionCodeId(appliedCoupon.promotionCodeId());
+            order.setCouponCode(appliedCoupon.code());
+        }
+        order.setDiscountAmount(discount);
+        order.setTotalAmount(calculatedTotal.subtract(discount));
 
         Order savedOrder = orderRepository.save(order);
+
+        // 3c. Record the redemption now the order id is known.
+        if (appliedCoupon != null) {
+            promotionService.recordRedemption(
+                    appliedCoupon.promotionCodeId(), userId, savedOrder.getId(), discount);
+        }
 
         // 4. Clear cart.
         cartService.clearCart(userId);
@@ -159,12 +181,11 @@ public class OrderServiceImpl implements OrderService {
 
         // Release the reservation held while the order was PENDING/CONFIRMED.
         if (order.getWarehouseId() != null) {
-            Map<Long, Integer> quantityByVariant = new LinkedHashMap<>();
-            for (OrderItem item : order.getItems()) {
-                quantityByVariant.merge(item.getVariantId(), item.getQuantity(), Integer::sum);
-            }
-            inventoryFacade.release(order.getWarehouseId(), quantityByVariant);
+            inventoryFacade.release(order.getWarehouseId(), quantitiesByVariant(order));
         }
+
+        // Refund the coupon redemption held for this order (frees a usage slot; idempotent).
+        promotionService.refundIfPresent(order.getPromotionCodeId(), order.getId());
 
         Order savedOrder = orderRepository.save(order);
         log.info("User cancelled order {}: reservation released", orderId);
@@ -199,23 +220,38 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
-        validateStatusTransition(order.getStatus(), request.status());
+        OrderStatus previousStatus = order.getStatus();
+        validateStatusTransition(previousStatus, request.status());
 
         // When the order ships, convert the reservation into an actual stock decrement.
         if (request.status() == OrderStatus.SHIPPED && order.getWarehouseId() != null) {
-            Map<Long, Integer> quantityByVariant = new LinkedHashMap<>();
-            for (OrderItem item : order.getItems()) {
-                quantityByVariant.merge(item.getVariantId(), item.getQuantity(), Integer::sum);
-            }
-            inventoryFacade.fulfill(order.getWarehouseId(), quantityByVariant);
+            inventoryFacade.fulfill(order.getWarehouseId(), quantitiesByVariant(order));
         }
 
-        log.info("Admin updating order {} status {} -> {}", orderId, order.getStatus(), request.status());
+        // When an admin cancels, release the reservation and refund any coupon (mirrors
+        // cancelUserOrder). Guard against a CANCELLED -> CANCELLED no-op double release.
+        if (request.status() == OrderStatus.CANCELLED && previousStatus != OrderStatus.CANCELLED) {
+            if (order.getWarehouseId() != null) {
+                inventoryFacade.release(order.getWarehouseId(), quantitiesByVariant(order));
+            }
+            promotionService.refundIfPresent(order.getPromotionCodeId(), order.getId());
+        }
+
+        log.info("Admin updating order {} status {} -> {}", orderId, previousStatus, request.status());
         order.setStatus(request.status());
         if (request.note() != null && !request.note().isBlank()) {
             order.setNote(request.note());
         }
         return orderMapper.toResponse(orderRepository.save(order));
+    }
+
+    /** Aggregate an order's line items into {@code variantId -> total quantity} for inventory calls. */
+    private static Map<Long, Integer> quantitiesByVariant(Order order) {
+        Map<Long, Integer> quantityByVariant = new LinkedHashMap<>();
+        for (OrderItem item : order.getItems()) {
+            quantityByVariant.merge(item.getVariantId(), item.getQuantity(), Integer::sum);
+        }
+        return quantityByVariant;
     }
 
     public void validateStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {

@@ -75,3 +75,12 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     com.training.marketplace: DEBUG
+
+marketplace:
+  recommendation:
+    best-seller-lookback: ${RECOMMENDATION_BEST_SELLER_LOOKBACK:30d}
+    valid-order-statuses: ${RECOMMENDATION_VALID_ORDER_STATUSES:CONFIRMED,PROCESSING,SHIPPED,DELIVERED}
+    co-viewed-lookback: ${RECOMMENDATION_CO_VIEWED_LOOKBACK:90d}
+    min-co-viewed-occurrences: ${RECOMMENDATION_MIN_CO_VIEWED_OCCURRENCES:2}
+    co-purchased-lookback: ${RECOMMENDATION_CO_PURCHASED_LOOKBACK:90d}
+    min-co-purchased-occurrences: ${RECOMMENDATION_MIN_CO_PURCHASED_OCCURRENCES:2}

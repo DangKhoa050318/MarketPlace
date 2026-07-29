@@ -9,7 +9,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PageEvent } from '@angular/material/paginator';
 import { Subject } from 'rxjs';
 import { finalize, takeUntil } from 'rxjs/operators';
-import { AnalyticsEventType } from '../../../core/models/analytics-event.model';
+import {
+  AnalyticsEventContext,
+  AnalyticsEventSource,
+  AnalyticsEventType,
+  RecommendationPlacement
+} from '../../../core/models/analytics-event.model';
 import { ProductResponse, ProductVariant } from '../../../core/models/product.model';
 import {
   ProductReview, RatingSummary, ReviewEligibility, ReviewPayload
@@ -20,8 +25,14 @@ import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { AnalyticsService } from '../../../core/services/analytics.service';
+import {
+  RecommendationAttributionService
+} from '../../../core/services/recommendation-attribution.service';
 import { RecentlyViewedService } from '../../../core/services/recently-viewed.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
+import {
+  RecommendationCarouselComponent
+} from '../../../shared/components/recommendation-carousel/recommendation-carousel.component';
 import { RatingSummaryComponent } from '../../reviews/rating-summary/rating-summary.component';
 import { ReviewFormComponent } from '../../reviews/review-form/review-form.component';
 import { ReviewListComponent } from '../../reviews/review-list/review-list.component';
@@ -32,7 +43,7 @@ import { ProductQuestionListComponent } from '../../questions/product-question-l
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule,
-    RatingSummaryComponent, ReviewFormComponent, ReviewListComponent, ProductQuestionListComponent
+    RatingSummaryComponent, ReviewFormComponent, ReviewListComponent, ProductQuestionListComponent, RecommendationCarouselComponent
   ],
   template: `
     <a mat-button routerLink="/products" class="back-link"><mat-icon>arrow_back</mat-icon>Sản phẩm</a>
@@ -118,6 +129,20 @@ import { ProductQuestionListComponent } from '../../questions/product-question-l
         </div>
       </article>
 
+      <app-recommendation-carousel
+        title="Sản phẩm tương tự"
+        [placement]="recommendationPlacement.ProductDetailSimilar"
+        [productId]="productId"
+        [limit]="8">
+      </app-recommendation-carousel>
+
+      <app-recommendation-carousel
+        title="Khách hàng cũng thường xem"
+        [placement]="recommendationPlacement.ProductDetailCoViewed"
+        [productId]="productId"
+        [limit]="8">
+      </app-recommendation-carousel>
+
       <section class="reviews surface-card">
         <h2>Đánh giá & Nhận xét</h2>
         @if (summaryLoading) {
@@ -194,7 +219,12 @@ import { ProductQuestionListComponent } from '../../questions/product-question-l
 })
 export class ProductDetailComponent implements OnInit, OnDestroy {
   readonly fallbackImage = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800';
+  readonly recommendationPlacement = RecommendationPlacement;
   private readonly destroy$ = new Subject<void>();
+  private readonly productChange$ = new Subject<void>();
+  private productViewAnalyticsContext: AnalyticsEventContext = {
+    source: AnalyticsEventSource.Direct
+  };
   productId = 0;
   product?: ProductResponse;
   variants: ProductVariant[] = [];
@@ -233,24 +263,42 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     private cartService: CartService,
     private notification: NotificationService,
     private analyticsService: AnalyticsService,
+    private recommendationAttributionService: RecommendationAttributionService,
     private recentlyViewedService: RecentlyViewedService,
     private wishlistService: WishlistService
   ) {}
 
   ngOnInit(): void {
-    this.productId = Number(this.route.snapshot.paramMap.get('id'));
-    if (this.productId) {
+    this.route.paramMap.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      const productId = Number(params.get('id'));
+      if (!productId || productId === this.productId) return;
+      this.productChange$.next();
+      this.productId = productId;
+      const recommendationContext =
+        this.recommendationAttributionService.consumeProductViewContext(productId);
+      if (recommendationContext) {
+        this.productViewAnalyticsContext = recommendationContext;
+      } else {
+        this.recommendationAttributionService.clear(productId);
+        this.productViewAnalyticsContext = {
+          productId,
+          source: AnalyticsEventSource.Direct
+        };
+      }
+      this.resetProductState();
       this.loadProduct();
       this.loadVariants();
       this.loadSummary();
       this.loadReviews();
       this.loadEligibility();
-      this.loadWishlistStatus(this.productId);
-      this.recordRecentlyViewed(this.productId);
-    }
+      this.loadWishlistStatus(productId);
+      this.recordRecentlyViewed(productId);
+    });
   }
 
   ngOnDestroy(): void {
+    this.productChange$.next();
+    this.productChange$.complete();
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -259,17 +307,18 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     this.productLoading = true;
     this.productError = '';
     this.productService.getProductById(this.productId).pipe(
-      takeUntil(this.destroy$), finalize(() => this.productLoading = false)
+      takeUntil(this.productChange$),
+      takeUntil(this.destroy$),
+      finalize(() => this.productLoading = false)
     ).subscribe({
       next: response => {
         this.product = response.data;
         if (this.product) {
           this.analyticsService.track(AnalyticsEventType.ProductView, {
-            productId: this.product.id,
             productName: this.product.name,
             categoryId: this.product.categoryId,
             categoryName: this.product.categoryName
-          });
+          }, this.productViewAnalyticsContext);
         }
       },
       error: () => this.productError = 'Không thể tải thông tin sản phẩm này.'
@@ -279,7 +328,9 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
   loadVariants(): void {
     this.variantsLoading = true;
     this.productService.getVariants(this.productId).pipe(
-      takeUntil(this.destroy$), finalize(() => this.variantsLoading = false)
+      takeUntil(this.productChange$),
+      takeUntil(this.destroy$),
+      finalize(() => this.variantsLoading = false)
     ).subscribe({
       next: response => {
         this.variants = (response.data || []).filter(v => v.active);
@@ -313,13 +364,15 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     }
     this.addingToCart = true;
     this.cartService.addToCart(this.selectedVariant.id, this.quantity).pipe(
+      takeUntil(this.productChange$),
       takeUntil(this.destroy$),
       finalize(() => this.addingToCart = false)
     ).subscribe({
       next: () => {
         this.analyticsService.track(AnalyticsEventType.AddToCart, {
-          productId: this.product?.id,
           productName: this.product?.name,
+        }, {
+          ...this.analyticsContext(),
           variantId: this.selectedVariant?.id,
           quantity: this.quantity
         });
@@ -344,9 +397,8 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
         this.wishlistBusy = false;
         if (!wasWishlisted) {
           this.analyticsService.track(AnalyticsEventType.AddToWishlist, {
-            productId: this.product?.id,
             productName: this.product?.name
-          });
+          }, this.analyticsContext());
         }
         this.notification.success(wasWishlisted ? 'Đã xóa khỏi yêu thích' : 'Đã thêm vào yêu thích');
       },
@@ -358,9 +410,15 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     };
 
     if (wasWishlisted) {
-      this.wishlistService.remove(this.product.id).subscribe(observer);
+      this.wishlistService.remove(this.product.id).pipe(
+        takeUntil(this.productChange$),
+        takeUntil(this.destroy$)
+      ).subscribe(observer);
     } else {
-      this.wishlistService.add(this.product.id).subscribe(observer);
+      this.wishlistService.add(this.product.id).pipe(
+        takeUntil(this.productChange$),
+        takeUntil(this.destroy$)
+      ).subscribe(observer);
     }
   }
 
@@ -368,7 +426,9 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     this.summaryLoading = true;
     this.summaryError = '';
     this.reviewService.getSummary(this.productId).pipe(
-      takeUntil(this.destroy$), finalize(() => this.summaryLoading = false)
+      takeUntil(this.productChange$),
+      takeUntil(this.destroy$),
+      finalize(() => this.summaryLoading = false)
     ).subscribe({
       next: response => this.summary = response.data,
       error: () => this.summaryError = 'Không thể tải tổng quan đánh giá.'
@@ -379,7 +439,9 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     this.reviewsLoading = true;
     this.reviewsError = '';
     this.reviewService.getReviews(this.productId, this.page, this.pageSize, this.rating, this.sort).pipe(
-      takeUntil(this.destroy$), finalize(() => this.reviewsLoading = false)
+      takeUntil(this.productChange$),
+      takeUntil(this.destroy$),
+      finalize(() => this.reviewsLoading = false)
     ).subscribe({
       next: response => {
         this.reviews = response.data.content;
@@ -396,7 +458,9 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     }
     this.eligibilityLoading = true;
     this.reviewService.getEligibility(this.productId).pipe(
-      takeUntil(this.destroy$), finalize(() => this.eligibilityLoading = false)
+      takeUntil(this.productChange$),
+      takeUntil(this.destroy$),
+      finalize(() => this.eligibilityLoading = false)
     ).subscribe({ next: response => this.eligibility = response.data, error: () => undefined });
   }
 
@@ -419,7 +483,9 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
       ? this.reviewService.update(this.editingReview.id, payload)
       : this.reviewService.create(this.productId, payload);
     request$.pipe(
-      takeUntil(this.destroy$), finalize(() => this.saving = false)
+      takeUntil(this.productChange$),
+      takeUntil(this.destroy$),
+      finalize(() => this.saving = false)
     ).subscribe({
       next: () => {
         this.editingReview = undefined;
@@ -433,15 +499,53 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
   }
 
   private loadWishlistStatus(productId: number): void {
-    this.wishlistService.status(productId).subscribe({
+    this.wishlistService.status(productId).pipe(
+      takeUntil(this.productChange$),
+      takeUntil(this.destroy$)
+    ).subscribe({
       next: (res) => this.wishlisted = !!res.data?.wishlisted,
       error: () => this.wishlisted = false
     });
   }
 
   private recordRecentlyViewed(productId: number): void {
-    this.recentlyViewedService.record(productId).subscribe({
+    this.recentlyViewedService.record(productId).pipe(
+      takeUntil(this.productChange$),
+      takeUntil(this.destroy$)
+    ).subscribe({
       error: () => {}
     });
+  }
+
+  private analyticsContext() {
+    return this.recommendationAttributionService.contextFor(this.productId) ?? {
+      productId: this.productId,
+      source: AnalyticsEventSource.Direct
+    };
+  }
+
+  private resetProductState(): void {
+    this.product = undefined;
+    this.variants = [];
+    this.selectedVariant = undefined;
+    this.selectedVariantId = undefined;
+    this.quantity = 1;
+    this.wishlisted = false;
+    this.wishlistBusy = false;
+    this.summary = undefined;
+    this.eligibility = undefined;
+    this.reviews = [];
+    this.editingReview = undefined;
+    this.productLoading = true;
+    this.variantsLoading = true;
+    this.summaryLoading = true;
+    this.eligibilityLoading = true;
+    this.reviewsLoading = true;
+    this.productError = '';
+    this.summaryError = '';
+    this.reviewsError = '';
+    this.saveError = '';
+    this.totalElements = 0;
+    this.page = 0;
   }
 }

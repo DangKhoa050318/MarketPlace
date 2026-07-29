@@ -1,9 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -12,6 +15,7 @@ import { CartService } from '../../core/services/cart.service';
 import { OrderService } from '../../core/services/order.service';
 import { AnalyticsEventType } from '../../core/models/analytics-event.model';
 import { AnalyticsService } from '../../core/services/analytics.service';
+import { PromotionService } from '../../core/services/promotion.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { Cart, CartItem } from '../../core/models/cart.model';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -22,10 +26,13 @@ import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.compo
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     RouterLink,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
+    MatFormFieldModule,
+    MatInputModule,
     MatProgressSpinnerModule,
     MatDialogModule,
     MatTooltipModule
@@ -113,15 +120,40 @@ import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.compo
 
             <div class="summary-body">
               <div class="summary-line">
-                <span>Total Items</span>
-                <strong>{{ cart.totalItems }} units</strong>
+                <span>Subtotal</span>
+                <strong>{{ cart.totalAmount | currency:'USD':'symbol':'1.2-2' }}</strong>
+              </div>
+
+              <!-- Coupon -->
+              <div class="coupon-block">
+                <div class="coupon-row" *ngIf="!appliedCode">
+                  <mat-form-field appearance="outline" class="coupon-field" subscriptSizing="dynamic">
+                    <mat-label>Coupon code</mat-label>
+                    <input matInput [(ngModel)]="couponInput" placeholder="e.g. SUMMER10"
+                           (keyup.enter)="applyCoupon()" />
+                  </mat-form-field>
+                  <button mat-stroked-button (click)="applyCoupon()" [disabled]="applyingCoupon || !couponInput">
+                    <mat-spinner *ngIf="applyingCoupon" diameter="16"></mat-spinner>
+                    <span *ngIf="!applyingCoupon">Apply</span>
+                  </button>
+                </div>
+                <div class="coupon-applied" *ngIf="appliedCode">
+                  <span><mat-icon class="ok">local_offer</mat-icon> {{ appliedCode }}</span>
+                  <button mat-button color="warn" (click)="removeCoupon()">Remove</button>
+                </div>
+                <div class="coupon-error" *ngIf="couponError"><mat-icon>error_outline</mat-icon> {{ couponError }}</div>
+              </div>
+
+              <div class="summary-line discount-line" *ngIf="appliedCode">
+                <span>Discount</span>
+                <strong class="discount-val">− {{ discountAmount | currency:'USD':'symbol':'1.2-2' }}</strong>
               </div>
 
               <div class="summary-divider"></div>
 
               <div class="summary-line total-line">
                 <span>Total Amount</span>
-                <strong class="total-price text-gradient-cyan">{{ cart.totalAmount | currency:'USD':'symbol':'1.2-2' }}</strong>
+                <strong class="total-price text-gradient-cyan">{{ payableTotal() | currency:'USD':'symbol':'1.2-2' }}</strong>
               </div>
 
               <!-- Checkout Action -->
@@ -412,6 +444,57 @@ import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.compo
       margin-top: 8px;
     }
 
+    .coupon-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .coupon-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .coupon-field {
+      flex: 1;
+    }
+
+    .coupon-applied {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 700;
+      color: #16a34a;
+      font-size: 0.9rem;
+    }
+
+    .coupon-applied .ok {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      vertical-align: middle;
+    }
+
+    .coupon-error {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #ef4444;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .coupon-error mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .discount-line .discount-val {
+      color: #16a34a;
+    }
+
     @media (max-width: 900px) {
       .cart-grid {
         grid-template-columns: 1fr;
@@ -427,14 +510,94 @@ export class CartComponent implements OnInit {
   loading = false;
   actionLoading = false;
 
+  couponInput = '';
+  appliedCode: string | null = null;
+  discountAmount = 0;
+  couponError: string | null = null;
+  applyingCoupon = false;
+
   constructor(
     private cartService: CartService,
     private orderService: OrderService,
+    private promotionService: PromotionService,
     private analyticsService: AnalyticsService,
     private notification: NotificationService,
     private dialog: MatDialog,
     private router: Router
   ) {}
+
+  payableTotal(): number {
+    const subtotal = this.cart?.totalAmount ?? 0;
+    return Math.max(0, subtotal - (this.appliedCode ? this.discountAmount : 0));
+  }
+
+  applyCoupon(): void {
+    const code = (this.couponInput || '').trim();
+    if (!code) return;
+    this.applyingCoupon = true;
+    this.couponError = null;
+    this.promotionService.preview(code).subscribe({
+      next: (res) => {
+        this.applyingCoupon = false;
+        const p = res.data;
+        if (p?.valid) {
+          this.appliedCode = p.code;
+          this.discountAmount = p.discountAmount;
+          this.couponError = null;
+        } else {
+          this.appliedCode = null;
+          this.discountAmount = 0;
+          this.couponError = this.reasonMessage(p?.reason);
+        }
+      },
+      error: (err) => {
+        this.applyingCoupon = false;
+        this.appliedCode = null;
+        this.discountAmount = 0;
+        this.couponError = err.error?.message || 'Could not validate coupon';
+      }
+    });
+  }
+
+  removeCoupon(): void {
+    this.appliedCode = null;
+    this.discountAmount = 0;
+    this.couponError = null;
+    this.couponInput = '';
+  }
+
+  /** F-306: after the cart changes, ask the backend to re-check the applied coupon and update totals. */
+  private revalidateCoupon(): void {
+    if (!this.appliedCode) return;
+    const code = this.appliedCode;
+    this.promotionService.preview(code).subscribe({
+      next: (res) => {
+        const p = res.data;
+        if (p?.valid) {
+          this.discountAmount = p.discountAmount;
+        } else {
+          this.appliedCode = null;
+          this.discountAmount = 0;
+          this.notification.error(`Coupon ${code} no longer applies: ${this.reasonMessage(p?.reason)}`);
+        }
+      },
+      error: () => { /* keep current state on transient error */ }
+    });
+  }
+
+  private reasonMessage(reason?: string): string {
+    switch (reason) {
+      case 'CODE_NOT_FOUND': return 'Coupon code not found';
+      case 'INACTIVE': return 'This coupon is no longer active';
+      case 'NOT_STARTED': return 'This coupon is not active yet';
+      case 'EXPIRED': return 'This coupon has expired';
+      case 'MIN_ORDER_NOT_MET': return 'Your cart does not meet the minimum order amount';
+      case 'NO_ELIGIBLE_ITEMS': return 'No items in your cart qualify for this coupon';
+      case 'USAGE_LIMIT_REACHED': return 'This coupon has reached its usage limit';
+      case 'PER_USER_LIMIT_REACHED': return 'You have already used this coupon';
+      default: return 'This coupon is not valid';
+    }
+  }
 
   ngOnInit(): void {
     this.loadCart();
@@ -464,6 +627,7 @@ export class CartComponent implements OnInit {
         this.actionLoading = false;
         if (res.success && res.data) {
           this.cart = res.data;
+          this.revalidateCoupon();
         }
       },
       error: (err) => {
@@ -480,6 +644,7 @@ export class CartComponent implements OnInit {
         this.actionLoading = false;
         this.notification.success(`Removed "${item.productName}" from cart`);
         this.loadCart();
+        this.revalidateCoupon();
       },
       error: () => {
         this.actionLoading = false;
@@ -503,6 +668,7 @@ export class CartComponent implements OnInit {
           next: () => {
             this.actionLoading = false;
             this.notification.success('Shopping cart cleared');
+            this.removeCoupon();
             this.loadCart();
           },
           error: () => {
@@ -530,7 +696,7 @@ export class CartComponent implements OnInit {
 
     const dialogRef = this.dialog.open(CheckoutDialogComponent, {
       width: '500px',
-      data: { cart: this.cart }
+      data: { cart: this.cart, couponCode: this.appliedCode, discountAmount: this.discountAmount }
     });
 
     dialogRef.afterClosed().subscribe((result) => {

@@ -18,6 +18,8 @@ export interface Order {
   userId: number;
   status: string;
   totalAmount: number;
+  discountAmount?: number;
+  couponCode?: string;
   shippingAddress: string;
   note?: string;
   items: OrderItem[];
@@ -27,6 +29,7 @@ export interface Order {
 export interface CreateOrderRequest {
   shippingAddress: string;
   note?: string;
+  couponCode?: string;
 }
 
 @Injectable({ providedIn: 'root' })

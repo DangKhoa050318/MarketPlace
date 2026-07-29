@@ -98,7 +98,9 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
             <mat-select [(ngModel)]="selectedRole" (selectionChange)="onFilterChange()">
               <mat-option value="ALL">All Roles</mat-option>
               <mat-option value="ADMIN">ADMIN</mat-option>
-              <mat-option value="USER">USER</mat-option>
+              <mat-option value="MANAGER">MANAGER</mat-option>
+              <mat-option value="STAFF">STAFF</mat-option>
+              <mat-option value="CUSTOMER">CUSTOMER</mat-option>
             </mat-select>
           </mat-form-field>
 
@@ -145,9 +147,11 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
             <!-- Email -->
             <ng-container matColumnDef="email">
               <th mat-header-cell *matHeaderCellDef> Email Address </th>
-              <td mat-cell *matCellDef="let user" class="email-cell">
-                <mat-icon class="email-icon">alternate_email</mat-icon>
-                <span>{{ user.email }}</span>
+              <td mat-cell *matCellDef="let user">
+                <div class="email-cell">
+                  <mat-icon class="email-icon">alternate_email</mat-icon>
+                  <span>{{ user.email }}</span>
+                </div>
               </td>
             </ng-container>
 
@@ -155,8 +159,10 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
             <ng-container matColumnDef="role">
               <th mat-header-cell *matHeaderCellDef> Access Level </th>
               <td mat-cell *matCellDef="let user">
-                <span class="role-badge" [class.badge-admin]="user.role === 'ADMIN'" [class.badge-user]="user.role === 'USER'">
-                  <mat-icon class="role-icon">{{ user.role === 'ADMIN' ? 'admin_panel_settings' : 'person' }}</mat-icon>
+                <span class="role-badge"
+                      [class.badge-admin]="user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'STAFF'"
+                      [class.badge-user]="user.role === 'CUSTOMER'">
+                  <mat-icon class="role-icon">{{ user.role === 'CUSTOMER' ? 'person' : 'admin_panel_settings' }}</mat-icon>
                   {{ user.role }}
                 </span>
               </td>
