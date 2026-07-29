@@ -349,3 +349,13 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
 - ⚠️ Visual smoke test desktop/mobile đã thực hiện với frontend local. Môi trường không
   có Docker nên chưa chạy backend/PostgreSQL thật và chưa đóng Playwright E2E
   `REQ-STP-T-506`.
+
+### Recommendation storefront E2E coverage — 2026-07-29
+
+- ✅ Bổ sung `REQ-STP-T-506` Playwright coverage cho product-detail recommendation carousel.
+- ✅ Test mock contract public API để kiểm tra render carousel, empty recommendation section bị ẩn,
+  impression tracking đủ request/placement/strategy/position và click attribution điều hướng sang product mới.
+- ✅ Thay đổi chỉ thêm E2E spec, không chạm component/storefront logic hoặc backend API nên giảm rủi ro conflict.
+- ✅ Verify: Angular production build **SUCCESS**; Playwright spec discovery **1/1 listed**.
+- ⚠️ Playwright browser execution chưa hoàn tất trên máy local vì Chrome headless crash khi launch
+  (`exitCode=3221225477`), không phải lỗi assertion của spec.
