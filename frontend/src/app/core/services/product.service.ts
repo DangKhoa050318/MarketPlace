@@ -12,7 +12,8 @@ import {
   CreateProductRequest,
   UpdateProductRequest,
   CreateProductVariantRequest,
-  UpdateProductVariantRequest
+  UpdateProductVariantRequest,
+  SuggestResult
 } from '../models/product.model';
 
 @Injectable({ providedIn: 'root' })
@@ -32,6 +33,12 @@ export class ProductService {
     }
 
     return this.http.get<ApiResponse<PageResponse<ProductResponse>>>(this.apiUrl, { params });
+  }
+
+  suggestProducts(query: string): Observable<ApiResponse<SuggestResult[]>> {
+    return this.http.get<ApiResponse<SuggestResult[]>>(`${this.apiUrl}/suggest`, {
+      params: new HttpParams().set('q', query)
+    });
   }
 
   browseProducts(query: ProductCatalogQuery): Observable<ApiResponse<PageResponse<StorefrontProduct>>> {

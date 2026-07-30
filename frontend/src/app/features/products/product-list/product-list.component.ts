@@ -9,21 +9,22 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { Subject, finalize, takeUntil } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, finalize, of, switchMap, takeUntil, tap } from 'rxjs';
 import {
   AnalyticsEventSource,
   AnalyticsEventType,
   RecommendationPlacement
 } from '../../../core/models/analytics-event.model';
 import { CategoryResponse } from '../../../core/models/category.model';
-import { ProductCatalogQuery, StorefrontProduct, StorefrontVariantItem } from '../../../core/models/product.model';
+import { ProductCatalogQuery, StorefrontProduct, StorefrontVariantItem, SuggestResult } from '../../../core/models/product.model';
 import { RecentlyViewedProductResponse } from '../../../core/models/recently-viewed.model';
-import { AnalyticsService } from '../../../core/services/analytics.service';
+import { ScrollRevealDirective } from '../../../shared/directives/scroll-reveal.directive';
 import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ProductService } from '../../../core/services/product.service';
+import { AnalyticsService } from '../../../core/services/analytics.service';
 import { RecentlyViewedService } from '../../../core/services/recently-viewed.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import {
@@ -35,11 +36,12 @@ import {
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatIconModule,
-    MatPaginatorModule, MatProgressSpinnerModule, MatSelectModule, RecommendationCarouselComponent
+    MatPaginatorModule, MatProgressSpinnerModule, MatSelectModule, RecommendationCarouselComponent,
+    ScrollRevealDirective
   ],
   template: `
     <!-- Hero Banner Carousel -->
-    <section class="carousel-hero">
+    <section class="carousel-hero" appScrollReveal>
       <div class="carousel-viewport" [style.transform]="'translateX(' + (-currentSlide * 100) + '%)'">
         @for (slide of heroSlides; track slide.id) {
           <div class="carousel-slide" [style.background]="slide.bgGradient">
@@ -83,7 +85,7 @@ import {
       </div>
     </section>
 
-    <app-recommendation-carousel
+    <app-recommendation-carousel appScrollReveal
       [title]="query.categoryId ? 'Bán chạy trong danh mục' : 'Sản phẩm bán chạy'"
       [placement]="query.categoryId
         ? recommendationPlacement.CategoryBestSellers
@@ -94,7 +96,7 @@ import {
 
     <!-- Recently Viewed Section -->
     @if (!loading && recentlyViewed.length > 0) {
-      <section class="recently-viewed-section">
+      <section class="recently-viewed-section" appScrollReveal>
         <div class="section-heading">
           <div>
             <span class="eyebrow">Lịch sử xem</span>
@@ -127,7 +129,7 @@ import {
       </section>
     }
 
-    <section class="catalog-shell" id="catalog-section">
+    <section class="catalog-shell" appScrollReveal id="catalog-section">
       <aside class="filters" [class.open]="filtersOpen">
         <div class="filter-heading">
           <div><span class="overline">Bộ lọc</span><h2>Tìm đúng sản phẩm</h2></div>
@@ -137,14 +139,58 @@ import {
         </div>
 
         <label class="field-label" for="catalog-search">Tìm kiếm</label>
-        <div class="search-box">
-          <mat-icon>search</mat-icon>
-          <input id="catalog-search" [(ngModel)]="draftSearch" (keyup.enter)="applyFilters()"
-                 placeholder="Tên hoặc mô tả sản phẩm">
-          @if (draftSearch) {
-            <button class="icon-button" (click)="draftSearch = ''; applyFilters()" aria-label="Xóa tìm kiếm">
-              <mat-icon>close</mat-icon>
-            </button>
+        <div class="search-wrap">
+          <div class="search-box" [class.focused]="searchFocused">
+            <mat-icon class="search-prefix">search</mat-icon>
+            <input id="catalog-search" [(ngModel)]="draftSearch"
+                   (keyup.enter)="commitInstantSearch()"
+                   (focus)="onSearchFocus()"
+                   (blur)="onSearchBlur()"
+                   (input)="onSearchInput()"
+                   autocomplete="off"
+                   placeholder="Tìm tên, mô tả hoặc phân loại…">
+            @if (draftSearch) {
+              <button class="icon-button" (click)="clearSearch()" aria-label="Xóa tìm kiếm">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </div>
+
+          <!-- Autocomplete / Recent Searches Dropdown -->
+          @if ((suggestions.length > 0 || recentSearches.length > 0) && searchFocused) {
+            <div class="search-dropdown" (mousedown)="$event.preventDefault()">
+              @if (suggestions.length > 0) {
+                <div class="dropdown-section">
+                  <span class="dropdown-label">Gợi ý sản phẩm</span>
+                  @for (s of suggestions; track s.id) {
+                    <button type="button" class="dropdown-item" (click)="selectSuggestion(s.name)"
+                            [routerLink]="['/products', s.id]">
+                      <img [src]="s.imageUrl || fallbackImage" (error)="useFallback($event)"
+                           class="suggest-thumb" alt="">
+                      <div class="suggest-info">
+                        <span class="suggest-name" [innerHTML]="highlightMatch(s.name, draftSearch)"></span>
+                        <span class="suggest-price">{{ s.minPrice | currency:'USD':'symbol':'1.0-0' }}</span>
+                      </div>
+                    </button>
+                  }
+                </div>
+              }
+              @if (suggestions.length === 0 && recentSearches.length > 0) {
+                <div class="dropdown-section">
+                  <span class="dropdown-label">Tìm gần đây</span>
+                  @for (s of recentSearches; track s) {
+                    <button type="button" class="dropdown-item" (click)="selectSuggestion(s)">
+                      <mat-icon>schedule</mat-icon>
+                      <span>{{ s }}</span>
+                    </button>
+                  }
+                  <button type="button" class="dropdown-item clear-recent" (click)="clearRecentSearches()">
+                    <mat-icon>delete_sweep</mat-icon>
+                    <span>Xóa lịch sử</span>
+                  </button>
+                </div>
+              }
+            </div>
           }
         </div>
 
@@ -192,6 +238,44 @@ import {
           </label>
         </div>
 
+        <!-- Active Filter Chips -->
+        @if (hasActiveFilters) {
+          <div class="filter-chips">
+            @if (appliedSearch) {
+              <span class="chip">
+                <mat-icon>search</mat-icon> “{{ appliedSearch }}”
+                <button class="chip-remove" (click)="removeFilter('search')"><mat-icon>close</mat-icon></button>
+              </span>
+            }
+            @if (categoryId) {
+              <span class="chip">
+                <mat-icon>category</mat-icon> {{ getCategoryName(categoryId) }}
+                <button class="chip-remove" (click)="removeFilter('category')"><mat-icon>close</mat-icon></button>
+              </span>
+            }
+            @if (minPrice !== undefined || maxPrice !== undefined) {
+              <span class="chip">
+                <mat-icon>attach_money</mat-icon>
+                @if (minPrice !== undefined && maxPrice !== undefined) {
+                  \${{ minPrice }} – \${{ maxPrice }}
+                } @else if (minPrice !== undefined) {
+                  ≥ \${{ minPrice }}
+                } @else {
+                  ≤ \${{ maxPrice }}
+                }
+                <button class="chip-remove" (click)="removeFilter('price')"><mat-icon>close</mat-icon></button>
+              </span>
+            }
+            @if (inStock) {
+              <span class="chip">
+                <mat-icon>inventory_2</mat-icon> Còn hàng
+                <button class="chip-remove" (click)="removeFilter('inStock')"><mat-icon>close</mat-icon></button>
+              </span>
+            }
+            <button class="chip-clear-all" (click)="resetFilters()">Xóa tất cả</button>
+          </div>
+        }
+
         @if (loading) {
           <div class="state"><mat-spinner diameter="42"></mat-spinner><p>Đang chuẩn bị bộ sưu tập…</p></div>
         } @else if (errorMessage) {
@@ -236,7 +320,8 @@ import {
                     </span>
                   </div>
                   
-                  <a class="product-name" [routerLink]="['/products', product.id]" [title]="product.name">{{ product.name }}</a>
+                  <a class="product-name" [routerLink]="['/products', product.id]" [title]="product.name"
+                     [innerHTML]="highlightMatch(product.name, appliedSearch)"></a>
                   
                   <!-- Interactive Variant Selection Buttons like Detail Page -->
                   <div class="card-variant-section">
@@ -464,6 +549,66 @@ import {
     .state { min-height:420px; border:1px dashed #ccd4d0; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#687572; }
     .state>mat-icon { font-size:48px; width:48px; height:48px; color:#9aa6a2; }.state h2 { color:#26332f; margin:12px 0 0; }
     mat-paginator { margin-top:22px; border:1px solid #e4e7e5; border-radius:12px; }.mobile-only { display:none; }.backdrop { display:none; }
+
+    /* Enhanced Search */
+    .search-wrap { position: relative; }
+    .search-box {
+      display: flex; align-items: center; border: 2px solid #d9dfdc; border-radius: 12px;
+      padding: 0 8px; transition: all 0.2s ease; background: #fff;
+    }
+    .search-box.focused { border-color: #b78a34; box-shadow: 0 0 0 3px rgba(183, 138, 52, 0.12); }
+    .search-box input { border:0; outline:0; padding:0 7px; min-width:0; flex:1; height: 40px; }
+    .search-prefix { color:#7a8784; font-size:20px; width:20px; height:20px; }
+
+    .search-dropdown {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 100;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.12); overflow: hidden; max-height: 360px; overflow-y: auto;
+    }
+    .dropdown-section { padding: 6px 0; }
+    .dropdown-section + .dropdown-section { border-top: 1px solid #f1f5f9; }
+    .dropdown-label { display:block; padding: 6px 14px 4px; font-size:0.72rem; font-weight:700; color:#94a3b8; letter-spacing:0.05em; text-transform:uppercase; }
+    .dropdown-item {
+      display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 14px; text-decoration: none;
+      border: 0; background: transparent; cursor: pointer; font: inherit; font-size: 0.88rem;
+      color: #334155; text-align: left; transition: background 0.12s ease;
+    }
+    .dropdown-item:hover { background: #f8fafc; }
+    .dropdown-item mat-icon { font-size: 18px; width: 18px; height: 18px; color: #94a3b8; }
+    .dropdown-item .highlight { background: #fef3c7; color: #b45309; font-weight: 700; border-radius: 2px; padding: 0 1px; }
+    .suggest-thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; background: #f1f5f9; flex-shrink: 0; }
+    .suggest-info { display: flex; flex-direction: column; min-width: 0; }
+    .suggest-name { font-weight: 650; font-size: 0.85rem; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .suggest-price { font-size: 0.78rem; font-weight: 800; color: #173d38; }
+    .clear-recent { color: #94a3b8; font-size: 0.82rem; }
+    .clear-recent:hover { color: #ef4444; }
+
+    /* Filter Chips */
+    .filter-chips {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px;
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 20px;
+      padding: 4px 8px 4px 11px; font-size: 0.8rem; font-weight: 650; color: #334155;
+    }
+    .chip mat-icon { font-size: 15px; width: 15px; height: 15px; color: #64748b; }
+    .chip-remove {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border: 0; background: transparent; cursor: pointer;
+      color: #94a3b8; border-radius: 50%; padding: 0;
+    }
+    .chip-remove:hover { background: #e2e8f0; color: #334155; }
+    .chip-remove mat-icon { font-size: 14px; width: 14px; height: 14px; }
+    .chip-clear-all {
+      border: 0; background: transparent; cursor: pointer; font: inherit;
+      font-size: 0.78rem; font-weight: 650; color: #94a3b8; padding: 4px 8px;
+    }
+    .chip-clear-all:hover { color: #ef4444; }
+
+    /* Highlight in grid */
+    .product-name .highlight { background: #fef3c7; color: #b45309; font-weight: 800; border-radius: 2px; padding: 0 2px; }
+
     @media(max-width:1050px) { .product-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @media(max-width:760px) {
       .hero { padding:28px 23px; border-radius:18px; }.hero-stat { display:none; }.catalog-shell { grid-template-columns:1fr; }
@@ -479,7 +624,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
   readonly fallbackImage = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800';
   readonly recommendationPlacement = RecommendationPlacement;
   private readonly destroy$ = new Subject<void>();
-  
+
   heroSlides = [
     {
       id: 1,
@@ -538,6 +683,16 @@ export class ProductListComponent implements OnInit, OnDestroy {
   sortValue = 'createdAt,DESC';
   query: ProductCatalogQuery = { page: 0, size: 12, sortBy: 'createdAt', sortDir: 'DESC' };
 
+  // Enhanced search properties
+  searchFocused = false;
+  suggestions: SuggestResult[] = [];
+  recentSearches: string[] = [];
+  private searchSubject = new Subject<string>();
+
+  get hasActiveFilters(): boolean {
+    return !!(this.appliedSearch || this.categoryId || this.minPrice !== undefined || this.maxPrice !== undefined || this.inStock);
+  }
+
   constructor(
     private productService: ProductService,
     private categoryService: CategoryService,
@@ -549,7 +704,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
     private notification: NotificationService,
     private route: ActivatedRoute,
     private router: Router
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
@@ -567,6 +722,25 @@ export class ProductListComponent implements OnInit, OnDestroy {
       next: response => this.categories = response.data || [],
       error: () => this.notification.error('Không thể tải danh mục')
     });
+
+    // Debounced instant search with switchMap for autocomplete
+    this.searchSubject.pipe(
+      debounceTime(350),
+      distinctUntilChanged(),
+      switchMap(query => {
+        if (query.length >= 2) {
+          return this.productService.suggestProducts(query).pipe(
+            tap(res => this.suggestions = res?.data || [])
+          );
+        }
+        this.suggestions = [];
+        return [];
+      }),
+      takeUntil(this.destroy$)
+    ).subscribe();
+
+    // Load recent searches from localStorage
+    this.loadRecentSearches();
 
     this.loadProducts();
     this.loadRecentlyViewed();
@@ -660,9 +834,11 @@ export class ProductListComponent implements OnInit, OnDestroy {
   loadProducts(): void {
     this.loading = true;
     this.errorMessage = '';
-    this.query = { ...this.query, q: this.appliedSearch || undefined, categoryId: this.categoryId,
-      minPrice: this.minPrice, maxPrice: this.maxPrice, inStock: this.inStock };
-    
+    this.query = {
+      ...this.query, q: this.appliedSearch || undefined, categoryId: this.categoryId,
+      minPrice: this.minPrice, maxPrice: this.maxPrice, inStock: this.inStock
+    };
+
     this.productService.browseProducts(this.query).pipe(
       takeUntil(this.destroy$), finalize(() => this.loading = false)
     ).subscribe({
@@ -704,6 +880,11 @@ export class ProductListComponent implements OnInit, OnDestroy {
     this.draftSearch = ''; this.appliedSearch = ''; this.categoryId = undefined;
     this.minPrice = undefined; this.maxPrice = undefined; this.inStock = false; this.priceError = '';
     this.query.page = 0; this.filtersOpen = false; this.syncUrl(); this.loadProducts();
+  }
+
+  getCategoryName(id: number | undefined): string {
+    const cat = this.categories?.find(c => c.id === id);
+    return cat ? cat.name : '';
   }
 
   changeSort(): void { this.setSort(); this.query.page = 0; this.syncUrl(); this.loadProducts(); }
@@ -819,11 +1000,13 @@ export class ProductListComponent implements OnInit, OnDestroy {
   }
 
   private syncUrl(): void {
-    this.router.navigate([], { relativeTo: this.route, replaceUrl: true, queryParams: {
-      q: this.appliedSearch || null, category: this.categoryId ?? null, minPrice: this.minPrice ?? null,
-      maxPrice: this.maxPrice ?? null, inStock: this.inStock || null, sort: this.sortValue,
-      page: this.query.page || null
-    }});
+    this.router.navigate([], {
+      relativeTo: this.route, replaceUrl: true, queryParams: {
+        q: this.appliedSearch || null, category: this.categoryId ?? null, minPrice: this.minPrice ?? null,
+        maxPrice: this.maxPrice ?? null, inStock: this.inStock || null, sort: this.sortValue,
+        page: this.query.page || null
+      }
+    });
   }
 
   private numberParam(value: string | null): number | undefined {
@@ -854,5 +1037,107 @@ export class ProductListComponent implements OnInit, OnDestroy {
       next: (res) => this.recentlyViewed = res.success && res.data ? res.data : [],
       error: () => this.recentlyViewed = []
     });
+  }
+
+  // ───────── Enhanced Search Methods ─────────
+
+  /** Highlight matching keyword in text for display */
+  highlightMatch(text: string, query: string): string {
+    if (!query || !text) return text || '';
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escaped})`, 'gi');
+    return text.replace(regex, '<span class="highlight">$1</span>');
+  }
+
+  onSearchFocus(): void {
+    this.searchFocused = true;
+    if (!this.draftSearch) {
+      this.suggestions = [];
+      this.loadRecentSearches();
+    }
+  }
+
+  onSearchBlur(): void {
+    // Delay hiding so clicks on dropdown register first
+    setTimeout(() => this.searchFocused = false, 200);
+  }
+
+  onSearchInput(): void {
+    this.searchSubject.next(this.draftSearch);
+    // If search is cleared, trigger instant refresh
+    if (!this.draftSearch && this.appliedSearch) {
+      this.commitInstantSearch();
+    }
+  }
+
+  /** Commits the current draft as an applied search (instant). */
+  commitInstantSearch(): void {
+    if (this.draftSearch.trim() !== this.appliedSearch) {
+      this.saveRecentSearch(this.draftSearch.trim());
+      this.applyFilters();
+    }
+  }
+
+  selectSuggestion(suggestion: string): void {
+    this.draftSearch = suggestion;
+    this.searchFocused = false;
+    this.commitInstantSearch();
+  }
+
+  clearSearch(): void {
+    this.draftSearch = '';
+    this.suggestions = [];
+    if (this.appliedSearch) {
+      this.applyFilters();
+    }
+    // Focus back to input
+    const input = document.getElementById('catalog-search');
+    input?.focus();
+  }
+
+  removeFilter(type: 'search' | 'category' | 'price' | 'inStock'): void {
+    switch (type) {
+      case 'search': this.draftSearch = ''; this.appliedSearch = ''; break;
+      case 'category': this.categoryId = undefined; break;
+      case 'price': this.minPrice = undefined; this.maxPrice = undefined; break;
+      case 'inStock': this.inStock = false; break;
+    }
+    this.query.page = 0;
+    this.syncUrl();
+    this.loadProducts();
+  }
+
+  // ───────── Recent Searches (localStorage) ─────────
+
+  private readonly RECENT_SEARCHES_KEY = 'marketplace_recent_searches';
+  private readonly MAX_RECENT = 5;
+
+  private loadRecentSearches(): void {
+    try {
+      const stored = localStorage.getItem(this.RECENT_SEARCHES_KEY);
+      this.recentSearches = stored ? JSON.parse(stored) : [];
+    } catch {
+      this.recentSearches = [];
+    }
+  }
+
+  private saveRecentSearch(query: string): void {
+    if (!query) return;
+    this.loadRecentSearches();
+    this.recentSearches = this.recentSearches.filter(s => s !== query);
+    this.recentSearches.unshift(query);
+    if (this.recentSearches.length > this.MAX_RECENT) {
+      this.recentSearches = this.recentSearches.slice(0, this.MAX_RECENT);
+    }
+    try {
+      localStorage.setItem(this.RECENT_SEARCHES_KEY, JSON.stringify(this.recentSearches));
+    } catch { /* ignore quota errors */ }
+  }
+
+  clearRecentSearches(): void {
+    this.recentSearches = [];
+    try {
+      localStorage.removeItem(this.RECENT_SEARCHES_KEY);
+    } catch { /* ignore */ }
   }
 }

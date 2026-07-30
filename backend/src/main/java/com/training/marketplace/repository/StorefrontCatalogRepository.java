@@ -2,6 +2,7 @@ package com.training.marketplace.repository;
 
 import com.training.marketplace.dto.request.ProductCatalogFilter;
 import com.training.marketplace.dto.response.StorefrontProductResponse;
+import com.training.marketplace.dto.response.SuggestResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -67,7 +69,7 @@ public class StorefrontCatalogRepository {
 
         if (!content.isEmpty()) {
             List<Long> productIds = content.stream().map(StorefrontProductResponse::id).toList();
-            String inSql = String.join(",", java.util.Collections.nCopies(productIds.size(), "?"));
+            String inSql = productIds.stream().map(id -> "?").collect(Collectors.joining(","));
             String variantSelect = String.format("""
                 SELECT id, product_id,
                        COALESCE(NULLIF(TRIM(CONCAT(color, ' ', size)), ''), variant_name) AS variant_name,
@@ -104,15 +106,59 @@ public class StorefrontCatalogRepository {
         return new PageImpl<>(content, pageable, total == null ? 0 : total);
     }
 
+    /** Returns up to {@code limit} product suggestions with id, name, image and price. */
+    public List<SuggestResult> suggest(String query, int limit) {
+        String like = "%" + query.trim().toLowerCase() + "%";
+        String prefix = query.trim().toLowerCase() + "%";
+        String sql = """
+                SELECT p.id, p.name,
+                       COALESCE((SELECT v.image_url FROM product_variants v
+                                  WHERE v.product_id = p.id AND v.active = TRUE
+                                  ORDER BY v.price ASC LIMIT 1), '') AS image_url,
+                       (SELECT MIN(v2.price) FROM product_variants v2
+                         WHERE v2.product_id = p.id AND v2.active = TRUE) AS min_price
+                  FROM products p
+                 WHERE p.active = TRUE
+                   AND (LOWER(p.name) LIKE LOWER(?)
+                    OR LOWER(p.slug) LIKE LOWER(?)
+                    OR EXISTS (SELECT 1 FROM product_variants v3
+                                WHERE v3.product_id = p.id AND v3.active = TRUE
+                                  AND LOWER(COALESCE(NULLIF(TRIM(CONCAT(v3.color, ' ', v3.size)), ''), v3.variant_name)) LIKE LOWER(?)))
+                 ORDER BY
+                   CASE WHEN LOWER(p.name) = LOWER(?) THEN 0
+                        WHEN LOWER(p.name) LIKE LOWER(?) THEN 1
+                        ELSE 2
+                   END,
+                   p.name
+                 LIMIT ?
+                """;
+        return jdbcTemplate.query(sql,
+                (rs, rn) -> new SuggestResult(
+                        rs.getLong("id"),
+                        rs.getString("name"),
+                        rs.getString("image_url"),
+                        rs.getBigDecimal("min_price")
+                ),
+                like, like, like, query.trim().toLowerCase(), prefix, limit);
+    }
+
     private String buildWhere(ProductCatalogFilter filter, List<Object> params) {
         var clauses = new ArrayList<String>();
         clauses.add("p.active = TRUE");
         if (filter.query() != null && !filter.query().isBlank()) {
-            clauses.add("(LOWER(p.name) LIKE ? OR LOWER(p.description) LIKE ? OR LOWER(p.slug) LIKE ?)");
-            String query = "%" + filter.query().trim().toLowerCase() + "%";
-            params.add(query);
-            params.add(query);
-            params.add(query);
+            clauses.add("""
+                    (LOWER(p.name) LIKE LOWER(?)
+                     OR LOWER(p.description) LIKE LOWER(?)
+                     OR LOWER(p.slug) LIKE LOWER(?)
+                     OR EXISTS (SELECT 1 FROM product_variants v2
+                                 WHERE v2.product_id = p.id AND v2.active = TRUE
+                                   AND LOWER(COALESCE(NULLIF(TRIM(CONCAT(v2.color, ' ', v2.size)), ''), v2.variant_name)) LIKE LOWER(?)))
+                    """);
+            String like = "%" + filter.query().trim().toLowerCase() + "%";
+            params.add(like);
+            params.add(like);
+            params.add(like);
+            params.add(like);
         }
         if (filter.categoryId() != null) {
             clauses.add("p.category_id = ?");

@@ -101,6 +101,13 @@ export interface UpdateProductRequest {
   active?: boolean;
 }
 
+export interface SuggestResult {
+  id: number;
+  name: string;
+  imageUrl: string;
+  minPrice: number;
+}
+
 export interface CreateProductVariantRequest {
   sku: string;
   variantName: string;

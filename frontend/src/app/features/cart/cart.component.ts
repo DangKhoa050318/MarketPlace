@@ -87,6 +87,10 @@ import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.compo
                 <!-- Details -->
                 <div class="item-details">
                   <h4 class="item-name">{{ item.productName }}</h4>
+                  <span class="item-variant" *ngIf="item.variantName">
+                    <mat-icon class="variant-icon">lens</mat-icon>
+                    {{ item.variantName }}
+                  </span>
                   <span class="item-unit-price">{{ item.unitPrice | currency:'USD':'symbol':'1.2-2' }}</span>
                 </div>
 
@@ -311,6 +315,28 @@ import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.compo
       font-size: 0.95rem;
       font-weight: 700;
       color: var(--text-main);
+    }
+
+    .item-variant {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #6366f1;
+      background: rgba(99, 102, 241, 0.1);
+      padding: 1px 10px 1px 6px;
+      border-radius: 20px;
+      width: fit-content;
+      margin: 2px 0 4px 0;
+    }
+
+    .variant-icon {
+      font-size: 8px;
+      width: 8px;
+      height: 8px;
+      line-height: 8px;
+      color: #6366f1;
     }
 
     .item-unit-price {

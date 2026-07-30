@@ -337,7 +337,7 @@ import { AuthService } from '../../core/services/auth.service';
   `]
 })
 export class AdminLayoutComponent {
-  constructor(public authService: AuthService) {}
+  constructor(public authService: AuthService) { }
 
   hasRole(roles: string[]): boolean {
     const role = this.authService.getRole() || '';
