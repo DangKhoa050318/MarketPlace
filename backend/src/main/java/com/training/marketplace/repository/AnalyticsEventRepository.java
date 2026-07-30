@@ -83,6 +83,55 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
             """, nativeQuery = true)
     int anonymizeExpiredRawEvents(@Param("cutoff") Instant cutoff);
 
+    @Modifying
+    @Query(value = """
+            INSERT INTO analytics_daily_aggregates (
+                aggregate_date,
+                event_type,
+                product_id,
+                category_id,
+                campaign,
+                device_type,
+                event_count,
+                updated_at
+            )
+            SELECT CAST(ae.occurred_at AS date),
+                   ae.event_type,
+                   ae.product_id,
+                   p.category_id,
+                   NULLIF(ae.properties ->> 'campaign', ''),
+                   NULLIF(ae.properties ->> 'deviceType', ''),
+                   COUNT(*),
+                   NOW()
+              FROM analytics_events ae
+              LEFT JOIN products p ON p.id = ae.product_id
+             WHERE ae.occurred_at < :cutoff
+             GROUP BY CAST(ae.occurred_at AS date),
+                      ae.event_type,
+                      ae.product_id,
+                      p.category_id,
+                      NULLIF(ae.properties ->> 'campaign', ''),
+                      NULLIF(ae.properties ->> 'deviceType', '')
+            ON CONFLICT (
+                aggregate_date,
+                event_type,
+                (COALESCE(product_id, -1)),
+                (COALESCE(category_id, -1)),
+                (COALESCE(campaign, '')),
+                (COALESCE(device_type, ''))
+            )
+            DO UPDATE SET event_count = analytics_daily_aggregates.event_count + EXCLUDED.event_count,
+                          updated_at = NOW()
+            """, nativeQuery = true)
+    int aggregateExpiredRawEvents(@Param("cutoff") Instant cutoff);
+
+    @Modifying
+    @Query(value = """
+            DELETE FROM analytics_events
+             WHERE occurred_at < :cutoff
+            """, nativeQuery = true)
+    int deleteExpiredRawEvents(@Param("cutoff") Instant cutoff);
+
     @Query(value = """
             WITH filtered AS (
                 SELECT event_type,

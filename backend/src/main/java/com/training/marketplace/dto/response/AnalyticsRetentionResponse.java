@@ -4,6 +4,8 @@ import java.time.Instant;
 
 public record AnalyticsRetentionResponse(
         Instant cutoff,
-        int eventsAnonymized
+        int eventsAnonymized,
+        int aggregateRowsUpdated,
+        int rawEventsDeleted
 ) {
 }

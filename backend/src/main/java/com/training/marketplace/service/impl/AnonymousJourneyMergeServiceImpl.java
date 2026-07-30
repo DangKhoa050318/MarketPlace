@@ -3,6 +3,7 @@ package com.training.marketplace.service.impl;
 import com.training.marketplace.dto.response.JourneyMergeResponse;
 import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.repository.AnalyticsEventRepository;
+import com.training.marketplace.repository.AnonymousWishlistItemRepository;
 import com.training.marketplace.repository.RecentlyViewedProductRepository;
 import com.training.marketplace.service.AnonymousJourneyMergeService;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AnonymousJourneyMergeServiceImpl implements AnonymousJourneyMergeService {
 
     private final RecentlyViewedProductRepository recentlyViewedProductRepository;
+    private final AnonymousWishlistItemRepository anonymousWishlistItemRepository;
     private final AnalyticsEventRepository analyticsEventRepository;
 
     @Override
@@ -27,9 +29,11 @@ public class AnonymousJourneyMergeServiceImpl implements AnonymousJourneyMergeSe
         }
 
         String normalizedSessionId = sessionId.trim();
+        int wishlistMerged = anonymousWishlistItemRepository.mergeSessionIntoUser(normalizedSessionId, userId);
+        anonymousWishlistItemRepository.deleteBySessionId(normalizedSessionId);
         int recentMerged = recentlyViewedProductRepository.mergeSessionIntoUser(normalizedSessionId, userId);
         recentlyViewedProductRepository.deleteBySessionId(normalizedSessionId);
         int eventsLinked = analyticsEventRepository.linkAnonymousSessionToUser(normalizedSessionId, userId);
-        return new JourneyMergeResponse(0, recentMerged, eventsLinked);
+        return new JourneyMergeResponse(wishlistMerged, recentMerged, eventsLinked);
     }
 }
