@@ -1,7 +1,9 @@
 package com.training.marketplace.service.impl;
 
+import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.request.AnalyticsDashboardFilter;
 import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
+import com.training.marketplace.dto.response.ProductPerformanceResponse;
 import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.repository.AnalyticsDashboardQueryRepository;
 import com.training.marketplace.service.AnalyticsDashboardService;
@@ -32,6 +34,18 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                 AnalyticsDashboardQueryRepository.rate(counts.orders(), counts.productViews()),
                 counts.returningCustomerRate(),
                 counts.lastUpdatedAt());
+    }
+
+    @Override
+    public PageResponse<ProductPerformanceResponse> productPerformance(
+            AnalyticsDashboardFilter filter, int page, int size) {
+        if (page < 0) {
+            throw new BadRequestException("Analytics page must not be negative");
+        }
+        if (size < 1 || size > 100) {
+            throw new BadRequestException("Analytics page size must be between 1 and 100");
+        }
+        return analyticsDashboardQueryRepository.productPerformance(normalize(filter), page, size);
     }
 
     private AnalyticsDashboardFilter normalize(AnalyticsDashboardFilter filter) {
