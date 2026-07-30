@@ -1,9 +1,12 @@
 package com.training.marketplace.controller;
 
 import com.training.marketplace.common.ApiResponse;
+import com.training.marketplace.dto.request.AnalyticsDashboardFilter;
 import com.training.marketplace.dto.request.AnalyticsRetentionRequest;
+import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.AnalyticsRetentionResponse;
 import com.training.marketplace.dto.response.FunnelSummaryResponse;
+import com.training.marketplace.service.AnalyticsDashboardService;
 import com.training.marketplace.service.AnalyticsEventService;
 import com.training.marketplace.service.FunnelAnalyticsService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,6 +33,21 @@ public class AdminAnalyticsController {
 
     private final FunnelAnalyticsService funnelAnalyticsService;
     private final AnalyticsEventService analyticsEventService;
+    private final AnalyticsDashboardService analyticsDashboardService;
+
+    @GetMapping("/overview")
+    @Operation(summary = "Get analytics KPI overview")
+    public ApiResponse<AnalyticsOverviewResponse> overview(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) String campaign,
+            @RequestParam(required = false) String placement,
+            @RequestParam(required = false) String deviceType) {
+        return ApiResponse.success(analyticsDashboardService.overview(
+                new AnalyticsDashboardFilter(from, to, categoryId, productId, campaign, placement, deviceType)));
+    }
 
     @GetMapping("/funnel")
     @Operation(summary = "Summarize storefront journey funnel")
