@@ -24,7 +24,7 @@ import { NotificationService } from '../../../core/services/notification.service
       <header>
         <span class="section-label">Welcome back</span>
         <h2>Sign in to your account</h2>
-        <p>Enter your credentials to continue to OrderFlow.</p>
+        <p>Enter your credentials to continue to MarketPlace.</p>
       </header>
 
       <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
@@ -82,7 +82,7 @@ import { NotificationService } from '../../../core/services/notification.service
         </button>
       </form>
 
-      <div class="divider"><span>New to OrderFlow?</span></div>
+      <div class="divider"><span>New to MarketPlace?</span></div>
       <p class="auth-switch">
         Create your account and start shopping.
         <a routerLink="/register">Create account <mat-icon>north_east</mat-icon></a>
