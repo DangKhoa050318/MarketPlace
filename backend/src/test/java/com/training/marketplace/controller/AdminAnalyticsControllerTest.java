@@ -170,7 +170,9 @@ class AdminAnalyticsControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new AnalyticsRetentionRequest(90))))
                 .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.data.eventsAnonymized").value(12));
+                .andExpect(jsonPath("$.data.eventsAnonymized").value(12))
+                .andExpect(jsonPath("$.data.aggregateRowsUpdated").value(3))
+                .andExpect(jsonPath("$.data.rawEventsDeleted").value(9));
 
         verify(analyticsEventService).anonymizeExpiredRawEvents(any());
     }

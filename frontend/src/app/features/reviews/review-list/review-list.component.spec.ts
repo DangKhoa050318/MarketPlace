@@ -1,5 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { AuthService } from '../../../core/services/auth.service';
+import { NotificationService } from '../../../core/services/notification.service';
+import { VoteService } from '../../../core/services/vote.service';
 import { ReviewListComponent } from './review-list.component';
 
 describe('ReviewListComponent', () => {
@@ -8,7 +11,24 @@ describe('ReviewListComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ReviewListComponent, NoopAnimationsModule]
+      imports: [ReviewListComponent, NoopAnimationsModule],
+      providers: [
+        {
+          provide: VoteService,
+          useValue: jasmine.createSpyObj<VoteService>('VoteService', ['toggleVote'])
+        },
+        {
+          provide: AuthService,
+          useValue: jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated'])
+        },
+        {
+          provide: NotificationService,
+          useValue: jasmine.createSpyObj<NotificationService>(
+            'NotificationService',
+            ['info', 'error']
+          )
+        }
+      ]
     }).compileComponents();
     fixture = TestBed.createComponent(ReviewListComponent);
     component = fixture.componentInstance;

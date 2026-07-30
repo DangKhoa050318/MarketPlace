@@ -235,12 +235,12 @@ Khách hàng chọn nhiều sản phẩm và xem bảng so sánh chuẩn hóa, c
 
 #### Testing
 
-- [ ] REQ-STP-T-501: Viết contract test cho schema sự kiện hợp lệ, thiếu trường, event type sai và event trùng.
-- [ ] REQ-STP-T-502: Viết unit test cho chiến lược similar products với danh mục, thuộc tính và khoảng giá.
-- [ ] REQ-STP-T-503: Viết unit test cho best sellers, co-view và co-purchase với dữ liệu rỗng/ít/nhiều.
-- [ ] REQ-STP-T-504: Viết test xác nhận kết quả loại sản phẩm ẩn, ngừng bán, nguồn và sản phẩm trùng.
+- [x] REQ-STP-T-501: Viết contract test cho schema sự kiện hợp lệ, thiếu trường, event type sai và event trùng.
+- [x] REQ-STP-T-502: Viết unit test cho chiến lược similar products với danh mục, thuộc tính và khoảng giá.
+- [x] REQ-STP-T-503: Viết unit test cho best sellers, co-view và co-purchase với dữ liệu rỗng/ít/nhiều.
+- [x] REQ-STP-T-504: Viết test xác nhận kết quả loại sản phẩm ẩn, ngừng bán, nguồn và sản phẩm trùng.
 - [x] REQ-STP-T-505: Viết Angular component test cho carousel, tracking, empty state và accessibility.
-- [ ] REQ-STP-T-506: Viết E2E test mở sản phẩm → thấy recommendation → click → add-to-cart và ghi nhận đúng chuỗi sự kiện.
+- [x] REQ-STP-T-506: Viết E2E test mở sản phẩm → thấy recommendation → click → add-to-cart và ghi nhận đúng chuỗi sự kiện.
 
 #### Assignment
 

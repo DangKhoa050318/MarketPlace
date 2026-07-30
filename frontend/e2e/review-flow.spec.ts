@@ -29,6 +29,34 @@ test('purchased customer creates and edits a review and sees refreshed product d
       variants: []
     })
   }));
+  await page.route('**/api/v1/products/1/variants', route => route.fulfill({
+    json: envelope([])
+  }));
+  await page.route('**/api/v1/products/1/questions**', route => route.fulfill({
+    json: envelope({ content: [], page: 0, size: 10, totalElements: 0, totalPages: 0, last: true })
+  }));
+  await page.route('**/api/v1/recommendations?*', route => {
+    const placement = new URL(route.request().url()).searchParams.get('placement');
+    return route.fulfill({
+      json: envelope({
+        requestId: '44444444-4444-4444-8444-444444444444',
+        placement,
+        strategy: placement === 'PRODUCT_DETAIL_SIMILAR' ? 'SIMILAR' : 'CO_VIEWED',
+        generatedAt: '2026-07-30T10:00:00Z',
+        items: []
+      })
+    });
+  });
+  await page.route('**/api/v1/wishlist/1/status', route => route.fulfill({
+    json: envelope({ productId: 1, wishlisted: false })
+  }));
+  await page.route('**/api/v1/recently-viewed', route => route.fulfill({
+    status: 201,
+    json: envelope({ productId: 1 })
+  }));
+  await page.route('**/api/v1/cart', route => route.fulfill({
+    json: envelope({ userId: 7, items: [], totalAmount: 0, totalItems: 0 })
+  }));
 
   await page.route('**/api/v1/products/1/reviews/summary', route => route.fulfill({
     json: envelope({
