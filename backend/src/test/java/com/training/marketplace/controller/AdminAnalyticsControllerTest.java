@@ -2,12 +2,14 @@ package com.training.marketplace.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.training.marketplace.dto.request.AnalyticsRetentionRequest;
+import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.AnalyticsRetentionResponse;
 import com.training.marketplace.dto.response.FunnelStepResponse;
 import com.training.marketplace.dto.response.FunnelSummaryResponse;
 import com.training.marketplace.security.JwtAuthenticationFilter;
 import com.training.marketplace.security.RateLimitingFilter;
 import com.training.marketplace.security.SecurityConfig;
+import com.training.marketplace.service.AnalyticsDashboardService;
 import com.training.marketplace.service.AnalyticsEventService;
 import com.training.marketplace.service.FunnelAnalyticsService;
 import jakarta.servlet.FilterChain;
@@ -22,6 +24,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -45,6 +48,7 @@ class AdminAnalyticsControllerTest {
 
     @MockBean private FunnelAnalyticsService funnelAnalyticsService;
     @MockBean private AnalyticsEventService analyticsEventService;
+    @MockBean private AnalyticsDashboardService analyticsDashboardService;
     @MockBean private JwtAuthenticationFilter jwtAuthenticationFilter;
     @MockBean private RateLimitingFilter rateLimitingFilter;
 
@@ -60,6 +64,34 @@ class AdminAnalyticsControllerTest {
             chain.doFilter(invocation.getArgument(0), invocation.getArgument(1));
             return null;
         }).when(rateLimitingFilter).doFilter(any(), any(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void overview_managerCanReadKpis() throws Exception {
+        when(analyticsDashboardService.overview(any()))
+                .thenReturn(new AnalyticsOverviewResponse(
+                        100,
+                        25,
+                        10,
+                        5,
+                        new BigDecimal("0.2500"),
+                        new BigDecimal("0.4000"),
+                        new BigDecimal("0.0500"),
+                        new BigDecimal("0.2000"),
+                        Instant.parse("2026-07-30T00:00:00Z")));
+
+        mockMvc.perform(get("/api/v1/admin/analytics/overview")
+                        .param("from", "2026-07-01T00:00:00Z")
+                        .param("to", "2026-08-01T00:00:00Z")
+                        .param("campaign", "summer")
+                        .param("placement", "HOME_BEST_SELLERS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.productViews").value(100))
+                .andExpect(jsonPath("$.data.addToCartRate").value(0.2500))
+                .andExpect(jsonPath("$.data.lastUpdatedAt").value("2026-07-30T00:00:00Z"));
+
+        verify(analyticsDashboardService).overview(any());
     }
 
     @Test
@@ -100,7 +132,7 @@ class AdminAnalyticsControllerTest {
     void anonymize_adminCanRunRetentionPolicy() throws Exception {
         Instant cutoff = Instant.parse("2026-05-01T00:00:00Z");
         when(analyticsEventService.anonymizeExpiredRawEvents(any()))
-                .thenReturn(new AnalyticsRetentionResponse(cutoff, 12));
+                .thenReturn(new AnalyticsRetentionResponse(cutoff, 12, 3, 9));
 
         mockMvc.perform(post("/api/v1/admin/analytics/retention/anonymize")
                         .contentType(MediaType.APPLICATION_JSON)
