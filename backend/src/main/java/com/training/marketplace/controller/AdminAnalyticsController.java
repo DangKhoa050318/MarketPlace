@@ -1,11 +1,13 @@
 package com.training.marketplace.controller;
 
 import com.training.marketplace.common.ApiResponse;
+import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.request.AnalyticsDashboardFilter;
 import com.training.marketplace.dto.request.AnalyticsRetentionRequest;
 import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.AnalyticsRetentionResponse;
 import com.training.marketplace.dto.response.FunnelSummaryResponse;
+import com.training.marketplace.dto.response.ProductPerformanceResponse;
 import com.training.marketplace.service.AnalyticsDashboardService;
 import com.training.marketplace.service.AnalyticsEventService;
 import com.training.marketplace.service.FunnelAnalyticsService;
@@ -47,6 +49,24 @@ public class AdminAnalyticsController {
             @RequestParam(required = false) String deviceType) {
         return ApiResponse.success(analyticsDashboardService.overview(
                 new AnalyticsDashboardFilter(from, to, categoryId, productId, campaign, placement, deviceType)));
+    }
+
+    @GetMapping("/products/performance")
+    @Operation(summary = "Get product analytics performance")
+    public ApiResponse<PageResponse<ProductPerformanceResponse>> productPerformance(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) String campaign,
+            @RequestParam(required = false) String placement,
+            @RequestParam(required = false) String deviceType,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.success(analyticsDashboardService.productPerformance(
+                new AnalyticsDashboardFilter(from, to, categoryId, productId, campaign, placement, deviceType),
+                page,
+                size));
     }
 
     @GetMapping("/funnel")

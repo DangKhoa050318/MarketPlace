@@ -1,11 +1,13 @@
 package com.training.marketplace.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.request.AnalyticsRetentionRequest;
 import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.AnalyticsRetentionResponse;
 import com.training.marketplace.dto.response.FunnelStepResponse;
 import com.training.marketplace.dto.response.FunnelSummaryResponse;
+import com.training.marketplace.dto.response.ProductPerformanceResponse;
 import com.training.marketplace.security.JwtAuthenticationFilter;
 import com.training.marketplace.security.RateLimitingFilter;
 import com.training.marketplace.security.SecurityConfig;
@@ -92,6 +94,36 @@ class AdminAnalyticsControllerTest {
                 .andExpect(jsonPath("$.data.lastUpdatedAt").value("2026-07-30T00:00:00Z"));
 
         verify(analyticsDashboardService).overview(any());
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void productPerformance_managerCanReadPagedMetrics() throws Exception {
+        when(analyticsDashboardService.productPerformance(any(), any(Integer.class), any(Integer.class)))
+                .thenReturn(new PageResponse<>(List.of(new ProductPerformanceResponse(
+                        7L,
+                        "Mechanical Keyboard",
+                        3L,
+                        120,
+                        18,
+                        30,
+                        9,
+                        new BigDecimal("4.50"),
+                        6,
+                        Instant.parse("2026-07-30T00:00:00Z"))), 0, 20, 1, 1, true));
+
+        mockMvc.perform(get("/api/v1/admin/analytics/products/performance")
+                        .param("from", "2026-07-01T00:00:00Z")
+                        .param("to", "2026-08-01T00:00:00Z")
+                        .param("categoryId", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].productId").value(7))
+                .andExpect(jsonPath("$.data.content[0].wishlists").value(18))
+                .andExpect(jsonPath("$.data.content[0].averageRating").value(4.50))
+                .andExpect(jsonPath("$.data.content[0].questionCount").value(6))
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+
+        verify(analyticsDashboardService).productPerformance(any(), any(Integer.class), any(Integer.class));
     }
 
     @Test
