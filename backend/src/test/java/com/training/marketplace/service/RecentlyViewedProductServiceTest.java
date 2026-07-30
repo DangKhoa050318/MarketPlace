@@ -83,6 +83,23 @@ class RecentlyViewedProductServiceTest {
                 .hasMessageContaining("X-Session-Id");
     }
 
+    @Test
+    void record_userProduct_updatesExistingUserViewAndTrimsUserOverflow() {
+        Product product = buildProduct(1L, "phone", "Phone");
+        RecentlyViewedProduct existing = buildView(11L, 7L, null, 1L, LocalDateTime.now().minusDays(1));
+
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(recentlyViewedRepository.findByUserIdAndProductId(7L, 1L)).thenReturn(Optional.of(existing));
+        when(recentlyViewedRepository.save(existing)).thenReturn(existing);
+        when(productMapper.toResponse(product)).thenReturn(buildProductResponse(product));
+
+        recentlyViewedService.record(7L, "ignored-session", 1L);
+
+        assertThat(existing.getViewedAt()).isAfter(LocalDateTime.now().minusMinutes(1));
+        verify(recentlyViewedRepository).deleteUserOverflow(7L, 20);
+        verify(recentlyViewedRepository, never()).deleteSessionOverflow(any(), eq(20));
+    }
+
     private Product buildProduct(Long id, String slug, String name) {
         Product product = Product.builder()
                 .slug(slug)

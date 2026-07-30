@@ -1,5 +1,6 @@
 package com.training.marketplace.service;
 
+import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.repository.AnalyticsEventRepository;
 import com.training.marketplace.repository.RecentlyViewedProductRepository;
 import com.training.marketplace.service.impl.AnonymousJourneyMergeServiceImpl;
@@ -10,7 +11,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,5 +34,16 @@ class AnonymousJourneyMergeServiceTest {
         assertThat(response.recentlyViewedItemsMerged()).isEqualTo(4);
         assertThat(response.analyticsEventsLinked()).isEqualTo(9);
         verify(recentlyViewedProductRepository).deleteBySessionId("session-1");
+    }
+    @Test
+    void merge_requiresAuthenticatedUserAndValidSession() {
+        assertThatThrownBy(() -> service.merge(null, "session-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Authenticated user");
+        assertThatThrownBy(() -> service.merge(7L, " "))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("session ID");
+
+        verifyNoInteractions(recentlyViewedProductRepository, analyticsEventRepository);
     }
 }
