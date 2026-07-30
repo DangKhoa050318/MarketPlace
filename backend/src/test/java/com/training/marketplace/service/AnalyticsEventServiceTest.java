@@ -215,12 +215,16 @@ class AnalyticsEventServiceTest {
     }
 
     @Test
-    void anonymizeExpiredRawEvents_usesConfiguredRetentionDays() {
+    void anonymizeExpiredRawEvents_aggregatesBeforeAnonymizingAndDeletingRawEvents() {
+        when(analyticsEventRepository.aggregateExpiredRawEvents(any())).thenReturn(2);
         when(analyticsEventRepository.anonymizeExpiredRawEvents(any())).thenReturn(3);
+        when(analyticsEventRepository.deleteExpiredRawEvents(any())).thenReturn(5);
 
         var response = analyticsEventService.anonymizeExpiredRawEvents(new AnalyticsRetentionRequest(30));
 
         assertThat(response.eventsAnonymized()).isEqualTo(3);
+        assertThat(response.aggregateRowsUpdated()).isEqualTo(2);
+        assertThat(response.rawEventsDeleted()).isEqualTo(5);
         assertThat(response.cutoff()).isNotNull();
     }
 }

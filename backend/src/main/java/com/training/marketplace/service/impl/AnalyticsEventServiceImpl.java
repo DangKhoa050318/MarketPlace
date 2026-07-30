@@ -123,8 +123,10 @@ public class AnalyticsEventServiceImpl implements AnalyticsEventService {
                 ? DEFAULT_RAW_RETENTION_DAYS
                 : request.rawRetentionDays();
         Instant cutoff = Instant.now().minus(Duration.ofDays(retentionDays));
+        int aggregateRowsUpdated = analyticsEventRepository.aggregateExpiredRawEvents(cutoff);
         int anonymized = analyticsEventRepository.anonymizeExpiredRawEvents(cutoff);
-        return new AnalyticsRetentionResponse(cutoff, anonymized);
+        int deleted = analyticsEventRepository.deleteExpiredRawEvents(cutoff);
+        return new AnalyticsRetentionResponse(cutoff, anonymized, aggregateRowsUpdated, deleted);
     }
 
     private AnalyticsEventResponse toResponse(
