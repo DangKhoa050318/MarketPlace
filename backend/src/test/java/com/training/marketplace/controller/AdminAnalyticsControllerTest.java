@@ -100,13 +100,15 @@ class AdminAnalyticsControllerTest {
     void anonymize_adminCanRunRetentionPolicy() throws Exception {
         Instant cutoff = Instant.parse("2026-05-01T00:00:00Z");
         when(analyticsEventService.anonymizeExpiredRawEvents(any()))
-                .thenReturn(new AnalyticsRetentionResponse(cutoff, 12));
+                .thenReturn(new AnalyticsRetentionResponse(cutoff, 12, 4, 12));
 
         mockMvc.perform(post("/api/v1/admin/analytics/retention/anonymize")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new AnalyticsRetentionRequest(90))))
                 .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.data.eventsAnonymized").value(12));
+                .andExpect(jsonPath("$.data.eventsAnonymized").value(12))
+                .andExpect(jsonPath("$.data.aggregateRowsUpdated").value(4))
+                .andExpect(jsonPath("$.data.rawEventsDeleted").value(12));
 
         verify(analyticsEventService).anonymizeExpiredRawEvents(any());
     }
