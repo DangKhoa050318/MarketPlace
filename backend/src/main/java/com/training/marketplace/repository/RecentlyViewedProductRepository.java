@@ -61,4 +61,17 @@ public interface RecentlyViewedProductRepository extends JpaRepository<RecentlyV
     void deleteByUserId(Long userId);
 
     void deleteBySessionId(String sessionId);
+
+    @Modifying
+    @Query(value = """
+            INSERT INTO recently_viewed_products (user_id, product_id, viewed_at, created_at, updated_at)
+            SELECT :userId, session_views.product_id, MAX(session_views.viewed_at), NOW(), NOW()
+              FROM recently_viewed_products session_views
+             WHERE session_views.session_id = :sessionId
+             GROUP BY session_views.product_id
+            ON CONFLICT (user_id, product_id) DO UPDATE
+                  SET viewed_at = GREATEST(recently_viewed_products.viewed_at, EXCLUDED.viewed_at),
+                      updated_at = NOW()
+            """, nativeQuery = true)
+    int mergeSessionIntoUser(@Param("sessionId") String sessionId, @Param("userId") Long userId);
 }

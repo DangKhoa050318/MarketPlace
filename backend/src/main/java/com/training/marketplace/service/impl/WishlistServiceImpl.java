@@ -1,5 +1,6 @@
 package com.training.marketplace.service.impl;
 
+import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.response.ProductResponse;
 import com.training.marketplace.dto.response.WishlistItemResponse;
 import com.training.marketplace.dto.response.WishlistStatusResponse;
@@ -11,6 +12,8 @@ import com.training.marketplace.repository.ProductRepository;
 import com.training.marketplace.repository.WishlistItemRepository;
 import com.training.marketplace.service.WishlistService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +35,20 @@ public class WishlistServiceImpl implements WishlistService {
                         .productId(productId)
                         .build()));
         return toResponse(item, product);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<WishlistItemResponse> list(Long userId, int page, int size) {
+        int boundedPage = Math.max(0, page);
+        int boundedSize = Math.max(1, Math.min(size, 50));
+        var pageable = PageRequest.of(
+                boundedPage,
+                boundedSize,
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")));
+        return PageResponse.from(
+                wishlistItemRepository.findByUserIdOrderByCreatedAtDescIdDesc(userId, pageable),
+                item -> toResponse(item, findActiveProduct(item.getProductId())));
     }
 
     @Override
