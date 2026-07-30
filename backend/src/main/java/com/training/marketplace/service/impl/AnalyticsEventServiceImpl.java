@@ -1,9 +1,14 @@
 package com.training.marketplace.service.impl;
 
 import com.training.marketplace.analytics.AnalyticsIngestionStatus;
+import com.training.marketplace.dto.request.AnalyticsRetentionRequest;
+import com.training.marketplace.dto.request.TrackAnalyticsEventBatchRequest;
 import com.training.marketplace.dto.request.TrackAnalyticsEventRequest;
+import com.training.marketplace.dto.response.AnalyticsBatchIngestionResponse;
 import com.training.marketplace.dto.response.AnalyticsEventResponse;
+import com.training.marketplace.dto.response.AnalyticsRetentionResponse;
 import com.training.marketplace.entity.AnalyticsEvent;
+import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.repository.AnalyticsEventIngestionRepository;
 import com.training.marketplace.repository.AnalyticsEventRepository;
 import com.training.marketplace.service.AnalyticsEventService;
@@ -13,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -23,6 +29,9 @@ import java.util.UUID;
 @Slf4j
 @RequiredArgsConstructor
 public class AnalyticsEventServiceImpl implements AnalyticsEventService {
+
+    static final int MAX_BATCH_SIZE = 50;
+    static final int DEFAULT_RAW_RETENTION_DAYS = 90;
 
     private final AnalyticsEventRepository analyticsEventRepository;
     private final AnalyticsEventIngestionRepository analyticsEventIngestionRepository;
@@ -83,6 +92,39 @@ public class AnalyticsEventServiceImpl implements AnalyticsEventService {
                 request.placement(), request.recommendationRequestId(), request.strategy(),
                 request.position(), eventInstant, receivedAt);
         return response;
+    }
+
+    @Override
+    @Transactional
+    public AnalyticsBatchIngestionResponse trackBatch(
+            Long userId,
+            String sessionId,
+            TrackAnalyticsEventBatchRequest request) {
+        if (request.events().size() > MAX_BATCH_SIZE) {
+            throw new BadRequestException("Analytics batch size must not exceed " + MAX_BATCH_SIZE);
+        }
+        var responses = request.events().stream()
+                .map(event -> track(userId, sessionId, event))
+                .toList();
+        int duplicates = (int) responses.stream()
+                .filter(response -> response.status() == AnalyticsIngestionStatus.DUPLICATE_IGNORED)
+                .count();
+        return new AnalyticsBatchIngestionResponse(
+                responses.size() - duplicates,
+                duplicates,
+                responses.size(),
+                responses);
+    }
+
+    @Override
+    @Transactional
+    public AnalyticsRetentionResponse anonymizeExpiredRawEvents(AnalyticsRetentionRequest request) {
+        int retentionDays = request.rawRetentionDays() == null
+                ? DEFAULT_RAW_RETENTION_DAYS
+                : request.rawRetentionDays();
+        Instant cutoff = Instant.now().minus(Duration.ofDays(retentionDays));
+        int anonymized = analyticsEventRepository.anonymizeExpiredRawEvents(cutoff);
+        return new AnalyticsRetentionResponse(cutoff, anonymized);
     }
 
     private AnalyticsEventResponse toResponse(

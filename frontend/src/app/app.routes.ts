@@ -23,6 +23,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/cart/cart.component').then(m => m.CartComponent)
       },
       {
+        path: 'wishlist',
+        canActivate: [authGuard],
+        loadComponent: () => import('./features/wishlist/wishlist.component').then(m => m.WishlistComponent)
+      },
+      {
         path: 'orders',
         canActivate: [authGuard],
         loadComponent: () => import('./features/orders/order-list/order-list.component').then(m => m.OrderListComponent)

@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap } from 'rxjs';
+import { EMPTY, Observable, tap } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api-response.model';
 
@@ -15,6 +16,8 @@ export interface AuthResponse {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private apiUrl = `${environment.apiUrl}/auth`;
+  private journeyApiUrl = `${environment.apiUrl}/journey`;
+  private sessionStorageKey = 'recently_viewed_session_id';
 
   constructor(private http: HttpClient, private router: Router) {}
 
@@ -23,6 +26,7 @@ export class AuthService {
       tap(res => {
         if (res.success && res.data) {
           this.storeTokens(res.data);
+          this.mergeAnonymousJourney();
         }
       })
     );
@@ -33,6 +37,7 @@ export class AuthService {
       tap(res => {
         if (res.success && res.data) {
           this.storeTokens(res.data);
+          this.mergeAnonymousJourney();
         }
       })
     );
@@ -77,5 +82,14 @@ export class AuthService {
     localStorage.setItem('refresh_token', auth.refreshToken);
     localStorage.setItem('username', auth.username);
     localStorage.setItem('role', auth.role);
+  }
+
+  private mergeAnonymousJourney(): void {
+    const sessionId = localStorage.getItem(this.sessionStorageKey);
+    if (!sessionId) return;
+
+    this.http.post(`${this.journeyApiUrl}/merge`, { sessionId }).pipe(
+      catchError(() => EMPTY)
+    ).subscribe();
   }
 }

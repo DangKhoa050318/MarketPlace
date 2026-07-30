@@ -51,6 +51,10 @@ import { Observable } from 'rxjs';
               <mat-icon>receipt_long</mat-icon>
               <span>My Orders</span>
             </a>
+            <a *ngIf="authService.isAuthenticated()" routerLink="/wishlist" routerLinkActive="active-link" class="nav-item">
+              <mat-icon>favorite</mat-icon>
+              <span>Wishlist</span>
+            </a>
 
             <!-- Single Dedicated Admin Dashboard Button (Only visible if logged-in user is ADMIN) -->
             <a *ngIf="authService.getRole() === 'ADMIN'" routerLink="/admin/dashboard" class="nav-item admin-badge-link" title="Open Admin Portal">
@@ -90,6 +94,10 @@ import { Observable } from 'rxjs';
               <button mat-menu-item routerLink="/cart">
                 <mat-icon>shopping_cart</mat-icon>
                 <span>My Cart</span>
+              </button>
+              <button mat-menu-item routerLink="/wishlist">
+                <mat-icon>favorite</mat-icon>
+                <span>Wishlist</span>
               </button>
               <button mat-menu-item routerLink="/orders">
                 <mat-icon>receipt_long</mat-icon>

@@ -63,12 +63,14 @@ public class SecurityConfig {
                         // Storefront (customer and back-office staff/manager/admin)
                         .requestMatchers("/api/v1/cart", "/api/v1/cart/**").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/orders", "/api/v1/orders/**").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers("/api/v1/journey/**").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         // Coupons: shoppers can preview; management is ADMIN-only (preview matcher first).
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/coupons/preview").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/coupons/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/wishlist", "/api/v1/wishlist/**").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         // Admin
                         .requestMatchers("/api/v1/admin/dashboard/**").hasAnyRole("MANAGER", "ADMIN")
+                        .requestMatchers("/api/v1/admin/analytics/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/orders/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/reviews/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

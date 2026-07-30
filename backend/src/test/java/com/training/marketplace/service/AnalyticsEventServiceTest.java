@@ -5,7 +5,10 @@ import com.training.marketplace.analytics.AnalyticsEventType;
 import com.training.marketplace.analytics.AnalyticsIngestionStatus;
 import com.training.marketplace.analytics.RecommendationPlacement;
 import com.training.marketplace.analytics.RecommendationStrategyType;
+import com.training.marketplace.dto.request.AnalyticsRetentionRequest;
+import com.training.marketplace.dto.request.TrackAnalyticsEventBatchRequest;
 import com.training.marketplace.dto.request.TrackAnalyticsEventRequest;
+import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.entity.AnalyticsEvent;
 import com.training.marketplace.repository.AnalyticsEventIngestionRepository;
 import com.training.marketplace.repository.AnalyticsEventRepository;
@@ -21,9 +24,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -149,5 +154,73 @@ class AnalyticsEventServiceTest {
         assertThat(response.status()).isEqualTo(AnalyticsIngestionStatus.DUPLICATE_IGNORED);
         assertThat(response.receivedAt()).isEqualTo(originalReceivedAt);
         verify(analyticsEventRepository).findByEventId(eventId);
+    }
+
+    @Test
+    void trackBatch_rejectsMoreThanMaximumEvents() {
+        var events = java.util.stream.IntStream.range(0, 51)
+                .mapToObj(i -> new TrackAnalyticsEventRequest(
+                        UUID.randomUUID(),
+                        1,
+                        AnalyticsEventType.PAGE_VIEW,
+                        Instant.parse("2026-07-28T12:30:00Z"),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        Map.of()))
+                .toList();
+
+        assertThatThrownBy(() -> analyticsEventService.trackBatch(null, "session-1",
+                new TrackAnalyticsEventBatchRequest(events)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("batch size");
+    }
+
+    @Test
+    void trackBatch_countsAcceptedAndDuplicateStatuses() {
+        UUID duplicateId = UUID.fromString("cbe865ca-3c3c-4dc6-b5cb-a30833342848");
+        var accepted = new TrackAnalyticsEventRequest(
+                UUID.randomUUID(), 1, AnalyticsEventType.PAGE_VIEW, Instant.parse("2026-07-28T12:30:00Z"),
+                null, null, null, null, null, null, null, null, null, null, Map.of());
+        var duplicate = new TrackAnalyticsEventRequest(
+                duplicateId, 1, AnalyticsEventType.PAGE_VIEW, Instant.parse("2026-07-28T12:31:00Z"),
+                null, null, null, null, null, null, null, null, null, null, Map.of());
+        AnalyticsEvent original = AnalyticsEvent.builder()
+                .eventId(duplicateId)
+                .schemaVersion(1)
+                .eventType(AnalyticsEventType.PAGE_VIEW)
+                .sessionId("session-1")
+                .occurredAt(duplicate.occurredAt())
+                .receivedAt(Instant.parse("2026-07-28T12:32:00Z"))
+                .properties(Map.of())
+                .build();
+        when(analyticsEventIngestionRepository.insertIfAbsent(any()))
+                .thenReturn(true)
+                .thenReturn(false);
+        when(analyticsEventRepository.findByEventId(duplicateId)).thenReturn(Optional.of(original));
+
+        var response = analyticsEventService.trackBatch(null, "session-1",
+                new TrackAnalyticsEventBatchRequest(List.of(accepted, duplicate)));
+
+        assertThat(response.total()).isEqualTo(2);
+        assertThat(response.accepted()).isEqualTo(1);
+        assertThat(response.duplicates()).isEqualTo(1);
+    }
+
+    @Test
+    void anonymizeExpiredRawEvents_usesConfiguredRetentionDays() {
+        when(analyticsEventRepository.anonymizeExpiredRawEvents(any())).thenReturn(3);
+
+        var response = analyticsEventService.anonymizeExpiredRawEvents(new AnalyticsRetentionRequest(30));
+
+        assertThat(response.eventsAnonymized()).isEqualTo(3);
+        assertThat(response.cutoff()).isNotNull();
     }
 }
