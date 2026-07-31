@@ -93,9 +93,10 @@ public class AdminAnalyticsController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long productId,
             @RequestParam(required = false) String campaign,
+            @RequestParam(required = false) String placement,
             @RequestParam(required = false) String deviceType) {
         return ApiResponse.success(funnelAnalyticsService.summarize(
-                from, to, categoryId, productId, campaign, deviceType));
+                from, to, categoryId, productId, campaign, placement, deviceType));
     }
 
     @PostMapping("/retention/anonymize")
