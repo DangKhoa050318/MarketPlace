@@ -4,6 +4,7 @@ import com.training.marketplace.dto.request.AnalyticsDashboardFilter;
 import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.ProductPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionRecommendationPerformanceResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -154,6 +155,63 @@ public class AnalyticsDashboardQueryRepository {
         long totalElements = total == null ? 0 : total;
         int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + size - 1) / size);
         return new PageResponse<>(content, page, size, totalElements, totalPages, page + 1 >= totalPages);
+    }
+
+    public List<PromotionRecommendationPerformanceResponse> promotionRecommendationPerformance(
+            AnalyticsDashboardFilter filter) {
+        String sql = """
+                SELECT NULLIF(ae.properties ->> 'campaign', '') AS campaign,
+                       ae.placement,
+                       ae.strategy,
+                       COUNT(*) FILTER (
+                           WHERE ae.event_type = 'RECOMMENDATION_IMPRESSION'
+                       ) AS impressions,
+                       COUNT(*) FILTER (
+                           WHERE ae.event_type = 'RECOMMENDATION_CLICK'
+                       ) AS clicks,
+                       COUNT(*) FILTER (
+                           WHERE ae.event_type = 'ADD_TO_CART'
+                             AND ae.recommendation_request_id IS NOT NULL
+                       ) AS add_to_carts,
+                       COUNT(DISTINCT ae.order_id) FILTER (
+                           WHERE ae.event_type = 'PURCHASE'
+                             AND ae.recommendation_request_id IS NOT NULL
+                             AND ae.order_id IS NOT NULL
+                       ) AS attributed_orders,
+                       MAX(ae.received_at) AS last_updated_at
+                  FROM analytics_events ae
+                  LEFT JOIN products p ON p.id = ae.product_id
+                 WHERE ae.occurred_at >= ? AND ae.occurred_at < ?
+                   AND ae.event_type IN (
+                       'RECOMMENDATION_IMPRESSION',
+                       'RECOMMENDATION_CLICK',
+                       'ADD_TO_CART',
+                       'PURCHASE'
+                   )
+                   AND (
+                       ae.recommendation_request_id IS NOT NULL
+                       OR NULLIF(ae.properties ->> 'campaign', '') IS NOT NULL
+                   )
+                   AND (? IS NULL OR p.category_id = ?)
+                   AND (? IS NULL OR ae.product_id = ?)
+                   AND (? IS NULL OR ae.properties ->> 'campaign' = ?)
+                   AND (? IS NULL OR ae.placement = ?)
+                   AND (? IS NULL OR ae.properties ->> 'deviceType' = ?)
+                 GROUP BY NULLIF(ae.properties ->> 'campaign', ''), ae.placement, ae.strategy
+                 ORDER BY impressions DESC, clicks DESC, campaign NULLS LAST,
+                          ae.placement NULLS LAST, ae.strategy NULLS LAST
+                """;
+        return jdbcTemplate.query(sql, (rs, rowNum) ->
+                new PromotionRecommendationPerformanceResponse(
+                        rs.getString("campaign"),
+                        rs.getString("placement"),
+                        rs.getString("strategy"),
+                        rs.getLong("impressions"),
+                        rs.getLong("clicks"),
+                        BigDecimal.ZERO,
+                        rs.getLong("add_to_carts"),
+                        rs.getLong("attributed_orders"),
+                        instant(rs, "last_updated_at")), filterArgs(filter).toArray());
     }
 
     private List<Object> productPerformanceArgs(AnalyticsDashboardFilter filter) {

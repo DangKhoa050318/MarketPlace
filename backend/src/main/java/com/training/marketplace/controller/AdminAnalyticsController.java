@@ -8,6 +8,7 @@ import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.AnalyticsRetentionResponse;
 import com.training.marketplace.dto.response.FunnelSummaryResponse;
 import com.training.marketplace.dto.response.ProductPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionRecommendationPerformanceResponse;
 import com.training.marketplace.service.AnalyticsDashboardService;
 import com.training.marketplace.service.AnalyticsEventService;
 import com.training.marketplace.service.FunnelAnalyticsService;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin/analytics")
@@ -67,6 +69,20 @@ public class AdminAnalyticsController {
                 new AnalyticsDashboardFilter(from, to, categoryId, productId, campaign, placement, deviceType),
                 page,
                 size));
+    }
+
+    @GetMapping("/promotion-recommendation/performance")
+    @Operation(summary = "Get promotion and recommendation performance")
+    public ApiResponse<List<PromotionRecommendationPerformanceResponse>> promotionRecommendationPerformance(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) String campaign,
+            @RequestParam(required = false) String placement,
+            @RequestParam(required = false) String deviceType) {
+        return ApiResponse.success(analyticsDashboardService.promotionRecommendationPerformance(
+                new AnalyticsDashboardFilter(from, to, categoryId, productId, campaign, placement, deviceType)));
     }
 
     @GetMapping("/funnel")

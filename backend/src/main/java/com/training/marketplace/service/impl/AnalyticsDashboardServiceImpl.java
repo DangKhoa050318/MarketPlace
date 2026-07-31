@@ -4,6 +4,7 @@ import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.request.AnalyticsDashboardFilter;
 import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.ProductPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionRecommendationPerformanceResponse;
 import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.repository.AnalyticsDashboardQueryRepository;
 import com.training.marketplace.service.AnalyticsDashboardService;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +48,24 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
             throw new BadRequestException("Analytics page size must be between 1 and 100");
         }
         return analyticsDashboardQueryRepository.productPerformance(normalize(filter), page, size);
+    }
+
+    @Override
+    public List<PromotionRecommendationPerformanceResponse> promotionRecommendationPerformance(
+            AnalyticsDashboardFilter filter) {
+        return analyticsDashboardQueryRepository.promotionRecommendationPerformance(normalize(filter))
+                .stream()
+                .map(counts -> new PromotionRecommendationPerformanceResponse(
+                        counts.campaign(),
+                        counts.placement(),
+                        counts.strategy(),
+                        counts.impressions(),
+                        counts.clicks(),
+                        AnalyticsDashboardQueryRepository.rate(counts.clicks(), counts.impressions()),
+                        counts.addToCarts(),
+                        counts.attributedOrders(),
+                        counts.lastUpdatedAt()))
+                .toList();
     }
 
     private AnalyticsDashboardFilter normalize(AnalyticsDashboardFilter filter) {
