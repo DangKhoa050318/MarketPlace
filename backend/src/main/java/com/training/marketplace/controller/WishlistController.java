@@ -1,6 +1,7 @@
 package com.training.marketplace.controller;
 
 import com.training.marketplace.common.ApiResponse;
+import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.response.WishlistItemResponse;
 import com.training.marketplace.dto.response.WishlistStatusResponse;
 import com.training.marketplace.entity.User;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,6 +30,15 @@ public class WishlistController {
 
     private final WishlistService wishlistService;
     private final UserRepository userRepository;
+
+    @GetMapping
+    @Operation(summary = "List the current user's wishlist")
+    public ApiResponse<PageResponse<WishlistItemResponse>> list(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        return ApiResponse.success(wishlistService.list(currentUserId(authentication), page, size));
+    }
 
     @PostMapping("/{productId}")
     @ResponseStatus(HttpStatus.CREATED)

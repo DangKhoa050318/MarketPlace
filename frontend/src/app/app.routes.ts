@@ -23,6 +23,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/cart/cart.component').then(m => m.CartComponent)
       },
       {
+        path: 'wishlist',
+        canActivate: [authGuard],
+        loadComponent: () => import('./features/wishlist/wishlist.component').then(m => m.WishlistComponent)
+      },
+      {
         path: 'orders',
         canActivate: [authGuard],
         loadComponent: () => import('./features/orders/order-list/order-list.component').then(m => m.OrderListComponent)
@@ -85,6 +90,10 @@ export const routes: Routes = [
       {
         path: 'admin/users/:id/edit',
         loadComponent: () => import('./features/users/user-form/user-form.component').then(m => m.UserFormComponent)
+      },
+      {
+        path: 'admin/moderation',
+        loadComponent: () => import('./features/admin/moderation/moderation-queue/moderation-queue.component').then(m => m.ModerationQueueComponent)
       },
 
       // Stock & Warehouse Features (Merged from StockPulse)

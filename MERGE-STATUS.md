@@ -346,6 +346,23 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
   stale-response cancellation, empty result và keyboard navigation.
 - ✅ Verify: focused recommendation frontend tests **10/10 PASS**; toàn bộ Angular unit
   tests **18/18 PASS**; Angular production build **SUCCESS**.
-- ⚠️ Visual smoke test desktop/mobile đã thực hiện với frontend local. Môi trường không
-  có Docker nên chưa chạy backend/PostgreSQL thật và chưa đóng Playwright E2E
-  `REQ-STP-T-506`.
+- ✅ Hoàn thành `REQ-STP-T-506`: Playwright mở source product, chờ impression ở ngưỡng
+  hiển thị, click recommendation, xác nhận attributed `PRODUCT_VIEW`, add SKU vào cart
+  và kiểm tra đúng thứ tự `IMPRESSION → CLICK → PRODUCT_VIEW → ADD_TO_CART`.
+- ✅ Playwright tự khởi động Angular dev server và dùng API route mocks xác định; toàn bộ
+  E2E hiện có **3/3 PASS**.
+
+### Workstream 3 testing completion — 2026-07-30
+
+- ✅ Đồng bộ checklist `REQ-STP-T-501` → `REQ-STP-T-506`; toàn bộ requirement backend,
+  frontend và testing của FEATURE-STP-03 đã hoàn thành.
+- ✅ Focused backend recommendation/event tests **64/64 PASS**.
+- ✅ Toàn bộ backend unit tests (không gồm IntegrationTest) **222/222 PASS**.
+- ✅ Focused Angular recommendation tests **10/10 PASS**; toàn bộ Angular unit tests
+  **26/26 PASS**.
+- ✅ Angular production build **SUCCESS**; còn một budget warning đã có sẵn ở
+  `product-list.component.ts`, không chặn build.
+- ✅ Playwright E2E **3/3 PASS**, gồm recommendation attribution journey, review flow và
+  customer funnel journey.
+- ℹ️ Frontend test tooling yêu cầu Node.js **20.9+** vì Playwright 1.62 không còn hỗ trợ
+  Node.js 18.

@@ -26,6 +26,9 @@ Marketplace/
 ```
 
 ## Chạy (dev)
+
+Yêu cầu frontend: **Node.js 20.9+** (`@playwright/test` 1.62 không hỗ trợ Node.js 18).
+
 ```bash
 cd backend && docker compose up -d          # postgres:5433, redis, rabbitmq, mailhog
 ./mvnw clean spring-boot:run                 # http://localhost:8080  (Swagger: /swagger-ui.html)

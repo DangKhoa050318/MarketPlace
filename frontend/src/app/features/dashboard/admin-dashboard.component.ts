@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { AuthService } from '../../core/services/auth.service';
-import { DashboardService, DashboardStats } from '../../core/services/dashboard.service';
+import { DashboardService, DashboardStats, FunnelSummary } from '../../core/services/dashboard.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -200,6 +200,28 @@ import { DashboardService, DashboardStats } from '../../core/services/dashboard.
             </a>
           </aside>
         </div>
+
+        <section class="panel surface-card funnel-panel" *ngIf="funnel as summary">
+          <div class="panel-heading">
+            <div>
+              <span class="panel-label">Customer Journey</span>
+              <h2>Storefront Funnel</h2>
+            </div>
+          </div>
+          <div class="funnel-grid">
+            <article class="funnel-step" *ngFor="let step of summary.steps; let i = index">
+              <span>{{ step.step }}</span>
+              <strong>{{ step.count | number }}</strong>
+              <div class="progress-track">
+                <span [style.width.%]="step.conversionRate * 100"></span>
+              </div>
+              <small>
+                {{ i === 0 ? 'Entry' : (step.conversionRate | percent:'1.0-1') + ' conversion' }}
+                <ng-container *ngIf="i > 0"> - {{ step.dropOffRate | percent:'1.0-1' }} drop-off</ng-container>
+              </small>
+            </article>
+          </div>
+        </section>
       </ng-container>
     </section>
   `,
@@ -326,6 +348,14 @@ import { DashboardService, DashboardStats } from '../../core/services/dashboard.
     .shortcut-text small { margin-top: 2px; color: var(--text-muted); font-size: .7rem; }
     .arrow-icon { color: var(--text-muted); font-size: 20px; width: 20px; height: 20px; }
 
+    .funnel-panel { margin-top: 18px; }
+    .funnel-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .funnel-step { display: grid; gap: 8px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .funnel-step span { color: var(--text-secondary); font-size: .72rem; font-weight: 800; }
+    .funnel-step strong { color: var(--text-main); font-size: 1.35rem; font-weight: 800; }
+    .funnel-step small { color: var(--text-muted); font-size: .72rem; }
+    .funnel-step .progress-track span { background: #0284c7; }
+
     .error-banner {
       display: flex; align-items: center; gap: 12px; padding: 16px 20px; border: 1px solid rgba(248, 113, 113, .3);
       color: #dc2626; background: #fef2f2;
@@ -356,6 +386,7 @@ import { DashboardService, DashboardStats } from '../../core/services/dashboard.
 export class DashboardComponent implements OnInit {
   readonly skeletonItems = Array.from({ length: 6 });
   stats: DashboardStats | null = null;
+  funnel: FunnelSummary | null = null;
   loading = false;
   errorMessage = '';
   lastUpdated: Date | null = null;
@@ -396,6 +427,7 @@ export class DashboardComponent implements OnInit {
         if (response.success && response.data) {
           this.stats = response.data;
           this.lastUpdated = new Date();
+          this.loadFunnel();
           return;
         }
         this.errorMessage = response.message || 'The server returned an empty response.';
@@ -404,6 +436,15 @@ export class DashboardComponent implements OnInit {
         this.loading = false;
         this.errorMessage = error.error?.message || 'Check the backend connection and try again.';
       }
+    });
+  }
+
+  private loadFunnel(): void {
+    const to = new Date();
+    const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+    this.dashboardService.getFunnelSummary(from, to).subscribe({
+      next: (response) => this.funnel = response.success ? response.data : null,
+      error: () => this.funnel = null
     });
   }
 

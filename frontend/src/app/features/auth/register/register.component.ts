@@ -31,7 +31,7 @@ interface RegisterFormValue {
       <header>
         <span class="section-label">Get started</span>
         <h2>Create your account</h2>
-        <p>Join OrderFlow and keep every purchase beautifully organized.</p>
+        <p>Join MarketPlace and keep every purchase beautifully organized.</p>
       </header>
 
       <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
@@ -114,7 +114,7 @@ interface RegisterFormValue {
 
       <div class="divider"><span>Already have an account?</span></div>
       <p class="auth-switch">
-        Return to your OrderFlow workspace.
+        Return to your MarketPlace workspace.
         <a routerLink="/login">Sign in <mat-icon>north_east</mat-icon></a>
       </p>
     </div>
@@ -149,7 +149,7 @@ export class RegisterComponent {
     const request: RegisterFormValue = this.form.getRawValue();
     this.authService.register(request).subscribe({
       next: () => {
-        this.notification.success('Your OrderFlow account is ready');
+        this.notification.success('Your MarketPlace account is ready');
         this.router.navigate(['/products']);
       },
       error: (err) => {

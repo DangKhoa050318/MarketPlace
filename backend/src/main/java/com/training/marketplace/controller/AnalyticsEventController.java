@@ -1,7 +1,9 @@
 package com.training.marketplace.controller;
 
 import com.training.marketplace.common.ApiResponse;
+import com.training.marketplace.dto.request.TrackAnalyticsEventBatchRequest;
 import com.training.marketplace.dto.request.TrackAnalyticsEventRequest;
+import com.training.marketplace.dto.response.AnalyticsBatchIngestionResponse;
 import com.training.marketplace.dto.response.AnalyticsEventResponse;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.repository.UserRepository;
@@ -43,6 +45,17 @@ public class AnalyticsEventController {
             @Valid @RequestBody TrackAnalyticsEventRequest request) {
         return ApiResponse.success("Analytics event accepted",
                 analyticsEventService.track(currentUserId(authentication), sessionId, request));
+    }
+
+    @PostMapping("/batch")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Operation(summary = "Ingest a bounded batch of canonical storefront analytics events")
+    public ApiResponse<AnalyticsBatchIngestionResponse> trackBatch(
+            Authentication authentication,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            @Valid @RequestBody TrackAnalyticsEventBatchRequest request) {
+        return ApiResponse.success("Analytics batch processed",
+                analyticsEventService.trackBatch(currentUserId(authentication), sessionId, request));
     }
 
     private Long currentUserId(Authentication authentication) {

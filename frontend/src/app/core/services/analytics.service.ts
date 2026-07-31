@@ -14,6 +14,8 @@ import {
 export class AnalyticsService {
   private apiUrl = `${environment.apiUrl}/analytics/events`;
   private sessionStorageKey = 'recently_viewed_session_id';
+  private consentStorageKey = 'analytics_consent';
+  private optOutStorageKey = 'analytics_opt_out';
 
   constructor(private http: HttpClient) {}
 
@@ -22,6 +24,10 @@ export class AnalyticsService {
     properties: Record<string, unknown> = {},
     context: AnalyticsEventContext = {}
   ): void {
+    if (!this.canTrack(type)) {
+      return;
+    }
+
     const payload: TrackAnalyticsEventRequest = {
       eventId: this.randomId(),
       schemaVersion: 1,
@@ -36,6 +42,31 @@ export class AnalyticsService {
     }).pipe(
       catchError(() => EMPTY)
     ).subscribe();
+  }
+
+  grantConsent(): void {
+    localStorage.setItem(this.consentStorageKey, 'true');
+    localStorage.removeItem(this.optOutStorageKey);
+  }
+
+  optOut(): void {
+    localStorage.setItem(this.optOutStorageKey, 'true');
+  }
+
+  sessionIdForMerge(): string | null {
+    return localStorage.getItem(this.sessionStorageKey);
+  }
+
+  private canTrack(type: AnalyticsEventType): boolean {
+    if (localStorage.getItem(this.optOutStorageKey) === 'true') {
+      return false;
+    }
+    const essential = new Set<AnalyticsEventType>([
+      AnalyticsEventType.AddToCart,
+      AnalyticsEventType.BeginCheckout,
+      AnalyticsEventType.OrderCreated
+    ]);
+    return essential.has(type) || localStorage.getItem(this.consentStorageKey) === 'true';
   }
 
   private sessionId(): string {

@@ -11,11 +11,11 @@ import { MatIconModule } from '@angular/material/icon';
       <div class="auth-glow auth-glow-one"></div>
       <div class="auth-glow auth-glow-two"></div>
 
-      <section class="auth-frame" aria-label="OrderFlow account">
+      <section class="auth-frame" aria-label="MarketPlace account">
         <aside class="brand-panel">
-          <a class="brand" routerLink="/login" aria-label="OrderFlow home">
+          <a class="brand" routerLink="/login" aria-label="MarketPlace home">
             <span class="brand-mark"><mat-icon>local_shipping</mat-icon></span>
-            <span>Order<span>Flow</span></span>
+            <span>Market<span>Place</span></span>
           </a>
 
           <div class="brand-copy">

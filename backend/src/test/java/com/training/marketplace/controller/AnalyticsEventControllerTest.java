@@ -3,7 +3,9 @@ package com.training.marketplace.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.training.marketplace.analytics.AnalyticsEventType;
 import com.training.marketplace.analytics.AnalyticsIngestionStatus;
+import com.training.marketplace.dto.request.TrackAnalyticsEventBatchRequest;
 import com.training.marketplace.dto.request.TrackAnalyticsEventRequest;
+import com.training.marketplace.dto.response.AnalyticsBatchIngestionResponse;
 import com.training.marketplace.dto.response.AnalyticsEventResponse;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.enums.Role;
@@ -178,6 +180,26 @@ class AnalyticsEventControllerTest {
                         .value("Malformed JSON or unsupported event value"));
 
         verifyNoInteractions(analyticsEventService);
+    }
+
+    @Test
+    void trackBatch_validEnvelopeReturnsAcceptedStatusSummary() throws Exception {
+        UUID eventId = UUID.fromString("cbe865ca-3c3c-4dc6-b5cb-a30833342848");
+        var response = acceptedResponse(eventId, null, "session-1", Instant.parse("2026-07-28T12:30:01Z"));
+        when(analyticsEventService.trackBatch(eq(null), eq("session-1"), any()))
+                .thenReturn(new AnalyticsBatchIngestionResponse(1, 0, 1, List.of(response)));
+
+        mockMvc.perform(post("/api/v1/analytics/events/batch")
+                        .header("X-Session-Id", "session-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new TrackAnalyticsEventBatchRequest(List.of(browserProductView(eventId))))))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.accepted").value(1))
+                .andExpect(jsonPath("$.data.duplicates").value(0))
+                .andExpect(jsonPath("$.data.events[0].status").value("ACCEPTED"));
+
+        verify(analyticsEventService).trackBatch(eq(null), eq("session-1"), any());
     }
 
     private TrackAnalyticsEventRequest browserProductView(UUID eventId) {

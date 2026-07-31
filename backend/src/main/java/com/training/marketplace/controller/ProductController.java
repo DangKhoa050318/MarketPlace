@@ -8,7 +8,10 @@ import com.training.marketplace.dto.request.UpdateProductRequest;
 import com.training.marketplace.dto.response.ProductResponse;
 import com.training.marketplace.dto.response.StorefrontProductResponse;
 import com.training.marketplace.exception.BadRequestException;
+import com.training.marketplace.repository.StorefrontCatalogRepository;
 import com.training.marketplace.service.ProductService;
+
+import java.util.List;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -27,6 +30,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.training.marketplace.dto.response.SuggestResult;
+
 import java.math.BigDecimal;
 
 @RestController
@@ -36,6 +41,7 @@ import java.math.BigDecimal;
 public class ProductController {
 
     private final ProductService productService;
+    private final StorefrontCatalogRepository storefrontCatalogRepository;
 
     @GetMapping
     @Operation(summary = "List all products with optional search query and pagination")
@@ -101,6 +107,15 @@ public class ProductController {
         Sort sort = Sort.by(Sort.Direction.fromString(sortDir), sortBy);
         var result = productService.search(query, PageRequest.of(page, size, sort));
         return ApiResponse.success(PageResponse.from(result, r -> r));
+    }
+
+    @GetMapping("/suggest")
+    @Operation(summary = "Autocomplete suggestions for search typeahead")
+    public ApiResponse<List<SuggestResult>> suggest(@RequestParam("q") String query) {
+        if (query == null || query.isBlank()) {
+            return ApiResponse.success(List.of());
+        }
+        return ApiResponse.success(storefrontCatalogRepository.suggest(query, 10));
     }
 
     @GetMapping("/{id:[0-9]+}")

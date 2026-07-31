@@ -13,6 +13,23 @@ export interface DashboardStats {
   totalCustomers: number;
 }
 
+export interface FunnelStep {
+  step: string;
+  count: number;
+  conversionRate: number;
+  dropOffRate: number;
+}
+
+export interface FunnelSummary {
+  from: string;
+  to: string;
+  categoryId?: number;
+  productId?: number;
+  campaign?: string;
+  deviceType?: string;
+  steps: FunnelStep[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -23,5 +40,14 @@ export class DashboardService {
 
   getDashboardStats(): Observable<ApiResponse<DashboardStats>> {
     return this.http.get<ApiResponse<DashboardStats>>(`${this.apiUrl}/stats`);
+  }
+
+  getFunnelSummary(from: Date, to: Date): Observable<ApiResponse<FunnelSummary>> {
+    return this.http.get<ApiResponse<FunnelSummary>>(`${environment.apiUrl}/admin/analytics/funnel`, {
+      params: {
+        from: from.toISOString(),
+        to: to.toISOString()
+      }
+    });
   }
 }

@@ -6,6 +6,7 @@ import com.training.marketplace.dto.request.UpdateProductRequest;
 import com.training.marketplace.dto.response.ProductResponse;
 import com.training.marketplace.dto.response.StorefrontProductResponse;
 import com.training.marketplace.exception.ResourceNotFoundException;
+import com.training.marketplace.repository.StorefrontCatalogRepository;
 import com.training.marketplace.security.JwtAuthenticationFilter;
 import com.training.marketplace.security.RateLimitingFilter;
 import com.training.marketplace.service.ProductService;
@@ -40,6 +41,7 @@ class ProductControllerTest {
     @Autowired private ObjectMapper objectMapper;
 
     @MockBean private ProductService productService;
+    @MockBean private StorefrontCatalogRepository storefrontCatalogRepository;
     @MockBean private JwtAuthenticationFilter jwtAuthenticationFilter;
     @MockBean private RateLimitingFilter rateLimitingFilter;
 
@@ -67,8 +69,8 @@ class ProductControllerTest {
     void browseCatalog_returnsPriceAndAvailability() throws Exception {
         var item = new StorefrontProductResponse(1L, "laptop", "Laptop", "A laptop",
                 1L, "Computers", "PCS", "http://example.com/image.png",
-                BigDecimal.valueOf(999), BigDecimal.valueOf(1299), 12, 2, LocalDateTime.now(),
-                "Standard", List.of());
+                BigDecimal.valueOf(999), BigDecimal.valueOf(1299), 12L, 2L, LocalDateTime.now(),
+                "Variant A, Variant B", List.of());
         var page = new PageImpl<>(List.of(item), PageRequest.of(0, 12), 1);
         when(productService.browse(any(), any(Pageable.class))).thenReturn(page);
 
