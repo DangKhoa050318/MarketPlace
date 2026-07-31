@@ -80,6 +80,42 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/promotions/promotion-form/promotion-form.component').then(m => m.PromotionFormComponent)
       },
       {
+        path: 'admin/campaigns',
+        loadComponent: () => import('./features/admin/merchandising/campaign-list/campaign-list.component').then(m => m.CampaignListComponent)
+      },
+      {
+        path: 'admin/campaigns/new',
+        loadComponent: () => import('./features/admin/merchandising/campaign-form/campaign-form.component').then(m => m.CampaignFormComponent)
+      },
+      {
+        path: 'admin/campaigns/:id/edit',
+        loadComponent: () => import('./features/admin/merchandising/campaign-form/campaign-form.component').then(m => m.CampaignFormComponent)
+      },
+      {
+        path: 'admin/collections',
+        loadComponent: () => import('./features/admin/merchandising/collection-list/collection-list.component').then(m => m.CollectionListComponent)
+      },
+      {
+        path: 'admin/collections/new',
+        loadComponent: () => import('./features/admin/merchandising/collection-form/collection-form.component').then(m => m.CollectionFormComponent)
+      },
+      {
+        path: 'admin/collections/:id/edit',
+        loadComponent: () => import('./features/admin/merchandising/collection-form/collection-form.component').then(m => m.CollectionFormComponent)
+      },
+      {
+        path: 'admin/banners',
+        loadComponent: () => import('./features/admin/merchandising/banner-list/banner-list.component').then(m => m.BannerListComponent)
+      },
+      {
+        path: 'admin/banners/new',
+        loadComponent: () => import('./features/admin/merchandising/banner-form/banner-form.component').then(m => m.BannerFormComponent)
+      },
+      {
+        path: 'admin/banners/:id/edit',
+        loadComponent: () => import('./features/admin/merchandising/banner-form/banner-form.component').then(m => m.BannerFormComponent)
+      },
+      {
         path: 'admin/users',
         loadComponent: () => import('./features/users/user-list/user-list.component').then(m => m.UserListComponent)
       },
