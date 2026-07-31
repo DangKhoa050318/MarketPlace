@@ -8,6 +8,7 @@ import com.training.marketplace.dto.response.AnalyticsRetentionResponse;
 import com.training.marketplace.dto.response.FunnelStepResponse;
 import com.training.marketplace.dto.response.FunnelSummaryResponse;
 import com.training.marketplace.dto.response.ProductPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionRecommendationPerformanceResponse;
 import com.training.marketplace.security.JwtAuthenticationFilter;
 import com.training.marketplace.security.RateLimitingFilter;
 import com.training.marketplace.security.SecurityConfig;
@@ -124,6 +125,37 @@ class AdminAnalyticsControllerTest {
                 .andExpect(jsonPath("$.data.totalElements").value(1));
 
         verify(analyticsDashboardService).productPerformance(any(), any(Integer.class), any(Integer.class));
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void promotionRecommendationPerformance_managerCanReadAttribution() throws Exception {
+        when(analyticsDashboardService.promotionRecommendationPerformance(any()))
+                .thenReturn(List.of(new PromotionRecommendationPerformanceResponse(
+                        "summer",
+                        "HOME_BEST_SELLERS",
+                        "BEST_SELLER",
+                        200,
+                        50,
+                        new BigDecimal("0.2500"),
+                        20,
+                        8,
+                        Instant.parse("2026-07-31T00:00:00Z"))));
+
+        mockMvc.perform(get("/api/v1/admin/analytics/promotion-recommendation/performance")
+                        .param("from", "2026-07-01T00:00:00Z")
+                        .param("to", "2026-08-01T00:00:00Z")
+                        .param("campaign", "summer")
+                        .param("placement", "HOME_BEST_SELLERS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].campaign").value("summer"))
+                .andExpect(jsonPath("$.data[0].impressions").value(200))
+                .andExpect(jsonPath("$.data[0].clicks").value(50))
+                .andExpect(jsonPath("$.data[0].clickThroughRate").value(0.2500))
+                .andExpect(jsonPath("$.data[0].attributedOrders").value(8))
+                .andExpect(jsonPath("$.data[0].lastUpdatedAt").value("2026-07-31T00:00:00Z"));
+
+        verify(analyticsDashboardService).promotionRecommendationPerformance(any());
     }
 
     @Test

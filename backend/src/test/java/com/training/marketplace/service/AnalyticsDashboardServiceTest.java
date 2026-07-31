@@ -4,6 +4,8 @@ import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.request.AnalyticsDashboardFilter;
 import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.ProductPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionRecommendationPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionRecommendationPerformanceResponse;
 import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.repository.AnalyticsDashboardQueryRepository;
 import com.training.marketplace.service.impl.AnalyticsDashboardServiceImpl;
@@ -91,6 +93,33 @@ class AnalyticsDashboardServiceTest {
         assertThatThrownBy(() -> analyticsDashboardService.productPerformance(filter(), 0, 101))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("between 1 and 100");
+    }
+
+    @Test
+    void promotionRecommendationPerformance_calculatesCtr() {
+        when(analyticsDashboardQueryRepository.promotionRecommendationPerformance(any()))
+                .thenReturn(List.of(new PromotionRecommendationPerformanceResponse(
+                        "summer",
+                        "HOME_BEST_SELLERS",
+                        "BEST_SELLER",
+                        200,
+                        50,
+                        BigDecimal.ZERO,
+                        20,
+                        8,
+                        Instant.parse("2026-07-31T00:00:00Z"))));
+
+        var response = analyticsDashboardService.promotionRecommendationPerformance(filter());
+
+        assertThat(response).singleElement().satisfies(item -> {
+            assertThat(item.clickThroughRate()).isEqualByComparingTo("0.2500");
+            assertThat(item.addToCarts()).isEqualTo(20);
+            assertThat(item.attributedOrders()).isEqualTo(8);
+        });
+        verify(analyticsDashboardQueryRepository).promotionRecommendationPerformance(
+                new AnalyticsDashboardFilter(
+                        filter().from(), filter().to(), null, null,
+                        "summer", "HOME_BEST_SELLERS", "mobile"));
     }
 
     private AnalyticsDashboardFilter filter() {
