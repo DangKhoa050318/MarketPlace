@@ -146,6 +146,7 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
                    AND (:categoryId IS NULL OR p.category_id = :categoryId)
                    AND (:productId IS NULL OR ae.product_id = :productId)
                    AND (:campaign IS NULL OR ae.properties ->> 'campaign' = :campaign)
+                   AND (:placement IS NULL OR ae.placement = :placement)
                    AND (:deviceType IS NULL OR ae.properties ->> 'deviceType' = :deviceType)
             ),
             firsts AS (
@@ -179,6 +180,7 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
             @Param("categoryId") Long categoryId,
             @Param("productId") Long productId,
             @Param("campaign") String campaign,
+            @Param("placement") String placement,
             @Param("deviceType") String deviceType);
 
     interface FunnelCounts {

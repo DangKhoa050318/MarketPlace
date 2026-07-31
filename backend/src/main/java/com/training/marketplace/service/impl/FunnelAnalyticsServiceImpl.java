@@ -26,12 +26,14 @@ public class FunnelAnalyticsServiceImpl implements FunnelAnalyticsService {
             Long categoryId,
             Long productId,
             String campaign,
+            String placement,
             String deviceType) {
         if (from == null || to == null || !from.isBefore(to)) {
             throw new BadRequestException("A valid from/to range is required");
         }
         var counts = analyticsEventRepository.summarizeFunnel(
-                from, to, categoryId, productId, blankToNull(campaign), blankToNull(deviceType));
+                from, to, categoryId, productId, blankToNull(campaign),
+                blankToNull(placement), blankToNull(deviceType));
         long productViews = counts == null ? 0 : counts.getProductViews();
         long addToCarts = counts == null ? 0 : counts.getAddToCarts();
         long beginCheckouts = counts == null ? 0 : counts.getBeginCheckouts();

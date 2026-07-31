@@ -163,7 +163,8 @@ class AdminAnalyticsControllerTest {
     void funnel_managerCanReadSummary() throws Exception {
         Instant from = Instant.parse("2026-07-01T00:00:00Z");
         Instant to = Instant.parse("2026-08-01T00:00:00Z");
-        when(funnelAnalyticsService.summarize(from, to, null, null, null, null))
+        when(funnelAnalyticsService.summarize(
+                from, to, null, null, null, "HOME_BEST_SELLERS", null))
                 .thenReturn(new FunnelSummaryResponse(
                         from,
                         to,
@@ -175,9 +176,13 @@ class AdminAnalyticsControllerTest {
 
         mockMvc.perform(get("/api/v1/admin/analytics/funnel")
                         .param("from", "2026-07-01T00:00:00Z")
-                        .param("to", "2026-08-01T00:00:00Z"))
+                        .param("to", "2026-08-01T00:00:00Z")
+                        .param("placement", "HOME_BEST_SELLERS"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.steps[0].step").value("PRODUCT_VIEW"));
+
+        verify(funnelAnalyticsService).summarize(
+                from, to, null, null, null, "HOME_BEST_SELLERS", null);
     }
 
     @Test
