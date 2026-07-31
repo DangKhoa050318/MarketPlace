@@ -1,0 +1,35 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Guard: fail fast on duplicate or old-style (non-timestamp) migration versions.
+      - name: Check Flyway migration versions
+        run: bash scripts/check-migration-versions.sh
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      # ubuntu-latest ships a working Docker daemon at /var/run/docker.sock, so
+      # Testcontainers runs for real here — the integration tests (incl. T-304
+      # ConcurrentCouponUsageIntegrationTest and T-306 E2ECouponFlowIntegrationTest)
+      # execute instead of skipping the way they do on Docker Desktop / Windows.
+      - name: Build + unit + integration tests
+        run: ./mvnw -B -ntp verify

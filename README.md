@@ -18,7 +18,7 @@ Tồn kho là nguồn chân lý ở `stock_levels` theo `(variant_id, warehouse_
 ## Cấu trúc
 ```
 Marketplace/
-├── backend/    Spring Boot (base package com.training.marketplace), Flyway V1–V9
+├── backend/    Spring Boot (base package com.training.marketplace), Flyway (timestamp migrations)
 ├── frontend/   Angular 17
 ├── docs/       đặc tả (Merged Spec, MERGE-STATUS, requirements, feature specs)
 ├── AGENTS.md   quy ước code
@@ -42,3 +42,16 @@ Tài khoản seed (mật khẩu `admin123`): `admin`, `manager`, `staff`, `custo
 
 > ℹ️ Backend/frontend đã compile & boot được (xem [`docs/MERGE-STATUS.md`](docs/MERGE-STATUS.md)).
 > Chạy `docker compose down -v` một lần khi khởi tạo DB lần đầu.
+
+## Flyway migrations — quy ước đặt tên (timestamp)
+
+Đặt tên **mọi** migration theo mốc thời gian tạo file, **không** dùng số thứ tự:
+
+```
+V<yyyyMMddHHmmss>__<mo_ta>.sql      # vd: V20260729143000__add_campaign_tables.sql
+```
+
+- Timestamp giúp các nhánh feature làm song song **không trùng version** khi merge (kiểu `V1, V2…` trước đây liên tục đụng nhau).
+- **Không sửa** migration đã apply — thêm file timestamp mới. Migration phải apply sạch trên DB mới (`docker compose down -v`).
+- Đổi/renumber migration ⇒ **mọi người phải `docker compose down -v`** tạo lại DB (vì `flyway_schema_history` lưu version).
+- Guard kiểm tra tự động: `bash backend/scripts/check-migration-versions.sh` (chạy trong CI — [`.github/workflows/backend-ci.yml`](.github/workflows/backend-ci.yml)) — fail nếu có version trùng hoặc còn kiểu `Vn` cũ.
