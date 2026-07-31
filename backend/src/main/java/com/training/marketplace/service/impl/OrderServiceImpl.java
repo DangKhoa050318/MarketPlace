@@ -23,6 +23,7 @@ import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.AppliedCoupon;
 import com.training.marketplace.service.CartService;
 import com.training.marketplace.service.InventoryFacade;
+import com.training.marketplace.service.MerchandisingEventService;
 import com.training.marketplace.service.OrderService;
 import com.training.marketplace.service.PromotionService;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final OrderEventPublisher orderEventPublisher;
     private final PromotionService promotionService;
+    private final MerchandisingEventService merchandisingEventService;
 
     @Override
     @Transactional
@@ -120,6 +122,14 @@ public class OrderServiceImpl implements OrderService {
         if (appliedCoupon != null) {
             promotionService.recordRedemption(
                     appliedCoupon.promotionCodeId(), userId, savedOrder.getId(), discount);
+        }
+
+        // 3d. Best-effort last-click merchandising attribution (B-408). Runs in its own transaction
+        //     (REQUIRES_NEW) and must never break order creation, so failures are swallowed.
+        try {
+            merchandisingEventService.attributeOrder(savedOrder.getId(), userId, savedOrder.getCreatedAt());
+        } catch (Exception ex) {
+            log.warn("Merchandising attribution skipped for order {}: {}", savedOrder.getId(), ex.getMessage());
         }
 
         // 4. Clear cart.
