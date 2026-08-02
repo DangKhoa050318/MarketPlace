@@ -146,4 +146,15 @@ describe('DashboardComponent funnel visualization', () => {
 
     expect(fixture.componentInstance.analyticsStale).toBeTrue();
   });
+
+  it('exposes keyboard links and accessible funnel progress values', () => {
+    const clickableKpis = fixture.nativeElement.querySelectorAll('a.clickable-card');
+    const funnel = fixture.nativeElement.querySelector('.funnel-panel');
+    const progressBars = fixture.nativeElement.querySelectorAll('.funnel-step [role="progressbar"]');
+
+    expect(clickableKpis.length).toBe(4);
+    expect(funnel.getAttribute('aria-describedby')).toBe('funnel-description');
+    expect(progressBars.length).toBe(4);
+    expect(progressBars[1].getAttribute('aria-valuenow')).toBe('40');
+  });
 });

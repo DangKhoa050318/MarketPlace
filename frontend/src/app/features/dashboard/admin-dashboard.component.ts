@@ -158,7 +158,7 @@ import {
             <small>Recognized across {{ data.totalOrders | number }} orders</small>
           </article>
 
-          <article class="kpi-card surface-card surface-card-hover clickable-card" [routerLink]="['/admin/orders']">
+          <a class="kpi-card surface-card surface-card-hover clickable-card" [routerLink]="['/admin/orders']">
             <div class="kpi-top">
               <span class="icon orders"><mat-icon>receipt_long</mat-icon></span>
               <span class="context">{{ pendingRate | number:'1.0-1' }}% pending</span>
@@ -166,7 +166,7 @@ import {
             <span class="label">Total Orders Processed</span>
             <strong class="kpi-amount">{{ data.totalOrders | number }}</strong>
             <small>{{ data.pendingOrders | number }} orders require fulfillment</small>
-          </article>
+          </a>
 
           <article class="kpi-card surface-card surface-card-hover">
             <div class="kpi-top">
@@ -178,7 +178,7 @@ import {
             <small>Calculated from customer checkout data</small>
           </article>
 
-          <article class="kpi-card surface-card surface-card-hover clickable-card" [routerLink]="['/admin/orders']" [queryParams]="{ status: 'DELIVERED' }">
+          <a class="kpi-card surface-card surface-card-hover clickable-card" [routerLink]="['/admin/orders']" [queryParams]="{ status: 'DELIVERED' }">
             <div class="kpi-top">
               <span class="icon delivery"><mat-icon>task_alt</mat-icon></span>
               <span class="context">{{ fulfillmentRate | number:'1.0-1' }}% fulfillment</span>
@@ -186,9 +186,9 @@ import {
             <span class="label">Delivered Orders</span>
             <strong class="kpi-amount">{{ data.completedOrders | number }}</strong>
             <small>Completed full delivery lifecycle</small>
-          </article>
+          </a>
 
-          <article class="kpi-card surface-card surface-card-hover clickable-card" routerLink="/admin/products">
+          <a class="kpi-card surface-card surface-card-hover clickable-card" routerLink="/admin/products">
             <div class="kpi-top">
               <span class="icon products"><mat-icon>inventory_2</mat-icon></span>
               <span class="context">Catalog items</span>
@@ -196,9 +196,9 @@ import {
             <span class="label">Catalog Products</span>
             <strong class="kpi-amount">{{ data.totalProducts | number }}</strong>
             <small>Active products listed on storefront</small>
-          </article>
+          </a>
 
-          <article class="kpi-card surface-card surface-card-hover clickable-card" routerLink="/admin/users">
+          <a class="kpi-card surface-card surface-card-hover clickable-card" routerLink="/admin/users">
             <div class="kpi-top">
               <span class="icon customers"><mat-icon>group</mat-icon></span>
               <span class="context">Registered accounts</span>
@@ -206,7 +206,7 @@ import {
             <span class="label">Registered Customers</span>
             <strong class="kpi-amount">{{ data.totalCustomers | number }}</strong>
             <small>Active user accounts in system</small>
-          </article>
+          </a>
         </div>
 
         <div class="content-grid">
@@ -221,7 +221,7 @@ import {
               </a>
             </div>
 
-            <div class="workload-row clickable-row" [routerLink]="['/admin/orders']" [queryParams]="{ status: 'PENDING' }">
+            <a class="workload-row clickable-row" [routerLink]="['/admin/orders']" [queryParams]="{ status: 'PENDING' }">
               <div class="workload-copy">
                 <span>Pending Queue</span>
                 <strong>{{ data.pendingOrders | number }}</strong>
@@ -230,9 +230,9 @@ import {
                 <span class="pending-progress" [style.width.%]="pendingRate"></span>
               </div>
               <span class="percentage">{{ pendingRate | number:'1.0-1' }}%</span>
-            </div>
+            </a>
 
-            <div class="workload-row clickable-row" [routerLink]="['/admin/orders']" [queryParams]="{ status: 'DELIVERED' }">
+            <a class="workload-row clickable-row" [routerLink]="['/admin/orders']" [queryParams]="{ status: 'DELIVERED' }">
               <div class="workload-copy">
                 <span>Delivered</span>
                 <strong>{{ data.completedOrders | number }}</strong>
@@ -241,9 +241,9 @@ import {
                 <span class="delivered-progress" [style.width.%]="fulfillmentRate"></span>
               </div>
               <span class="percentage">{{ fulfillmentRate | number:'1.0-1' }}%</span>
-            </div>
+            </a>
 
-            <div class="attention clickable-attention" [class.clear]="data.pendingOrders === 0" [routerLink]="['/admin/orders']" [queryParams]="{ status: 'PENDING' }">
+            <a class="attention clickable-attention" [class.clear]="data.pendingOrders === 0" [routerLink]="['/admin/orders']" [queryParams]="{ status: 'PENDING' }">
               <mat-icon>{{ data.pendingOrders > 0 ? 'notification_important' : 'check_circle' }}</mat-icon>
               <div>
                 <strong>{{ data.pendingOrders > 0 ? 'Action Needed: Pending Orders' : 'Fulfillment Status Operational' }}</strong>
@@ -252,7 +252,7 @@ import {
                 </span>
                 <span *ngIf="data.pendingOrders === 0">No orders currently pending review.</span>
               </div>
-            </div>
+            </a>
           </section>
 
           <aside class="panel surface-card quick-actions">
@@ -301,18 +301,25 @@ import {
           </aside>
         </div>
 
-        <section class="panel surface-card funnel-panel" *ngIf="!analyticsEmpty && funnel as summary">
+        <section class="panel surface-card funnel-panel" *ngIf="!analyticsEmpty && funnel as summary"
+                 aria-labelledby="funnel-title" aria-describedby="funnel-description">
           <div class="panel-heading">
             <div>
               <span class="panel-label">Customer Journey</span>
-              <h2>Storefront Funnel</h2>
+              <h2 id="funnel-title">Storefront Funnel</h2>
+              <p id="funnel-description" class="visually-hidden">
+                Product journey counts, conversion rates and drop-off rates for the selected date range.
+              </p>
             </div>
           </div>
-          <div class="funnel-grid">
-            <article class="funnel-step" *ngFor="let step of summary.steps; let i = index">
+          <div class="funnel-grid" role="list">
+            <article class="funnel-step" role="listitem" *ngFor="let step of summary.steps; let i = index"
+                     [attr.aria-label]="step.step + ': ' + step.count + ' events'">
               <span>{{ step.step }}</span>
               <strong>{{ step.count | number }}</strong>
-              <div class="progress-track">
+              <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                   [attr.aria-valuenow]="step.conversionRate * 100"
+                   [attr.aria-label]="step.step + ' conversion rate'">
                 <span [style.width.%]="step.conversionRate * 100"></span>
               </div>
               <small>
@@ -430,6 +437,10 @@ import {
     }
     .clickable-card { cursor: pointer; }
     .clickable-card:hover { border-color: var(--primary) !important; }
+    .clickable-card, .clickable-row, .clickable-attention { color: inherit; text-decoration: none; }
+    a:focus-visible, button:focus-visible, input:focus-visible {
+      outline: 3px solid #0ea5e9; outline-offset: 3px;
+    }
 
     .kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
     .icon {
@@ -541,6 +552,7 @@ import {
       .analytics-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .analytics-loading { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .content-grid { grid-template-columns: 1fr; }
+      .funnel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 700px) {
       .page-header { align-items: flex-start; flex-direction: column; }
@@ -552,6 +564,7 @@ import {
       .analytics-kpi-grid { grid-template-columns: 1fr; }
       .analytics-loading { grid-template-columns: 1fr; }
       .section-heading { align-items: flex-start; flex-direction: column; }
+      .funnel-grid { grid-template-columns: 1fr; }
       .kpi-grid, .loading-grid { grid-template-columns: 1fr; }
       .workload-row { grid-template-columns: 110px 1fr 45px; gap: 10px; }
     }
