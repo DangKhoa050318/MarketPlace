@@ -10,7 +10,11 @@ describe('DashboardComponent funnel visualization', () => {
   let dashboardService: jasmine.SpyObj<DashboardService>;
 
   beforeEach(async () => {
-    dashboardService = jasmine.createSpyObj('DashboardService', ['getDashboardStats', 'getFunnelSummary']);
+    dashboardService = jasmine.createSpyObj('DashboardService', [
+      'getDashboardStats',
+      'getFunnelSummary',
+      'getAnalyticsOverview'
+    ]);
     dashboardService.getDashboardStats.and.returnValue(of({
       success: true,
       message: '',
@@ -39,6 +43,22 @@ describe('DashboardComponent funnel visualization', () => {
         ]
       }
     }));
+    dashboardService.getAnalyticsOverview.and.returnValue(of({
+      success: true,
+      message: '',
+      timestamp: '',
+      data: {
+        productViews: 100,
+        addToCarts: 40,
+        beginCheckouts: 20,
+        orders: 5,
+        addToCartRate: 0.4,
+        checkoutRate: 0.5,
+        orderConversionRate: 0.05,
+        returningCustomerRate: 0.25,
+        lastUpdatedAt: '2026-08-01T12:00:00Z'
+      }
+    }));
 
     await TestBed.configureTestingModule({
       imports: [DashboardComponent, RouterTestingModule],
@@ -59,5 +79,26 @@ describe('DashboardComponent funnel visualization', () => {
     expect(text).toContain('Storefront Funnel');
     expect(text).toContain('ORDER_CREATED');
     expect(fixture.componentInstance.funnel?.steps[3].dropOffRate).toBe(0.75);
+  });
+
+  it('renders analytics KPIs for the selected date range', () => {
+    const text = fixture.nativeElement.textContent;
+
+    expect(dashboardService.getAnalyticsOverview).toHaveBeenCalled();
+    expect(text).toContain('Conversion Overview');
+    expect(text).toContain('Product views');
+    expect(text).toContain('Returning customers');
+    expect(text).toContain('40%');
+  });
+
+  it('reloads overview and funnel when a preset changes', () => {
+    dashboardService.getAnalyticsOverview.calls.reset();
+    dashboardService.getFunnelSummary.calls.reset();
+
+    fixture.componentInstance.setRange(7);
+
+    expect(fixture.componentInstance.selectedRangeDays).toBe(7);
+    expect(dashboardService.getAnalyticsOverview).toHaveBeenCalledTimes(1);
+    expect(dashboardService.getFunnelSummary).toHaveBeenCalledTimes(1);
   });
 });
