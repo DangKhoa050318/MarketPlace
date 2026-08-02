@@ -1,11 +1,13 @@
 package com.training.marketplace.repository;
 
+import com.training.marketplace.analytics.AnalyticsCacheNames;
 import com.training.marketplace.dto.request.AnalyticsDashboardFilter;
 import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.ProductPerformanceResponse;
 import com.training.marketplace.dto.response.PromotionRecommendationPerformanceResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -23,6 +25,7 @@ public class AnalyticsDashboardQueryRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
+    @Cacheable(cacheNames = AnalyticsCacheNames.OVERVIEW, sync = true)
     public AnalyticsOverviewResponse overview(AnalyticsDashboardFilter filter) {
         String sql = """
                 WITH filtered AS (
@@ -67,6 +70,7 @@ public class AnalyticsDashboardQueryRepository {
                 instant(rs, "last_updated_at")), args.toArray());
     }
 
+    @Cacheable(cacheNames = AnalyticsCacheNames.PRODUCT_PERFORMANCE, sync = true)
     public PageResponse<ProductPerformanceResponse> productPerformance(
             AnalyticsDashboardFilter filter, int page, int size) {
         String sql = """
@@ -157,6 +161,7 @@ public class AnalyticsDashboardQueryRepository {
         return new PageResponse<>(content, page, size, totalElements, totalPages, page + 1 >= totalPages);
     }
 
+    @Cacheable(cacheNames = AnalyticsCacheNames.PROMOTION_RECOMMENDATION, sync = true)
     public List<PromotionRecommendationPerformanceResponse> promotionRecommendationPerformance(
             AnalyticsDashboardFilter filter) {
         String sql = """
