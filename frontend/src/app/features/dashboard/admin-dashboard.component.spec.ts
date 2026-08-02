@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { DashboardComponent } from './admin-dashboard.component';
@@ -100,5 +100,50 @@ describe('DashboardComponent funnel visualization', () => {
     expect(fixture.componentInstance.selectedRangeDays).toBe(7);
     expect(dashboardService.getAnalyticsOverview).toHaveBeenCalledTimes(1);
     expect(dashboardService.getFunnelSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders an empty state when the selected period has no journey events', () => {
+    dashboardService.getAnalyticsOverview.and.returnValue(of({
+      success: true,
+      message: '',
+      timestamp: '',
+      data: {
+        productViews: 0,
+        addToCarts: 0,
+        beginCheckouts: 0,
+        orders: 0,
+        addToCartRate: 0,
+        checkoutRate: 0,
+        orderConversionRate: 0,
+        returningCustomerRate: 0,
+        lastUpdatedAt: ''
+      }
+    }));
+
+    fixture.componentInstance.loadAnalytics();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('No journey activity in this period');
+  });
+
+  it('renders an error state when analytics requests fail', () => {
+    dashboardService.getAnalyticsOverview.and.returnValue(throwError(() => ({
+      error: { message: 'Analytics service unavailable' }
+    })));
+
+    fixture.componentInstance.loadAnalytics();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Analytics data is unavailable');
+    expect(fixture.nativeElement.textContent).toContain('Analytics service unavailable');
+  });
+
+  it('marks analytics as stale when lastUpdatedAt is older than ten minutes', () => {
+    fixture.componentInstance.analyticsOverview = {
+      ...fixture.componentInstance.analyticsOverview!,
+      lastUpdatedAt: new Date(Date.now() - 11 * 60 * 1000).toISOString()
+    };
+
+    expect(fixture.componentInstance.analyticsStale).toBeTrue();
   });
 });
