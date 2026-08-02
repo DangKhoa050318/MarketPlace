@@ -30,6 +30,18 @@ export interface FunnelSummary {
   steps: FunnelStep[];
 }
 
+export interface AnalyticsOverview {
+  productViews: number;
+  addToCarts: number;
+  beginCheckouts: number;
+  orders: number;
+  addToCartRate: number;
+  checkoutRate: number;
+  orderConversionRate: number;
+  returningCustomerRate: number;
+  lastUpdatedAt: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -44,6 +56,15 @@ export class DashboardService {
 
   getFunnelSummary(from: Date, to: Date): Observable<ApiResponse<FunnelSummary>> {
     return this.http.get<ApiResponse<FunnelSummary>>(`${environment.apiUrl}/admin/analytics/funnel`, {
+      params: {
+        from: from.toISOString(),
+        to: to.toISOString()
+      }
+    });
+  }
+
+  getAnalyticsOverview(from: Date, to: Date): Observable<ApiResponse<AnalyticsOverview>> {
+    return this.http.get<ApiResponse<AnalyticsOverview>>(`${environment.apiUrl}/admin/analytics/overview`, {
       params: {
         from: from.toISOString(),
         to: to.toISOString()

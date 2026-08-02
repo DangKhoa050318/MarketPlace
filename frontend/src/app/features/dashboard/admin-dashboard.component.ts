@@ -1,15 +1,21 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { AuthService } from '../../core/services/auth.service';
-import { DashboardService, DashboardStats, FunnelSummary } from '../../core/services/dashboard.service';
+import {
+  AnalyticsOverview,
+  DashboardService,
+  DashboardStats,
+  FunnelSummary
+} from '../../core/services/dashboard.service';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatIconModule, MatButtonModule],
+  imports: [CommonModule, FormsModule, RouterLink, MatIconModule, MatButtonModule],
   template: `
     <section class="dashboard">
       <header class="page-header">
@@ -33,6 +39,28 @@ import { DashboardService, DashboardStats, FunnelSummary } from '../../core/serv
         </div>
       </header>
 
+      <section class="analytics-toolbar" aria-label="Analytics date range">
+        <div class="range-presets" role="group" aria-label="Quick date ranges">
+          <button type="button" *ngFor="let days of rangePresets"
+                  [class.active]="selectedRangeDays === days" (click)="setRange(days)">
+            {{ days }} days
+          </button>
+        </div>
+        <label>
+          <span>From</span>
+          <input type="date" [(ngModel)]="fromDate" [max]="toDate">
+        </label>
+        <label>
+          <span>To</span>
+          <input type="date" [(ngModel)]="toDate" [min]="fromDate">
+        </label>
+        <button type="button" class="apply-range" (click)="applyCustomRange()"
+                [disabled]="loading || !isDateRangeValid">
+          <mat-icon>calendar_month</mat-icon>
+          Apply
+        </button>
+      </section>
+
       <div *ngIf="errorMessage" class="error-banner surface-card" role="alert">
         <mat-icon>error_outline</mat-icon>
         <div>
@@ -47,6 +75,46 @@ import { DashboardService, DashboardStats, FunnelSummary } from '../../core/serv
       </div>
 
       <ng-container *ngIf="stats as data">
+        <section class="analytics-section" *ngIf="analyticsOverview as overview">
+          <div class="section-heading">
+            <div>
+              <span class="panel-label">Journey Analytics</span>
+              <h2>Conversion Overview</h2>
+            </div>
+            <span class="updated-at" *ngIf="overview.lastUpdatedAt">
+              <mat-icon>schedule</mat-icon>
+              Data updated {{ overview.lastUpdatedAt | date:'medium' }}
+            </span>
+          </div>
+          <div class="analytics-kpi-grid">
+            <article class="analytics-kpi">
+              <span>Product views</span>
+              <strong>{{ overview.productViews | number }}</strong>
+              <small>Storefront detail views</small>
+            </article>
+            <article class="analytics-kpi">
+              <span>Add-to-cart rate</span>
+              <strong>{{ overview.addToCartRate | percent:'1.0-1' }}</strong>
+              <small>{{ overview.addToCarts | number }} cart additions</small>
+            </article>
+            <article class="analytics-kpi">
+              <span>Checkout rate</span>
+              <strong>{{ overview.checkoutRate | percent:'1.0-1' }}</strong>
+              <small>{{ overview.beginCheckouts | number }} checkouts started</small>
+            </article>
+            <article class="analytics-kpi">
+              <span>Order conversion</span>
+              <strong>{{ overview.orderConversionRate | percent:'1.0-1' }}</strong>
+              <small>{{ overview.orders | number }} attributed orders</small>
+            </article>
+            <article class="analytics-kpi">
+              <span>Returning customers</span>
+              <strong>{{ overview.returningCustomerRate | percent:'1.0-1' }}</strong>
+              <small>Customers with repeat orders</small>
+            </article>
+          </div>
+        </section>
+
         <div class="kpi-grid">
           <article class="kpi-card surface-card surface-card-hover">
             <div class="kpi-top">
@@ -247,6 +315,41 @@ import { DashboardService, DashboardStats, FunnelSummary } from '../../core/serv
     .header-actions { display: flex; align-items: center; gap: 14px; }
     .updated-at { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: .75rem; }
     .updated-at mat-icon { width: 16px; height: 16px; font-size: 16px; }
+
+    .analytics-toolbar {
+      display: flex; align-items: flex-end; gap: 12px; padding: 14px 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .range-presets { display: flex; gap: 4px; padding: 3px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    .range-presets button {
+      min-height: 34px; padding: 0 12px; border: 0; border-radius: 4px;
+      color: var(--text-secondary); background: transparent; font: inherit; font-size: .78rem; cursor: pointer;
+    }
+    .range-presets button.active { color: #ffffff; background: #0369a1; font-weight: 700; }
+    .analytics-toolbar label { display: grid; gap: 4px; color: var(--text-secondary); font-size: .7rem; font-weight: 700; }
+    .analytics-toolbar input {
+      min-height: 36px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+      color: var(--text-main); background: #ffffff; font: inherit; font-size: .78rem;
+    }
+    .apply-range {
+      display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px;
+      border: 0; border-radius: 6px; color: #ffffff; background: #0369a1; font: inherit;
+      font-size: .78rem; font-weight: 700; cursor: pointer;
+    }
+    .apply-range:disabled { opacity: .5; cursor: not-allowed; }
+    .apply-range mat-icon { width: 18px; height: 18px; font-size: 18px; }
+
+    .analytics-section { display: grid; gap: 14px; }
+    .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+    .section-heading h2 { margin: 4px 0 0; font-size: 1.1rem; }
+    .analytics-kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+    .analytics-kpi {
+      display: grid; gap: 7px; min-height: 118px; padding: 18px; box-sizing: border-box;
+      border: 1px solid #dbe4ee; border-radius: 6px; background: #ffffff;
+    }
+    .analytics-kpi span { color: var(--text-secondary); font-size: .76rem; font-weight: 700; }
+    .analytics-kpi strong { color: var(--text-main); font-size: 1.45rem; }
+    .analytics-kpi small { color: var(--text-muted); font-size: .7rem; }
     
     .refresh-button {
       display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px;
@@ -373,11 +476,18 @@ import { DashboardService, DashboardStats, FunnelSummary } from '../../core/serv
 
     @media (max-width: 1050px) {
       .kpi-grid, .loading-grid { grid-template-columns: repeat(2, 1fr); }
+      .analytics-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .content-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 700px) {
       .page-header { align-items: flex-start; flex-direction: column; }
       .header-actions { width: 100%; justify-content: space-between; }
+      .analytics-toolbar { align-items: stretch; flex-wrap: wrap; }
+      .range-presets { width: 100%; }
+      .range-presets button { flex: 1; }
+      .analytics-toolbar label { flex: 1 1 130px; }
+      .analytics-kpi-grid { grid-template-columns: 1fr; }
+      .section-heading { align-items: flex-start; flex-direction: column; }
       .kpi-grid, .loading-grid { grid-template-columns: 1fr; }
       .workload-row { grid-template-columns: 110px 1fr 45px; gap: 10px; }
     }
@@ -385,11 +495,16 @@ import { DashboardService, DashboardStats, FunnelSummary } from '../../core/serv
 })
 export class DashboardComponent implements OnInit {
   readonly skeletonItems = Array.from({ length: 6 });
+  readonly rangePresets = [7, 30, 90];
   stats: DashboardStats | null = null;
+  analyticsOverview: AnalyticsOverview | null = null;
   funnel: FunnelSummary | null = null;
   loading = false;
   errorMessage = '';
   lastUpdated: Date | null = null;
+  selectedRangeDays: number | null = 30;
+  fromDate = '';
+  toDate = '';
 
   constructor(
     public authService: AuthService,
@@ -410,8 +525,27 @@ export class DashboardComponent implements OnInit {
     return this.percentageOfOrders(this.stats?.completedOrders ?? 0);
   }
 
+  get isDateRangeValid(): boolean {
+    return Boolean(this.fromDate && this.toDate && this.fromDate <= this.toDate);
+  }
+
   ngOnInit(): void {
+    this.updateDateInputs(30);
     this.loadStats();
+  }
+
+  setRange(days: number): void {
+    this.selectedRangeDays = days;
+    this.updateDateInputs(days);
+    this.loadAnalytics();
+  }
+
+  applyCustomRange(): void {
+    if (!this.isDateRangeValid) {
+      return;
+    }
+    this.selectedRangeDays = null;
+    this.loadAnalytics();
   }
 
   loadStats(): void {
@@ -427,7 +561,7 @@ export class DashboardComponent implements OnInit {
         if (response.success && response.data) {
           this.stats = response.data;
           this.lastUpdated = new Date();
-          this.loadFunnel();
+          this.loadAnalytics();
           return;
         }
         this.errorMessage = response.message || 'The server returned an empty response.';
@@ -439,13 +573,34 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  private loadFunnel(): void {
-    const to = new Date();
-    const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+  private loadAnalytics(): void {
+    const from = new Date(`${this.fromDate}T00:00:00`);
+    const to = new Date(`${this.toDate}T23:59:59.999`);
+    this.dashboardService.getAnalyticsOverview(from, to).subscribe({
+      next: (response) => {
+        this.analyticsOverview = response.success ? response.data : null;
+      },
+      error: () => this.analyticsOverview = null
+    });
     this.dashboardService.getFunnelSummary(from, to).subscribe({
       next: (response) => this.funnel = response.success ? response.data : null,
       error: () => this.funnel = null
     });
+  }
+
+  private updateDateInputs(days: number): void {
+    const to = new Date();
+    const from = new Date(to);
+    from.setDate(from.getDate() - (days - 1));
+    this.fromDate = this.dateInputValue(from);
+    this.toDate = this.dateInputValue(to);
+  }
+
+  private dateInputValue(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   private percentageOfOrders(count: number): number {
