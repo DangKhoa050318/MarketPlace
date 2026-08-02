@@ -86,7 +86,8 @@ public class RedisConfig {
                 .withInitialCacheConfigurations(Map.of(
                         AnalyticsCacheNames.OVERVIEW, analyticsCacheConfig,
                         AnalyticsCacheNames.PRODUCT_PERFORMANCE, analyticsCacheConfig,
-                        AnalyticsCacheNames.PROMOTION_RECOMMENDATION, analyticsCacheConfig))
+                        AnalyticsCacheNames.PROMOTION_RECOMMENDATION, analyticsCacheConfig,
+                        AnalyticsCacheNames.PROMOTION_TREND, analyticsCacheConfig))
                 .build();
     }
 

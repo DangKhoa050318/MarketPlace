@@ -19,6 +19,9 @@ class AnalyticsDashboardCachingTest {
         assertCache("promotionRecommendationPerformance",
                 new Class<?>[]{AnalyticsDashboardFilter.class},
                 AnalyticsCacheNames.PROMOTION_RECOMMENDATION);
+        assertCache("promotionTrend",
+                new Class<?>[]{AnalyticsDashboardFilter.class},
+                AnalyticsCacheNames.PROMOTION_TREND);
     }
 
     private void assertCache(String methodName, Class<?>[] parameterTypes, String expectedName)

@@ -9,9 +9,14 @@ import { finalize } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import {
   AnalyticsOverview,
+  AnalyticsExportJob,
+  AnalyticsExportType,
   DashboardService,
   DashboardStats,
-  FunnelSummary
+  FunnelSummary,
+  ProductPerformance,
+  PromotionPerformance,
+  PromotionTrendPoint
 } from '../../core/services/dashboard.service';
 
 @Component({
@@ -329,6 +334,96 @@ import {
             </article>
           </div>
         </section>
+
+        <section class="panel surface-card performance-panel" aria-labelledby="product-performance-title">
+          <div class="panel-heading performance-heading">
+            <div>
+              <span class="panel-label">Catalog Analytics</span>
+              <h2 id="product-performance-title">Product Performance</h2>
+            </div>
+            <div class="table-controls">
+              <label>
+                <span class="visually-hidden">Search products</span>
+                <input type="search" [(ngModel)]="productSearch" placeholder="Search product name"
+                       (keyup.enter)="applyProductSearch()">
+              </label>
+              <button type="button" (click)="applyProductSearch()" aria-label="Search product performance">
+                <mat-icon>search</mat-icon>
+              </button>
+            </div>
+          </div>
+          <div class="table-loading" *ngIf="productsLoading">Loading product metrics...</div>
+          <div class="table-wrap" *ngIf="!productsLoading && productRows.length">
+            <table>
+              <thead><tr>
+                <th><button type="button" (click)="sortProducts('productName')">Product <mat-icon>{{ sortIcon('productName') }}</mat-icon></button></th>
+                <th><button type="button" (click)="sortProducts('productViews')">Views <mat-icon>{{ sortIcon('productViews') }}</mat-icon></button></th>
+                <th><button type="button" (click)="sortProducts('wishlists')">Wishlist <mat-icon>{{ sortIcon('wishlists') }}</mat-icon></button></th>
+                <th><button type="button" (click)="sortProducts('addToCarts')">Cart <mat-icon>{{ sortIcon('addToCarts') }}</mat-icon></button></th>
+                <th><button type="button" (click)="sortProducts('orders')">Orders <mat-icon>{{ sortIcon('orders') }}</mat-icon></button></th>
+                <th><button type="button" (click)="sortProducts('averageRating')">Rating <mat-icon>{{ sortIcon('averageRating') }}</mat-icon></button></th>
+                <th><button type="button" (click)="sortProducts('questionCount')">Questions <mat-icon>{{ sortIcon('questionCount') }}</mat-icon></button></th>
+              </tr></thead>
+              <tbody>
+                <tr *ngFor="let row of productRows">
+                  <td><a [routerLink]="['/products', row.productId]">{{ row.productName }}</a></td>
+                  <td>{{ row.productViews | number }}</td><td>{{ row.wishlists | number }}</td>
+                  <td>{{ row.addToCarts | number }}</td><td>{{ row.orders | number }}</td>
+                  <td>{{ row.averageRating | number:'1.1-1' }}</td><td>{{ row.questionCount | number }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-empty" *ngIf="!productsLoading && !productRows.length">No products match this filter.</div>
+          <div class="table-pagination">
+            <span>{{ productTotal | number }} products</span>
+            <button type="button" (click)="changeProductPage(-1)" [disabled]="productPage === 0" aria-label="Previous product page"><mat-icon>chevron_left</mat-icon></button>
+            <span>Page {{ productPage + 1 }} of {{ productTotalPages || 1 }}</span>
+            <button type="button" (click)="changeProductPage(1)" [disabled]="productPage + 1 >= productTotalPages" aria-label="Next product page"><mat-icon>chevron_right</mat-icon></button>
+          </div>
+        </section>
+
+        <section class="panel surface-card campaign-panel" aria-labelledby="campaign-title">
+          <div class="panel-heading">
+            <div><span class="panel-label">Attribution</span><h2 id="campaign-title">Campaign & Placement Performance</h2></div>
+          </div>
+          <p class="chart-description">Horizontal bars compare reach and engagement; CTR shows click efficiency.</p>
+          <div class="trend-chart" *ngIf="promotionTrend.length" role="img" aria-label="Daily recommendation impressions and clicks">
+            <div class="trend-day" *ngFor="let point of promotionTrend" [attr.aria-label]="point.date + ': ' + point.impressions + ' impressions and ' + point.clicks + ' clicks'">
+              <div class="trend-bars"><i class="trend-impressions" [style.height.%]="trendHeight(point.impressions)"></i><i class="trend-clicks" [style.height.%]="trendHeight(point.clicks)"></i></div>
+              <span>{{ point.date | date:'MMM d' }}</span>
+            </div>
+          </div>
+          <div class="trend-legend" *ngIf="promotionTrend.length"><span><i class="legend-impressions"></i>Impressions</span><span><i class="legend-clicks"></i>Clicks</span></div>
+          <div class="campaign-grid" *ngIf="promotionRows.length; else noCampaigns">
+            <article class="campaign-row" *ngFor="let row of promotionRows">
+              <div class="campaign-copy"><strong>{{ row.campaign || 'Organic recommendation' }}</strong><span>{{ row.placement || 'Unassigned' }} · {{ row.strategy || 'Default' }}</span></div>
+              <div class="metric-bars" role="img" [attr.aria-label]="campaignAria(row)">
+                <div><span>Impressions</span><i class="bar impressions" [style.width.%]="barWidth(row.impressions)"></i><b>{{ row.impressions }}</b></div>
+                <div><span>Clicks</span><i class="bar clicks" [style.width.%]="barWidth(row.clicks)"></i><b>{{ row.clicks }}</b></div>
+                <div><span>Cart</span><i class="bar carts" [style.width.%]="barWidth(row.addToCarts)"></i><b>{{ row.addToCarts }}</b></div>
+                <div><span>Orders</span><i class="bar orders-bar" [style.width.%]="barWidth(row.attributedOrders)"></i><b>{{ row.attributedOrders }}</b></div>
+              </div>
+              <div class="ctr"><span>CTR</span><strong>{{ row.clickThroughRate | percent:'1.0-1' }}</strong></div>
+            </article>
+          </div>
+          <ng-template #noCampaigns><div class="table-empty">No attributed campaign activity in this period.</div></ng-template>
+        </section>
+
+        <section class="panel surface-card export-panel" *ngIf="authService.getRole() === 'ADMIN'" aria-labelledby="export-title">
+          <div><span class="panel-label">Reporting</span><h2 id="export-title">Export Center</h2></div>
+          <div class="export-controls">
+            <select [(ngModel)]="exportType" aria-label="Export report type">
+              <option value="OVERVIEW">Overview KPI</option><option value="PRODUCT_PERFORMANCE">Product performance</option><option value="PROMOTION_RECOMMENDATION">Campaign attribution</option>
+            </select>
+            <button type="button" (click)="createExport()" [disabled]="exportBusy"><mat-icon>download</mat-icon>{{ exportBusy ? 'Creating...' : 'Create CSV' }}</button>
+          </div>
+          <div class="export-status" *ngIf="exportJob" role="status">
+            <mat-icon>{{ exportJob.status === 'COMPLETED' ? 'check_circle' : exportJob.status === 'FAILED' ? 'error' : 'sync' }}</mat-icon>
+            <div><strong>{{ exportJob.status }}</strong><span *ngIf="exportJob.expiresAt">Download expires {{ exportJob.expiresAt | date:'medium' }}</span><span *ngIf="exportJob.errorMessage">{{ exportJob.errorMessage }}</span></div>
+            <button type="button" *ngIf="exportJob.status === 'COMPLETED'" (click)="downloadExport()">Download CSV</button>
+          </div>
+        </section>
       </ng-container>
     </section>
   `,
@@ -531,6 +626,64 @@ import {
     .funnel-step small { color: var(--text-muted); font-size: .72rem; }
     .funnel-step .progress-track span { background: #0284c7; }
 
+    .performance-panel, .campaign-panel, .export-panel { display: grid; gap: 16px; }
+    .performance-heading { gap: 16px; margin-bottom: 0; }
+    .table-controls { display: flex; align-items: center; }
+    .table-controls input, .export-controls select {
+      min-height: 38px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 6px 0 0 6px;
+      color: var(--text-main); background: #fff; font: inherit; font-size: .78rem;
+    }
+    .table-controls button, .table-pagination button {
+      display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid #cbd5e1;
+      color: #0369a1; background: #fff; cursor: pointer;
+    }
+    .table-controls button { border-left: 0; border-radius: 0 6px 6px 0; }
+    .table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 6px; }
+    table { width: 100%; min-width: 820px; border-collapse: collapse; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: .76rem; }
+    th:first-child, td:first-child { text-align: left; }
+    th { color: #475569; background: #f8fafc; }
+    th button { display: inline-flex; align-items: center; gap: 3px; border: 0; color: inherit; background: transparent; font: inherit; font-weight: 750; cursor: pointer; }
+    th mat-icon { width: 15px; height: 15px; font-size: 15px; }
+    td a { color: #0369a1; font-weight: 700; text-decoration: none; }
+    .table-loading, .table-empty { padding: 28px; color: var(--text-muted); text-align: center; font-size: .78rem; }
+    .table-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 10px; color: var(--text-muted); font-size: .74rem; }
+    .table-pagination span:first-child { margin-right: auto; }
+    .table-pagination button { border-radius: 5px; }
+    .table-pagination button:disabled { opacity: .4; cursor: not-allowed; }
+
+    .chart-description { margin: -10px 0 0; color: var(--text-muted); font-size: .74rem; }
+    .trend-chart { display: flex; align-items: flex-end; gap: 6px; min-height: 190px; padding: 16px 12px 0; overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; }
+    .trend-day { display: grid; flex: 1 0 38px; gap: 5px; min-width: 38px; text-align: center; }
+    .trend-bars { display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 140px; }
+    .trend-bars i { display: block; width: 11px; min-height: 2px; border-radius: 3px 3px 0 0; }
+    .trend-impressions, .legend-impressions { background: #0369a1; }.trend-clicks, .legend-clicks { background: #7c3aed; }
+    .trend-day span { color: var(--text-muted); font-size: .62rem; }
+    .trend-legend { display: flex; justify-content: flex-end; gap: 14px; color: var(--text-muted); font-size: .68rem; }
+    .trend-legend span { display: inline-flex; align-items: center; gap: 5px; }.trend-legend i { width: 9px; height: 9px; border-radius: 2px; }
+    .campaign-grid { display: grid; gap: 12px; }
+    .campaign-row { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(360px, 2fr) 90px; align-items: center; gap: 18px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 6px; }
+    .campaign-copy strong, .campaign-copy span { display: block; }
+    .campaign-copy strong { font-size: .82rem; }
+    .campaign-copy span { margin-top: 4px; color: var(--text-muted); font-size: .7rem; }
+    .metric-bars { display: grid; gap: 7px; }
+    .metric-bars > div { display: grid; grid-template-columns: 72px minmax(80px, 1fr) 34px; align-items: center; gap: 8px; }
+    .metric-bars span, .metric-bars b { color: var(--text-muted); font-size: .68rem; font-style: normal; }
+    .metric-bars b { text-align: right; }
+    .bar { display: block; min-width: 2px; height: 7px; border-radius: 3px; }
+    .impressions { background: #0369a1; } .clicks { background: #7c3aed; } .carts { background: #d97706; } .orders-bar { background: #059669; }
+    .ctr { display: grid; gap: 3px; padding-left: 12px; border-left: 1px solid #e2e8f0; }
+    .ctr span { color: var(--text-muted); font-size: .68rem; }.ctr strong { font-size: 1.2rem; }
+    .export-panel { grid-template-columns: 1fr auto; align-items: center; }
+    .export-panel h2 { margin: 4px 0 0; }
+    .export-controls { display: flex; }
+    .export-controls select { border-radius: 6px 0 0 6px; }
+    .export-controls button, .export-status button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border: 0; border-radius: 0 6px 6px 0; color: #fff; background: #0369a1; font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer; }
+    .export-controls mat-icon { width: 17px; height: 17px; font-size: 17px; }
+    .export-status { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 13px; border: 1px solid #bfdbfe; border-radius: 6px; background: #eff6ff; }
+    .export-status div { flex: 1; }.export-status strong, .export-status span { display: block; }.export-status strong { font-size: .78rem; }.export-status span { color: var(--text-muted); font-size: .7rem; }
+    .export-status button { border-radius: 6px; }
+
     .error-banner {
       display: flex; align-items: center; gap: 12px; padding: 16px 20px; border: 1px solid rgba(248, 113, 113, .3);
       color: #dc2626; background: #fef2f2;
@@ -553,6 +706,8 @@ import {
       .analytics-loading { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .content-grid { grid-template-columns: 1fr; }
       .funnel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .campaign-row { grid-template-columns: 1fr; }
+      .ctr { padding: 0; border: 0; }
     }
     @media (max-width: 700px) {
       .page-header { align-items: flex-start; flex-direction: column; }
@@ -565,6 +720,10 @@ import {
       .analytics-loading { grid-template-columns: 1fr; }
       .section-heading { align-items: flex-start; flex-direction: column; }
       .funnel-grid { grid-template-columns: 1fr; }
+      .performance-heading { align-items: stretch; flex-direction: column; }
+      .table-controls input { width: 100%; }
+      .export-panel { grid-template-columns: 1fr; }
+      .export-controls { width: 100%; }.export-controls select { min-width: 0; flex: 1; }
       .kpi-grid, .loading-grid { grid-template-columns: 1fr; }
       .workload-row { grid-template-columns: 110px 1fr 45px; gap: 10px; }
     }
@@ -585,6 +744,20 @@ export class DashboardComponent implements OnInit {
   selectedRangeDays: number | null = 30;
   fromDate = '';
   toDate = '';
+  productRows: ProductPerformance[] = [];
+  promotionRows: PromotionPerformance[] = [];
+  promotionTrend: PromotionTrendPoint[] = [];
+  productsLoading = false;
+  productSearch = '';
+  productPage = 0;
+  productSize = 8;
+  productTotal = 0;
+  productTotalPages = 0;
+  productSortBy = 'productViews';
+  productSortDirection: 'asc' | 'desc' = 'desc';
+  exportType: AnalyticsExportType = 'OVERVIEW';
+  exportJob: AnalyticsExportJob | null = null;
+  exportBusy = false;
 
   constructor(
     public authService: AuthService,
@@ -678,25 +851,136 @@ export class DashboardComponent implements OnInit {
     this.analyticsError = '';
     this.analyticsOverview = null;
     this.funnel = null;
+    this.promotionRows = [];
+    this.promotionTrend = [];
 
     forkJoin({
       overview: this.dashboardService.getAnalyticsOverview(from, to),
-      funnel: this.dashboardService.getFunnelSummary(from, to)
+      funnel: this.dashboardService.getFunnelSummary(from, to),
+      promotion: this.dashboardService.getPromotionPerformance(from, to),
+      trend: this.dashboardService.getPromotionTrend(from, to)
     }).pipe(
       finalize(() => this.analyticsLoading = false)
     ).subscribe({
-      next: ({ overview, funnel }) => {
-        if (!overview.success || !funnel.success) {
-          this.analyticsError = overview.message || funnel.message || 'Analytics data could not be loaded.';
+      next: ({ overview, funnel, promotion, trend }) => {
+        if (!overview.success || !funnel.success || !promotion.success || !trend.success) {
+          this.analyticsError = overview.message || funnel.message || promotion.message || 'Analytics data could not be loaded.';
           return;
         }
         this.analyticsOverview = overview.data;
         this.funnel = funnel.data;
+        this.promotionRows = promotion.data;
+        this.promotionTrend = trend.data;
+        this.productPage = 0;
+        this.loadProducts();
       },
       error: (error) => {
         this.analyticsError = error.error?.message || 'Check the backend connection and try again.';
       }
     });
+  }
+
+  loadProducts(): void {
+    const from = new Date(`${this.fromDate}T00:00:00`);
+    const to = new Date(`${this.toDate}T23:59:59.999`);
+    this.productsLoading = true;
+    this.dashboardService.getProductPerformance(
+      from, to, this.productPage, this.productSize, this.productSearch,
+      this.productSortBy, this.productSortDirection
+    ).pipe(finalize(() => this.productsLoading = false)).subscribe({
+      next: response => {
+        this.productRows = response.success ? response.data.content : [];
+        this.productTotal = response.success ? response.data.totalElements : 0;
+        this.productTotalPages = response.success ? response.data.totalPages : 0;
+      },
+      error: () => {
+        this.productRows = [];
+        this.productTotal = 0;
+        this.productTotalPages = 0;
+      }
+    });
+  }
+
+  applyProductSearch(): void {
+    this.productPage = 0;
+    this.loadProducts();
+  }
+
+  sortProducts(field: string): void {
+    if (this.productSortBy === field) {
+      this.productSortDirection = this.productSortDirection === 'desc' ? 'asc' : 'desc';
+    } else {
+      this.productSortBy = field;
+      this.productSortDirection = field === 'productName' ? 'asc' : 'desc';
+    }
+    this.productPage = 0;
+    this.loadProducts();
+  }
+
+  sortIcon(field: string): string {
+    return this.productSortBy !== field ? 'unfold_more'
+      : this.productSortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward';
+  }
+
+  changeProductPage(delta: number): void {
+    const next = this.productPage + delta;
+    if (next < 0 || next >= this.productTotalPages) return;
+    this.productPage = next;
+    this.loadProducts();
+  }
+
+  barWidth(value: number): number {
+    const max = Math.max(1, ...this.promotionRows.map(row => row.impressions));
+    return Math.max(value > 0 ? 2 : 0, (value / max) * 100);
+  }
+
+  trendHeight(value: number): number {
+    const max = Math.max(1, ...this.promotionTrend.map(point => point.impressions));
+    return Math.max(value > 0 ? 2 : 0, (value / max) * 100);
+  }
+
+  campaignAria(row: PromotionPerformance): string {
+    return `${row.campaign || 'Organic'}: ${row.impressions} impressions, ${row.clicks} clicks, `
+      + `${row.addToCarts} add to carts, ${row.attributedOrders} attributed orders`;
+  }
+
+  createExport(): void {
+    const from = new Date(`${this.fromDate}T00:00:00`);
+    const to = new Date(`${this.toDate}T23:59:59.999`);
+    this.exportBusy = true;
+    this.exportJob = null;
+    this.dashboardService.createExport(this.exportType, from, to).subscribe({
+      next: response => {
+        this.exportBusy = false;
+        this.exportJob = response.data;
+        this.pollExport(response.data.id);
+      },
+      error: () => this.exportBusy = false
+    });
+  }
+
+  downloadExport(): void {
+    if (!this.exportJob) return;
+    this.dashboardService.downloadExport(this.exportJob.id).subscribe(blob => {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = this.exportJob?.fileName || 'analytics-export.csv';
+      anchor.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  private pollExport(id: string, attempt = 0): void {
+    if (attempt >= 20) return;
+    setTimeout(() => this.dashboardService.getExport(id).subscribe({
+      next: response => {
+        this.exportJob = response.data;
+        if (response.data.status === 'PENDING' || response.data.status === 'PROCESSING') {
+          this.pollExport(id, attempt + 1);
+        }
+      }
+    }), 750);
   }
 
   private updateDateInputs(days: number): void {

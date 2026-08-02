@@ -74,7 +74,8 @@ class AnalyticsDashboardServiceTest {
     @Test
     void productPerformance_normalizesFilterAndReturnsPage() {
         var expected = new PageResponse<ProductPerformanceResponse>(List.of(), 1, 25, 0, 0, true);
-        when(analyticsDashboardQueryRepository.productPerformance(any(), any(Integer.class), any(Integer.class)))
+        when(analyticsDashboardQueryRepository.productPerformance(
+                any(), any(Integer.class), any(Integer.class), any(), any(), any()))
                 .thenReturn(expected);
 
         var response = analyticsDashboardService.productPerformance(filter(), 1, 25);
@@ -85,7 +86,10 @@ class AnalyticsDashboardServiceTest {
                         filter().from(), filter().to(), null, null,
                         "summer", "HOME_BEST_SELLERS", "mobile"),
                 1,
-                25);
+                25,
+                null,
+                "productViews",
+                "desc");
     }
 
     @Test

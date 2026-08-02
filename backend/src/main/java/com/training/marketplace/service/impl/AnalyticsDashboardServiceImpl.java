@@ -5,6 +5,7 @@ import com.training.marketplace.dto.request.AnalyticsDashboardFilter;
 import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.ProductPerformanceResponse;
 import com.training.marketplace.dto.response.PromotionRecommendationPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionTrendPointResponse;
 import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.repository.AnalyticsDashboardQueryRepository;
 import com.training.marketplace.service.AnalyticsDashboardService;
@@ -41,13 +42,21 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
     @Override
     public PageResponse<ProductPerformanceResponse> productPerformance(
             AnalyticsDashboardFilter filter, int page, int size) {
+        return productPerformance(filter, page, size, null, "productViews", "desc");
+    }
+
+    @Override
+    public PageResponse<ProductPerformanceResponse> productPerformance(
+            AnalyticsDashboardFilter filter, int page, int size,
+            String search, String sortBy, String sortDirection) {
         if (page < 0) {
             throw new BadRequestException("Analytics page must not be negative");
         }
         if (size < 1 || size > 100) {
             throw new BadRequestException("Analytics page size must be between 1 and 100");
         }
-        return analyticsDashboardQueryRepository.productPerformance(normalize(filter), page, size);
+        return analyticsDashboardQueryRepository.productPerformance(
+                normalize(filter), page, size, search, sortBy, sortDirection);
     }
 
     @Override
@@ -66,6 +75,11 @@ public class AnalyticsDashboardServiceImpl implements AnalyticsDashboardService 
                         counts.attributedOrders(),
                         counts.lastUpdatedAt()))
                 .toList();
+    }
+
+    @Override
+    public List<PromotionTrendPointResponse> promotionTrend(AnalyticsDashboardFilter filter) {
+        return analyticsDashboardQueryRepository.promotionTrend(normalize(filter));
     }
 
     private AnalyticsDashboardFilter normalize(AnalyticsDashboardFilter filter) {
