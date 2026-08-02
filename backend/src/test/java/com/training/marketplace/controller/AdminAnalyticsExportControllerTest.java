@@ -9,6 +9,7 @@ import com.training.marketplace.security.JwtAuthenticationFilter;
 import com.training.marketplace.security.RateLimitingFilter;
 import com.training.marketplace.security.SecurityConfig;
 import com.training.marketplace.service.AnalyticsExportService;
+import com.training.marketplace.service.AuditService;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -44,6 +46,7 @@ class AdminAnalyticsExportControllerTest {
     @Autowired private ObjectMapper objectMapper;
 
     @MockBean private AnalyticsExportService analyticsExportService;
+    @MockBean private AuditService auditService;
     @MockBean private JwtAuthenticationFilter jwtAuthenticationFilter;
     @MockBean private RateLimitingFilter rateLimitingFilter;
 
@@ -62,7 +65,7 @@ class AdminAnalyticsExportControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "MANAGER")
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void create_returnsAcceptedJob() throws Exception {
         UUID id = UUID.randomUUID();
         when(analyticsExportService.create(any())).thenReturn(new AnalyticsExportJobResponse(
@@ -86,10 +89,13 @@ class AdminAnalyticsExportControllerTest {
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.data.id").value(id.toString()))
                 .andExpect(jsonPath("$.data.status").value("PENDING"));
+
+        verify(auditService).record(
+                "admin", "ANALYTICS_EXPORT_CREATE", "AnalyticsExportJob", id, "type=OVERVIEW");
     }
 
     @Test
-    @WithMockUser(roles = "MANAGER")
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void download_returnsCsvAttachment() throws Exception {
         UUID id = UUID.randomUUID();
         byte[] csv = "productViews,orders\n10,2\n".getBytes(StandardCharsets.UTF_8);
@@ -102,5 +108,24 @@ class AdminAnalyticsExportControllerTest {
                 .andExpect(header().string("Content-Disposition",
                         org.hamcrest.Matchers.containsString("analytics.csv")))
                 .andExpect(content().bytes(csv));
+
+        verify(auditService).record(
+                "admin", "ANALYTICS_EXPORT_DOWNLOAD", "AnalyticsExportJob", id,
+                "fileName=analytics.csv");
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void create_managerIsForbidden() throws Exception {
+        var request = new CreateAnalyticsExportRequest(
+                AnalyticsExportType.OVERVIEW,
+                Instant.parse("2026-07-01T00:00:00Z"),
+                Instant.parse("2026-07-31T00:00:00Z"),
+                null, null, null, null, null);
+
+        mockMvc.perform(post("/api/v1/admin/analytics/exports")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(request)))
+                .andExpect(status().isForbidden());
     }
 }
