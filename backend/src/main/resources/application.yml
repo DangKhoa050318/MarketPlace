@@ -77,6 +77,8 @@ logging:
     com.training.marketplace: DEBUG
 
 marketplace:
+  analytics:
+    cache-ttl: ${ANALYTICS_CACHE_TTL:5m}
   recommendation:
     best-seller-lookback: ${RECOMMENDATION_BEST_SELLER_LOOKBACK:30d}
     valid-order-statuses: ${RECOMMENDATION_VALID_ORDER_STATUSES:CONFIRMED,PROCESSING,SHIPPED,DELIVERED}
