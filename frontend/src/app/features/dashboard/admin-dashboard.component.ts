@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { forkJoin } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import {
   AnalyticsOverview,
@@ -75,7 +77,36 @@ import {
       </div>
 
       <ng-container *ngIf="stats as data">
-        <section class="analytics-section" *ngIf="analyticsOverview as overview">
+        <div class="analytics-status analytics-loading" *ngIf="analyticsLoading" aria-live="polite">
+          <span class="analytics-skeleton" *ngFor="let item of analyticsSkeletonItems"></span>
+          <span class="visually-hidden">Loading analytics overview</span>
+        </div>
+
+        <div class="analytics-status analytics-error" *ngIf="analyticsError" role="alert">
+          <mat-icon>query_stats</mat-icon>
+          <div>
+            <strong>Analytics data is unavailable</strong>
+            <span>{{ analyticsError }}</span>
+          </div>
+          <button type="button" (click)="loadAnalytics()">Try again</button>
+        </div>
+
+        <div class="analytics-status analytics-empty"
+             *ngIf="!analyticsLoading && !analyticsError && analyticsEmpty">
+          <mat-icon>insights</mat-icon>
+          <div>
+            <strong>No journey activity in this period</strong>
+            <span>Choose a wider date range to review storefront conversion data.</span>
+          </div>
+        </div>
+
+        <div class="stale-notice" *ngIf="!analyticsLoading && !analyticsError && analyticsStale" role="status">
+          <mat-icon>history</mat-icon>
+          Analytics data may be stale. Refresh to request the latest aggregate.
+        </div>
+
+        <section class="analytics-section" *ngIf="!analyticsLoading && analyticsOverview as overview">
+          <ng-container *ngIf="!analyticsEmpty">
           <div class="section-heading">
             <div>
               <span class="panel-label">Journey Analytics</span>
@@ -113,6 +144,7 @@ import {
               <small>Customers with repeat orders</small>
             </article>
           </div>
+          </ng-container>
         </section>
 
         <div class="kpi-grid">
@@ -269,7 +301,7 @@ import {
           </aside>
         </div>
 
-        <section class="panel surface-card funnel-panel" *ngIf="funnel as summary">
+        <section class="panel surface-card funnel-panel" *ngIf="!analyticsEmpty && funnel as summary">
           <div class="panel-heading">
             <div>
               <span class="panel-label">Customer Journey</span>
@@ -340,6 +372,35 @@ import {
     .apply-range mat-icon { width: 18px; height: 18px; font-size: 18px; }
 
     .analytics-section { display: grid; gap: 14px; }
+    .analytics-status {
+      display: flex; align-items: center; gap: 12px; min-height: 88px; padding: 18px;
+      box-sizing: border-box; border: 1px solid #dbe4ee; border-radius: 6px; background: #ffffff;
+    }
+    .analytics-status div { flex: 1; }
+    .analytics-status strong, .analytics-status span { display: block; }
+    .analytics-status strong { font-size: .84rem; }
+    .analytics-status span { margin-top: 3px; color: var(--text-muted); font-size: .74rem; }
+    .analytics-status button {
+      border: 0; color: #0369a1; background: transparent; font: inherit; font-size: .78rem;
+      font-weight: 700; cursor: pointer;
+    }
+    .analytics-loading { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; padding: 0; border: 0; }
+    .analytics-skeleton {
+      min-height: 118px; margin: 0 !important; border-radius: 6px;
+      background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+      background-size: 200% 100%; animation: shimmer 1.2s infinite;
+    }
+    .analytics-error { border-color: #fecaca; color: #b91c1c; background: #fef2f2; }
+    .analytics-empty { color: #475569; background: #f8fafc; }
+    .stale-notice {
+      display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #fde68a;
+      border-radius: 6px; color: #92400e; background: #fffbeb; font-size: .74rem; font-weight: 650;
+    }
+    .stale-notice mat-icon { width: 18px; height: 18px; font-size: 18px; }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
     .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
     .section-heading h2 { margin: 4px 0 0; font-size: 1.1rem; }
     .analytics-kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
@@ -473,10 +534,12 @@ import {
       height: 150px; border-radius: 16px; background: #e2e8f0;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes shimmer { to { background-position: -200% 0; } }
 
     @media (max-width: 1050px) {
       .kpi-grid, .loading-grid { grid-template-columns: repeat(2, 1fr); }
       .analytics-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .analytics-loading { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .content-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 700px) {
@@ -487,6 +550,7 @@ import {
       .range-presets button { flex: 1; }
       .analytics-toolbar label { flex: 1 1 130px; }
       .analytics-kpi-grid { grid-template-columns: 1fr; }
+      .analytics-loading { grid-template-columns: 1fr; }
       .section-heading { align-items: flex-start; flex-direction: column; }
       .kpi-grid, .loading-grid { grid-template-columns: 1fr; }
       .workload-row { grid-template-columns: 110px 1fr 45px; gap: 10px; }
@@ -495,10 +559,13 @@ import {
 })
 export class DashboardComponent implements OnInit {
   readonly skeletonItems = Array.from({ length: 6 });
+  readonly analyticsSkeletonItems = Array.from({ length: 5 });
   readonly rangePresets = [7, 30, 90];
   stats: DashboardStats | null = null;
   analyticsOverview: AnalyticsOverview | null = null;
   funnel: FunnelSummary | null = null;
+  analyticsLoading = false;
+  analyticsError = '';
   loading = false;
   errorMessage = '';
   lastUpdated: Date | null = null;
@@ -527,6 +594,24 @@ export class DashboardComponent implements OnInit {
 
   get isDateRangeValid(): boolean {
     return Boolean(this.fromDate && this.toDate && this.fromDate <= this.toDate);
+  }
+
+  get analyticsEmpty(): boolean {
+    if (!this.analyticsOverview) {
+      return false;
+    }
+    return this.analyticsOverview.productViews === 0
+      && this.analyticsOverview.addToCarts === 0
+      && this.analyticsOverview.beginCheckouts === 0
+      && this.analyticsOverview.orders === 0;
+  }
+
+  get analyticsStale(): boolean {
+    if (!this.analyticsOverview?.lastUpdatedAt) {
+      return false;
+    }
+    const updatedAt = new Date(this.analyticsOverview.lastUpdatedAt).getTime();
+    return Number.isFinite(updatedAt) && Date.now() - updatedAt > 10 * 60 * 1000;
   }
 
   ngOnInit(): void {
@@ -573,18 +658,31 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  private loadAnalytics(): void {
+  loadAnalytics(): void {
     const from = new Date(`${this.fromDate}T00:00:00`);
     const to = new Date(`${this.toDate}T23:59:59.999`);
-    this.dashboardService.getAnalyticsOverview(from, to).subscribe({
-      next: (response) => {
-        this.analyticsOverview = response.success ? response.data : null;
+    this.analyticsLoading = true;
+    this.analyticsError = '';
+    this.analyticsOverview = null;
+    this.funnel = null;
+
+    forkJoin({
+      overview: this.dashboardService.getAnalyticsOverview(from, to),
+      funnel: this.dashboardService.getFunnelSummary(from, to)
+    }).pipe(
+      finalize(() => this.analyticsLoading = false)
+    ).subscribe({
+      next: ({ overview, funnel }) => {
+        if (!overview.success || !funnel.success) {
+          this.analyticsError = overview.message || funnel.message || 'Analytics data could not be loaded.';
+          return;
+        }
+        this.analyticsOverview = overview.data;
+        this.funnel = funnel.data;
       },
-      error: () => this.analyticsOverview = null
-    });
-    this.dashboardService.getFunnelSummary(from, to).subscribe({
-      next: (response) => this.funnel = response.success ? response.data : null,
-      error: () => this.funnel = null
+      error: (error) => {
+        this.analyticsError = error.error?.message || 'Check the backend connection and try again.';
+      }
     });
   }
 
