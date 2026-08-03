@@ -43,5 +43,7 @@ cd ../frontend && npm install && npm start   # http://localhost:4200
 
 Tài khoản seed (mật khẩu `admin123`): `admin`, `manager`, `staff`, `customer`.
 
+> ⚠️ Seed chỉ dùng **local**. Khi deploy thật: đổi mật khẩu mạnh cho mọi tài khoản (đừng giữ `admin123`) và đặt `JWT_SECRET` **riêng cho từng môi trường** (app không còn giá trị default — bắt buộc set, xem `backend/.env.example`).
+
 > ℹ️ Backend/frontend đã compile & boot được (xem [`docs/MERGE-STATUS.md`](docs/MERGE-STATUS.md)).
 > Chạy `docker compose down -v` một lần khi khởi tạo DB lần đầu.
