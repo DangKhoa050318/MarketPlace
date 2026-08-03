@@ -79,6 +79,9 @@ logging:
     com.training.marketplace: DEBUG
 
 marketplace:
+  payment:
+    # Safe default: orders stay PENDING and Rabbit retries/DLQs until a real provider adapter is configured.
+    provider: ${PAYMENT_PROVIDER:disabled}
   features:
     review-qa: ${FEATURE_REVIEW_QA_ENABLED:true}
     promotions: ${FEATURE_PROMOTIONS_ENABLED:true}

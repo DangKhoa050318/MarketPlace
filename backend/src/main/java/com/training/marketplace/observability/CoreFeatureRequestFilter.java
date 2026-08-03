@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -22,6 +23,7 @@ import java.util.Locale;
 
 @Slf4j
 @Component
+@ConditionalOnBean(CoreFeatureProperties.class)
 @RequiredArgsConstructor
 public class CoreFeatureRequestFilter extends OncePerRequestFilter {
 
