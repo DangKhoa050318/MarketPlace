@@ -9,5 +9,6 @@ public record CartResponse(
         Long userId,
         List<CartItemResponse> items,
         BigDecimal totalAmount,
+        BigDecimal shippingFee,
         Integer totalItems
 ) {}

@@ -13,6 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { User, UserService } from '../user.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -35,7 +36,8 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
     MatFormFieldModule,
     MatSelectModule,
     MatTooltipModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatSlideToggleModule
   ],
   template: `
     <div class="admin-users-container">
@@ -168,26 +170,25 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
               </td>
             </ng-container>
 
-            <!-- Status -->
-            <ng-container matColumnDef="active">
-              <th mat-header-cell *matHeaderCellDef> Status </th>
-              <td mat-cell *matCellDef="let user">
-                <span class="badge-pill" [class.badge-delivered]="user.active" [class.badge-pending]="!user.active">
-                  {{ user.active ? 'ACTIVE' : 'INACTIVE' }}
-                </span>
-              </td>
-            </ng-container>
-
-            <!-- Actions -->
+            <!-- Actions & Status Switch Column -->
             <ng-container matColumnDef="actions">
-              <th mat-header-cell *matHeaderCellDef> Actions </th>
+              <th mat-header-cell *matHeaderCellDef class="actions-header"> Actions & Status </th>
               <td mat-cell *matCellDef="let user">
-                <div class="action-buttons">
-                  <a mat-icon-button [routerLink]="['/admin/users', user.id, 'edit']" matTooltip="Edit User" class="action-btn edit">
+                <div class="actions-cell">
+                  <a mat-icon-button [routerLink]="['/admin/users', user.id, 'edit']" matTooltip="Edit User Profile" class="action-btn edit">
                     <mat-icon>edit</mat-icon>
                   </a>
-                  <button mat-icon-button color="warn" (click)="onDelete(user)" matTooltip="Delete User" class="action-btn delete">
-                    <mat-icon>delete</mat-icon>
+                  <button type="button" class="status-toggle-pill"
+                          [class.active]="user.active"
+                          [class.banned]="!user.active"
+                          (click)="onToggleBanStatus(user)"
+                          [matTooltip]="user.active ? 'Click to Ban User Account' : 'Click to Reactivate User Account'">
+                    <span class="toggle-track">
+                      <span class="toggle-thumb">
+                        <mat-icon class="thumb-icon">{{ user.active ? 'check' : 'block' }}</mat-icon>
+                      </span>
+                    </span>
+                    <span class="toggle-label">{{ user.active ? 'ACTIVE' : 'BANNED' }}</span>
                   </button>
                 </div>
               </td>
@@ -423,7 +424,101 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
       gap: 4px;
     }
 
-    .action-btn.edit { color: #0284c7; }
+    .actions-header {
+      text-align: right;
+    }
+
+    .actions-cell {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .action-btn.edit {
+      color: #0284c7;
+    }
+
+    .status-toggle-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px 4px 6px;
+      border-radius: 20px;
+      border: 1px solid transparent;
+      background: transparent;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+    }
+
+    .status-toggle-pill.active {
+      background: #ecfdf5 !important;
+      border: 1px solid rgba(16, 185, 129, 0.4) !important;
+      color: #059669 !important;
+    }
+
+    .status-toggle-pill.banned {
+      background: #fef2f2 !important;
+      border: 1px solid rgba(239, 68, 68, 0.4) !important;
+      color: #dc2626 !important;
+      flex-direction: row-reverse;
+      padding: 4px 6px 4px 12px;
+    }
+
+    .toggle-track {
+      display: flex;
+      align-items: center;
+      width: 34px;
+      height: 20px;
+      border-radius: 10px;
+      padding: 2px;
+      transition: all 0.25s ease;
+      box-sizing: border-box;
+    }
+
+    .status-toggle-pill.active .toggle-track {
+      background-color: #10b981 !important;
+      justify-content: flex-start;
+    }
+
+    .status-toggle-pill.banned .toggle-track {
+      background-color: #ef4444 !important;
+      justify-content: flex-end;
+    }
+
+    .toggle-thumb {
+      display: grid;
+      place-items: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background-color: #ffffff !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .thumb-icon {
+      font-size: 11px !important;
+      width: 11px !important;
+      height: 11px !important;
+      font-weight: 900;
+      line-height: 11px;
+    }
+
+    .status-toggle-pill.active .thumb-icon {
+      color: #047857 !important;
+    }
+
+    .status-toggle-pill.banned .thumb-icon {
+      color: #b91c1c !important;
+    }
+
+    .toggle-label {
+      font-size: 0.74rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
 
     .empty-state {
       text-align: center;
@@ -442,7 +537,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 export class UserListComponent implements OnInit {
   users: User[] = [];
   filteredUsers: User[] = [];
-  displayedColumns = ['id', 'fullName', 'email', 'role', 'active', 'actions'];
+  displayedColumns = ['id', 'fullName', 'email', 'role', 'actions'];
   totalElements = 0;
   pageSize = 10;
   currentPage = 0;
@@ -474,13 +569,20 @@ export class UserListComponent implements OnInit {
 
   loadUsers(): void {
     this.loading = true;
-    this.userService.getAll(this.currentPage, this.pageSize).subscribe({
+    let activeParam: boolean | undefined = undefined;
+    if (this.selectedStatus === 'ACTIVE') {
+      activeParam = true;
+    } else if (this.selectedStatus === 'INACTIVE') {
+      activeParam = false;
+    }
+
+    this.userService.getAll(this.currentPage, this.pageSize, this.searchQuery, this.selectedRole, activeParam).subscribe({
       next: (res) => {
         this.loading = false;
         if (res.success && res.data) {
           this.users = res.data.content;
+          this.filteredUsers = res.data.content;
           this.totalElements = res.data.totalElements;
-          this.applyFilters();
         }
       },
       error: () => {
@@ -490,33 +592,12 @@ export class UserListComponent implements OnInit {
     });
   }
 
-  applyFilters(): void {
-    let result = [...this.users];
-
-    if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase();
-      result = result.filter(u =>
-        u.username.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        (u.fullName && u.fullName.toLowerCase().includes(q))
-      );
-    }
-
-    if (this.selectedRole !== 'ALL') {
-      result = result.filter(u => u.role === this.selectedRole);
-    }
-
-    if (this.selectedStatus === 'ACTIVE') {
-      result = result.filter(u => u.active);
-    } else if (this.selectedStatus === 'INACTIVE') {
-      result = result.filter(u => !u.active);
-    }
-
-    this.filteredUsers = result;
-  }
-
   onFilterChange(): void {
-    this.applyFilters();
+    this.currentPage = 0;
+    if (this.paginator) {
+      this.paginator.pageIndex = 0;
+    }
+    this.loadUsers();
   }
 
   onPageChange(event: PageEvent): void {
@@ -525,20 +606,21 @@ export class UserListComponent implements OnInit {
     this.loadUsers();
   }
 
-  onDelete(user: User): void {
-    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
-      data: { title: 'Delete User Account', message: `Are you sure you want to delete user "${user.username}"?` }
-    });
+  onToggleBanStatus(user: User): void {
+    const newStatus = !user.active;
+    const isBan = !newStatus;
 
-    dialogRef.afterClosed().subscribe(confirmed => {
-      if (confirmed) {
-        this.userService.delete(user.id).subscribe({
-          next: () => {
-            this.notification.success('User account deleted');
-            this.loadUsers();
-          },
-          error: () => this.notification.error('Failed to delete user')
-        });
+    // Optimistic UI update for instant visual response
+    user.active = newStatus;
+
+    this.userService.update(user.id, { active: newStatus }).subscribe({
+      next: () => {
+        this.notification.success(`User "${user.username}" ${isBan ? 'banned' : 'reactivated'} successfully`);
+      },
+      error: (err) => {
+        // Rollback on error
+        user.active = !newStatus;
+        this.notification.error(err.error?.message || `Failed to update status for "${user.username}"`);
       }
     });
   }

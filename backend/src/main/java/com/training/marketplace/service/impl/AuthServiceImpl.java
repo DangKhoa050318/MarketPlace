@@ -11,6 +11,7 @@ import com.training.marketplace.exception.DuplicateResourceException;
 import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.security.JwtTokenProvider;
 import com.training.marketplace.service.AuthService;
+import com.training.marketplace.service.RefreshTokenStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -27,6 +28,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
+    private final RefreshTokenStore refreshTokenStore;
 
     @Override
     @Transactional
@@ -51,6 +53,7 @@ public class AuthServiceImpl implements AuthService {
 
         String accessToken = jwtTokenProvider.generateAccessToken(user.getUsername());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUsername());
+        storeRefreshToken(user.getUsername(), refreshToken);
 
         return new AuthResponse(accessToken, refreshToken, user.getUsername(), user.getRole().name());
     }
@@ -65,8 +68,13 @@ public class AuthServiceImpl implements AuthService {
                 .or(() -> userRepository.findByEmail(identifier))
                 .orElseThrow(() -> new BadRequestException("User not found"));
 
+        if (!user.isActive()) {
+            throw new BadRequestException("User account has been banned or deactivated. Please contact support.");
+        }
+
         String accessToken = jwtTokenProvider.generateAccessToken(user.getUsername());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUsername());
+        storeRefreshToken(user.getUsername(), refreshToken);
 
         return new AuthResponse(accessToken, refreshToken, user.getUsername(), user.getRole().name());
     }
@@ -78,12 +86,46 @@ public class AuthServiceImpl implements AuthService {
         }
 
         String username = jwtTokenProvider.extractUsername(request.refreshToken());
+        String currentTokenId = jwtTokenProvider.extractTokenId(request.refreshToken());
+        if (currentTokenId == null || currentTokenId.isBlank()) {
+            throw new BadRequestException("Invalid refresh token");
+        }
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BadRequestException("User not found"));
 
+        if (!user.isActive()) {
+            throw new BadRequestException("User account has been banned or deactivated. Please contact support.");
+        }
+
         String accessToken = jwtTokenProvider.generateAccessToken(username);
         String refreshToken = jwtTokenProvider.generateRefreshToken(username);
+        String newTokenId = jwtTokenProvider.extractTokenId(refreshToken);
+        if (!refreshTokenStore.rotate(
+                username, currentTokenId, newTokenId, jwtTokenProvider.getRefreshTokenTtl())) {
+            throw new BadRequestException("Refresh token has been revoked or already used");
+        }
 
         return new AuthResponse(accessToken, refreshToken, username, user.getRole().name());
+    }
+
+    @Override
+    public void logout(RefreshTokenRequest request) {
+        if (!jwtTokenProvider.isTokenValid(request.refreshToken(), "refresh")) {
+            return;
+        }
+        String tokenId = jwtTokenProvider.extractTokenId(request.refreshToken());
+        if (tokenId == null || tokenId.isBlank()) {
+            return;
+        }
+        refreshTokenStore.revoke(
+                jwtTokenProvider.extractUsername(request.refreshToken()),
+                tokenId);
+    }
+
+    private void storeRefreshToken(String username, String refreshToken) {
+        refreshTokenStore.save(
+                username,
+                jwtTokenProvider.extractTokenId(refreshToken),
+                jwtTokenProvider.getRefreshTokenTtl());
     }
 }

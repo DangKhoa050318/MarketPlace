@@ -98,8 +98,8 @@ class CartControllerTest {
     @WithMockUser(username = "testuser", roles = {"CUSTOMER"})
     void getCart_validUser_returns200AndCartResponse() throws Exception {
         // Given
-        var cartItem = new CartItemResponse(10L, "SKU-10", "Phone", "Silver", BigDecimal.valueOf(500), 2, BigDecimal.valueOf(1000), "http://img.jpg");
-        var cartResponse = new CartResponse(1L, List.of(cartItem), BigDecimal.valueOf(1000), 2);
+        var cartItem = new CartItemResponse(10L, 100L, "SKU-10", "Phone", "Silver", BigDecimal.valueOf(500), 2, BigDecimal.valueOf(1000), "http://img.jpg");
+        var cartResponse = new CartResponse(1L, List.of(cartItem), BigDecimal.valueOf(1000), BigDecimal.ZERO, 2);
         when(cartService.getCart(1L)).thenReturn(cartResponse);
 
         // When & Then
@@ -122,8 +122,8 @@ class CartControllerTest {
     void addItem_validRequest_returns200AndCartResponse() throws Exception {
         // Given
         var request = new AddToCartRequest(10L, 2);
-        var cartItem = new CartItemResponse(10L, "SKU-10", "Phone", "Silver", BigDecimal.valueOf(500), 2, BigDecimal.valueOf(1000), "http://img.jpg");
-        var cartResponse = new CartResponse(1L, List.of(cartItem), BigDecimal.valueOf(1000), 2);
+        var cartItem = new CartItemResponse(10L, 100L, "SKU-10", "Phone", "Silver", BigDecimal.valueOf(500), 2, BigDecimal.valueOf(1000), "http://img.jpg");
+        var cartResponse = new CartResponse(1L, List.of(cartItem), BigDecimal.valueOf(1000), BigDecimal.ZERO, 2);
 
         when(cartService.addItem(eq(1L), any(AddToCartRequest.class))).thenReturn(cartResponse);
 
@@ -143,8 +143,8 @@ class CartControllerTest {
     void updateQuantity_validRequest_returns200AndCartResponse() throws Exception {
         // Given
         var request = new UpdateCartItemRequest(3);
-        var cartItem = new CartItemResponse(10L, "SKU-10", "Phone", "Silver", BigDecimal.valueOf(500), 3, BigDecimal.valueOf(1500), "http://img.jpg");
-        var cartResponse = new CartResponse(1L, List.of(cartItem), BigDecimal.valueOf(1500), 3);
+        var cartItem = new CartItemResponse(10L, 100L, "SKU-10", "Phone", "Silver", BigDecimal.valueOf(500), 3, BigDecimal.valueOf(1500), "http://img.jpg");
+        var cartResponse = new CartResponse(1L, List.of(cartItem), BigDecimal.valueOf(1500), BigDecimal.ZERO, 3);
 
         when(cartService.updateQuantity(eq(1L), eq(10L), eq(3))).thenReturn(cartResponse);
 

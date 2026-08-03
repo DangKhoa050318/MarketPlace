@@ -4,11 +4,13 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.training.marketplace.analytics.AnalyticsCacheNames;
 import com.training.marketplace.dto.response.StockLevelResponse;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -19,6 +21,7 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
+import java.util.Map;
 
 @Configuration
 @EnableCaching
@@ -64,7 +67,9 @@ public class RedisConfig {
     }
 
     @Bean
-    public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+    public CacheManager cacheManager(
+            RedisConnectionFactory connectionFactory,
+            @Value("${marketplace.analytics.cache-ttl:5m}") Duration analyticsCacheTtl) {
         ObjectMapper mapper = createObjectMapper();
         GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer(mapper);
 
@@ -74,8 +79,15 @@ public class RedisConfig {
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer));
 
+        RedisCacheConfiguration analyticsCacheConfig = cacheConfig.entryTtl(analyticsCacheTtl);
+
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(cacheConfig)
+                .withInitialCacheConfigurations(Map.of(
+                        AnalyticsCacheNames.OVERVIEW, analyticsCacheConfig,
+                        AnalyticsCacheNames.PRODUCT_PERFORMANCE, analyticsCacheConfig,
+                        AnalyticsCacheNames.PROMOTION_RECOMMENDATION, analyticsCacheConfig,
+                        AnalyticsCacheNames.PROMOTION_TREND, analyticsCacheConfig))
                 .build();
     }
 

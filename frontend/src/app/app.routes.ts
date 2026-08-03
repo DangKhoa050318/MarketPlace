@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
+import { analyticsGuard } from './core/guards/analytics.guard';
 
 export const routes: Routes = [
   // User Storefront Routes (Immersive 3D Glassmorphism Theme)
@@ -49,6 +50,7 @@ export const routes: Routes = [
       { path: 'admin', redirectTo: 'admin/dashboard', pathMatch: 'full' },
       {
         path: 'admin/dashboard',
+        canActivate: [analyticsGuard],
         loadComponent: () => import('./features/dashboard/admin-dashboard.component').then(m => m.DashboardComponent)
       },
       {

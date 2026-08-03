@@ -143,7 +143,7 @@ import { ProductQuestionListComponent } from '../../questions/product-question-l
         [limit]="8">
       </app-recommendation-carousel>
 
-      <section class="reviews surface-card">
+      <section class="reviews surface-card" id="reviews-section">
         <h2>Đánh giá & Nhận xét</h2>
         @if (summaryLoading) {
           <div class="state compact"><mat-spinner diameter="30"></mat-spinner></div>
@@ -153,20 +153,10 @@ import { ProductQuestionListComponent } from '../../questions/product-question-l
           <app-rating-summary [summary]="summary"></app-rating-summary>
         }
 
-        @if (eligibilityLoading) {
-          <p>Kiểm tra quyền viết đánh giá…</p>
-        } @else if (eligibility && (eligibility.eligible || editingReview)) {
-          <app-review-form [review]="editingReview" [saving]="saving" [error]="saveError"
-                           (save)="saveReview($event)" (cancel)="editingReview = undefined"></app-review-form>
-        } @else if (eligibility?.existingReview) {
-          <p class="eligibility">{{ eligibility?.message }} Bạn có thể chỉnh sửa phía dưới.</p>
-        }
-
         <app-review-list [reviews]="reviews" [loading]="reviewsLoading" [error]="reviewsError"
                          [totalElements]="totalElements" [page]="page" [pageSize]="pageSize"
-                         [editableReviewId]="eligibility?.existingReview?.id"
                          (filterChange)="changeFilter($event)" (pageChange)="changePage($event)"
-                         (retry)="loadReviews()" (edit)="editingReview = $event"></app-review-list>
+                         (retry)="loadReviews()"></app-review-list>
       </section>
 
       <app-product-question-list [productId]="product.id"></app-product-question-list>
@@ -293,6 +283,17 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
       this.loadEligibility();
       this.loadWishlistStatus(productId);
       this.recordRecentlyViewed(productId);
+
+      const writeReview = this.route.snapshot?.queryParamMap?.get('writeReview');
+      const fragment = this.route.snapshot?.fragment;
+      if (writeReview === 'true' || fragment === 'reviews') {
+        setTimeout(() => {
+          const el = document.getElementById('reviews-section');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 500);
+      }
     });
   }
 

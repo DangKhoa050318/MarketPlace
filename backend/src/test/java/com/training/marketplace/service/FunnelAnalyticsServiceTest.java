@@ -26,10 +26,12 @@ class FunnelAnalyticsServiceTest {
     void summarize_calculatesConversionAndDropOffAcrossFunnelSteps() {
         Instant from = Instant.parse("2026-07-01T00:00:00Z");
         Instant to = Instant.parse("2026-08-01T00:00:00Z");
-        when(analyticsEventRepository.summarizeFunnel(from, to, 1L, 10L, "summer", "mobile"))
+        when(analyticsEventRepository.summarizeFunnel(
+                from, to, 1L, 10L, "summer", "HOME_BEST_SELLERS", "mobile"))
                 .thenReturn(counts(100, 40, 20, 5));
 
-        var result = funnelAnalyticsService.summarize(from, to, 1L, 10L, " summer ", " mobile ");
+        var result = funnelAnalyticsService.summarize(
+                from, to, 1L, 10L, " summer ", " HOME_BEST_SELLERS ", " mobile ");
 
         assertThat(result.steps()).extracting("step")
                 .containsExactly("PRODUCT_VIEW", "ADD_TO_CART", "BEGIN_CHECKOUT", "ORDER_CREATED");
@@ -45,10 +47,10 @@ class FunnelAnalyticsServiceTest {
     void summarize_zeroPreviousStepAvoidsDivideByZero() {
         Instant from = Instant.parse("2026-07-01T00:00:00Z");
         Instant to = Instant.parse("2026-08-01T00:00:00Z");
-        when(analyticsEventRepository.summarizeFunnel(from, to, null, null, null, null))
+        when(analyticsEventRepository.summarizeFunnel(from, to, null, null, null, null, null))
                 .thenReturn(counts(0, 0, 0, 0));
 
-        var result = funnelAnalyticsService.summarize(from, to, null, null, null, null);
+        var result = funnelAnalyticsService.summarize(from, to, null, null, null, null, null);
 
         assertThat(result.steps()).allSatisfy(step -> {
             assertThat(step.conversionRate()).isZero();
@@ -61,7 +63,8 @@ class FunnelAnalyticsServiceTest {
         Instant from = Instant.parse("2026-08-01T00:00:00Z");
         Instant to = Instant.parse("2026-07-01T00:00:00Z");
 
-        assertThatThrownBy(() -> funnelAnalyticsService.summarize(from, to, null, null, null, null))
+        assertThatThrownBy(() -> funnelAnalyticsService.summarize(
+                from, to, null, null, null, null, null))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("from/to");
     }

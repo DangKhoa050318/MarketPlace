@@ -9,7 +9,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.time.Duration;
 import java.util.Date;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Component
@@ -29,7 +31,17 @@ public class JwtTokenProvider {
     }
 
     public String generateRefreshToken(String username) {
-        return generateToken(username, "refresh", refreshTokenExpiration);
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + refreshTokenExpiration);
+
+        return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .subject(username)
+                .claim("token_type", "refresh")
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
+                .compact();
     }
 
     private String generateToken(String username, String tokenType, long expiration) {
@@ -47,6 +59,14 @@ public class JwtTokenProvider {
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    public String extractTokenId(String token) {
+        return extractClaim(token, Claims::getId);
+    }
+
+    public Duration getRefreshTokenTtl() {
+        return Duration.ofMillis(refreshTokenExpiration);
     }
 
     public boolean isTokenValid(String token) {

@@ -52,7 +52,9 @@ spring:
     port: ${MAIL_PORT:1025}
 
 jwt:
-  secret: ${JWT_SECRET:dHJhaW5pbmctc3RhcnRlci1zZWNyZXQta2V5LW11c3QtYmUtYXQtbGVhc3QtMjU2LWJpdHMtbG9uZy1mb3Itc2VjdXJpdHk=}
+  # REQUIRED. No default on purpose — set a unique 256-bit secret per environment (see .env.example).
+  # The app fails fast if JWT_SECRET is unset, so a shared/hardcoded key can never leak via the repo.
+  secret: ${JWT_SECRET}
   access-token-expiration: 900000
   refresh-token-expiration: 604800000
 
@@ -77,6 +79,16 @@ logging:
     com.training.marketplace: DEBUG
 
 marketplace:
+  payment:
+    # Safe default: orders stay PENDING and Rabbit retries/DLQs until a real provider adapter is configured.
+    provider: ${PAYMENT_PROVIDER:disabled}
+  features:
+    review-qa: ${FEATURE_REVIEW_QA_ENABLED:true}
+    promotions: ${FEATURE_PROMOTIONS_ENABLED:true}
+    recommendations: ${FEATURE_RECOMMENDATIONS_ENABLED:true}
+    journey-analytics: ${FEATURE_JOURNEY_ANALYTICS_ENABLED:true}
+  analytics:
+    cache-ttl: ${ANALYTICS_CACHE_TTL:5m}
   recommendation:
     best-seller-lookback: ${RECOMMENDATION_BEST_SELLER_LOOKBACK:30d}
     valid-order-statuses: ${RECOMMENDATION_VALID_ORDER_STATUSES:CONFIRMED,PROCESSING,SHIPPED,DELIVERED}
@@ -84,3 +96,12 @@ marketplace:
     min-co-viewed-occurrences: ${RECOMMENDATION_MIN_CO_VIEWED_OCCURRENCES:2}
     co-purchased-lookback: ${RECOMMENDATION_CO_PURCHASED_LOOKBACK:90d}
     min-co-purchased-occurrences: ${RECOMMENDATION_MIN_CO_PURCHASED_OCCURRENCES:2}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized

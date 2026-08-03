@@ -7,6 +7,7 @@ export interface ProductReview {
   rating: number;
   title: string;
   content: string;
+  imageUrl?: string;
   status: 'APPROVED' | 'HIDDEN' | 'DELETED';
   isVerifiedPurchase: boolean;
   isEdited: boolean;
@@ -32,6 +33,8 @@ export interface ReviewEligibility {
 
 export interface ReviewPayload {
   rating: number;
-  title: string;
+  title?: string;
   content: string;
+  imageUrl?: string;
+  orderItemId?: number;
 }

@@ -13,6 +13,7 @@ export interface Cart {
   userId: number;
   items: CartItem[];
   totalAmount: number;
+  shippingFee?: number;
   totalItems: number;
 }
 

@@ -28,7 +28,14 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public Page<UserResponse> getAll(Pageable pageable) {
-        return userRepository.findAll(pageable).map(userMapper::toResponse);
+        return getAll(null, null, null, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<UserResponse> getAll(String search, Role role, Boolean active, Pageable pageable) {
+        String searchPattern = (search != null && !search.isBlank()) ? "%" + search.trim().toLowerCase() + "%" : null;
+        return userRepository.searchUsers(searchPattern, role, active, pageable).map(userMapper::toResponse);
     }
 
     @Override
@@ -69,6 +76,9 @@ public class UserServiceImpl implements UserService {
         }
 
         userMapper.updateEntity(user, request);
+        if (request.active() != null) {
+            user.setActive(request.active());
+        }
         return userMapper.toResponse(userRepository.save(user));
     }
 

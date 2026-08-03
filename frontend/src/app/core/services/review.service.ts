@@ -56,4 +56,18 @@ export class ReviewService {
   update(reviewId: number, payload: ReviewPayload): Observable<ApiResponse<ProductReview>> {
     return this.http.put<ApiResponse<ProductReview>>(`${this.apiUrl}/reviews/${reviewId}`, payload);
   }
+
+  getMyReviewedProductIds(): Observable<ApiResponse<number[]>> {
+    return this.http.get<ApiResponse<number[]>>(`${this.apiUrl}/reviews/my-reviewed-product-ids`);
+  }
+
+  getMyReviewedOrderItemIds(): Observable<ApiResponse<number[]>> {
+    return this.http.get<ApiResponse<number[]>>(`${this.apiUrl}/reviews/my-reviewed-order-item-ids`);
+  }
+
+  uploadImage(file: File): Observable<ApiResponse<{ url: string }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<ApiResponse<{ url: string }>>(`${this.apiUrl}/uploads/image`, formData);
+  }
 }

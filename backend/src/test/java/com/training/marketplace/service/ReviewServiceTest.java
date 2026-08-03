@@ -94,12 +94,13 @@ class ReviewServiceTest {
     @Test
     @DisplayName("REQ-STP-T-101: Should create review successfully with verified purchase status")
     void testCreateReview_VerifiedPurchase_Success() {
-        CreateReviewRequest req = new CreateReviewRequest(5, "Excellent product", "Build quality is superb, highly recommended.");
+        CreateReviewRequest req = new CreateReviewRequest(5, "Excellent product", "Build quality is superb, highly recommended.", null);
+        OrderItem item = OrderItem.builder().id(50L).build();
 
         when(productRepository.findById(20L)).thenReturn(Optional.of(sampleProduct));
         when(userRepository.findByUsername("customer1")).thenReturn(Optional.of(sampleUser));
-        when(reviewRepository.existsByUserIdAndProductIdAndDeletedAtIsNull(10L, 20L)).thenReturn(false);
-        when(orderItemRepository.findEligibleOrderItemsForReview(10L, 20L)).thenReturn(List.of(new OrderItem()));
+        when(orderItemRepository.findEligibleOrderItemsForReview(10L, 20L)).thenReturn(List.of(item));
+        when(reviewRepository.existsByUserIdAndOrderItemIdAndDeletedAtIsNull(10L, 50L)).thenReturn(false);
         when(reviewRepository.save(any(ProductReview.class))).thenReturn(sampleReview);
 
         ProductReviewResponse res = reviewService.createReview(20L, "customer1", req);
@@ -114,10 +115,9 @@ class ReviewServiceTest {
     @DisplayName("REQ-STP-T-102: Verified purchase is derived from eligible order items")
     void testCreateReview_NoEligibleOrder_CannotBecomeVerified() {
         CreateReviewRequest req = new CreateReviewRequest(
-                4, "Independent review", "No purchase is associated with this review.");
+                4, "Independent review", "No purchase is associated with this review.", null);
         when(productRepository.findById(20L)).thenReturn(Optional.of(sampleProduct));
         when(userRepository.findByUsername("customer1")).thenReturn(Optional.of(sampleUser));
-        when(reviewRepository.existsByUserIdAndProductIdAndDeletedAtIsNull(10L, 20L)).thenReturn(false);
         when(orderItemRepository.findEligibleOrderItemsForReview(10L, 20L)).thenReturn(Collections.emptyList());
         when(reviewRepository.save(any(ProductReview.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -131,13 +131,15 @@ class ReviewServiceTest {
     }
 
     @Test
-    @DisplayName("REQ-STP-T-103: Should reject duplicate review submission from same user")
+    @DisplayName("REQ-STP-T-103: Should reject duplicate review submission from same order item")
     void testCreateReview_DuplicateReview_ThrowsException() {
-        CreateReviewRequest req = new CreateReviewRequest(4, "Second review", "Trying to write a second review for product.");
+        CreateReviewRequest req = new CreateReviewRequest(4, "Second review", "Trying to write a second review for product.", null, 50L);
+        OrderItem item = OrderItem.builder().id(50L).build();
 
         when(productRepository.findById(20L)).thenReturn(Optional.of(sampleProduct));
         when(userRepository.findByUsername("customer1")).thenReturn(Optional.of(sampleUser));
-        when(reviewRepository.existsByUserIdAndProductIdAndDeletedAtIsNull(10L, 20L)).thenReturn(true);
+        when(orderItemRepository.findById(50L)).thenReturn(Optional.of(item));
+        when(reviewRepository.existsByUserIdAndOrderItemIdAndDeletedAtIsNull(10L, 50L)).thenReturn(true);
 
         assertThatThrownBy(() -> reviewService.createReview(20L, "customer1", req))
                 .isInstanceOf(DuplicateResourceException.class);
@@ -172,7 +174,7 @@ class ReviewServiceTest {
         User anotherUser = User.builder().username("otheruser").role(Role.CUSTOMER).build();
         anotherUser.setId(99L);
 
-        UpdateReviewRequest req = new UpdateReviewRequest(3, "Modified title", "Modified content body text");
+        UpdateReviewRequest req = new UpdateReviewRequest(3, "Modified title", "Modified content body text", null);
 
         when(reviewRepository.findById(100L)).thenReturn(Optional.of(sampleReview));
         when(userRepository.findByUsername("otheruser")).thenReturn(Optional.of(anotherUser));
@@ -185,7 +187,7 @@ class ReviewServiceTest {
     @DisplayName("REQ-STP-T-103: Owner can update the existing review and it is marked edited")
     void testUpdateReview_Owner_UpdatesAccordingToPolicy() {
         UpdateReviewRequest req = new UpdateReviewRequest(
-                4, "Updated title", "Updated content with enough detail.");
+                4, "Updated title", "Updated content with enough detail.", null);
         when(reviewRepository.findById(100L)).thenReturn(Optional.of(sampleReview));
         when(userRepository.findByUsername("customer1")).thenReturn(Optional.of(sampleUser));
         when(reviewRepository.save(sampleReview)).thenReturn(sampleReview);

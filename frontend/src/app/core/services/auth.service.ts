@@ -54,11 +54,21 @@ export class AuthService {
   }
 
   logout(): void {
+    const refreshToken = localStorage.getItem('refresh_token');
+    this.clearSession();
+    if (refreshToken) {
+      this.http.post(`${this.apiUrl}/logout`, { refreshToken }).pipe(
+        catchError(() => EMPTY)
+      ).subscribe();
+    }
+    this.router.navigate(['/login']);
+  }
+
+  private clearSession(): void {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('username');
     localStorage.removeItem('role');
-    this.router.navigate(['/login']);
   }
 
   getToken(): string | null {

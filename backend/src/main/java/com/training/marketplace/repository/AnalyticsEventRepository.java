@@ -135,17 +135,18 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
     @Query(value = """
             WITH filtered AS (
                 SELECT event_type,
-                       COALESCE('u:' || user_id::text, 's:' || NULLIF(BTRIM(session_id), '')) AS actor_key,
+                       COALESCE('u:' || CAST(user_id AS text), 's:' || NULLIF(BTRIM(session_id), '')) AS actor_key,
                        occurred_at
                   FROM analytics_events ae
                   LEFT JOIN products p ON p.id = ae.product_id
                  WHERE occurred_at >= :from
                    AND occurred_at < :to
                    AND event_type IN ('PRODUCT_VIEW', 'ADD_TO_CART', 'BEGIN_CHECKOUT', 'ORDER_CREATED')
-                   AND COALESCE('u:' || user_id::text, 's:' || NULLIF(BTRIM(session_id), '')) IS NOT NULL
+                   AND COALESCE('u:' || CAST(user_id AS text), 's:' || NULLIF(BTRIM(session_id), '')) IS NOT NULL
                    AND (:categoryId IS NULL OR p.category_id = :categoryId)
                    AND (:productId IS NULL OR ae.product_id = :productId)
                    AND (:campaign IS NULL OR ae.properties ->> 'campaign' = :campaign)
+                   AND (:placement IS NULL OR ae.placement = :placement)
                    AND (:deviceType IS NULL OR ae.properties ->> 'deviceType' = :deviceType)
             ),
             firsts AS (
@@ -179,6 +180,7 @@ public interface AnalyticsEventRepository extends JpaRepository<AnalyticsEvent, 
             @Param("categoryId") Long categoryId,
             @Param("productId") Long productId,
             @Param("campaign") String campaign,
+            @Param("placement") String placement,
             @Param("deviceType") String deviceType);
 
     interface FunnelCounts {
