@@ -12,6 +12,7 @@ import com.training.marketplace.dto.response.PromotionRecommendationPerformanceR
 import com.training.marketplace.security.JwtAuthenticationFilter;
 import com.training.marketplace.security.RateLimitingFilter;
 import com.training.marketplace.security.SecurityConfig;
+import com.training.marketplace.observability.CoreFeatureRequestFilter;
 import com.training.marketplace.service.AnalyticsDashboardService;
 import com.training.marketplace.service.AnalyticsEventService;
 import com.training.marketplace.service.FunnelAnalyticsService;
@@ -54,6 +55,7 @@ class AdminAnalyticsControllerTest {
     @MockBean private AnalyticsDashboardService analyticsDashboardService;
     @MockBean private JwtAuthenticationFilter jwtAuthenticationFilter;
     @MockBean private RateLimitingFilter rateLimitingFilter;
+    @MockBean private CoreFeatureRequestFilter coreFeatureRequestFilter;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -67,6 +69,11 @@ class AdminAnalyticsControllerTest {
             chain.doFilter(invocation.getArgument(0), invocation.getArgument(1));
             return null;
         }).when(rateLimitingFilter).doFilter(any(), any(), any());
+        doAnswer(invocation -> {
+            FilterChain chain = invocation.getArgument(2);
+            chain.doFilter(invocation.getArgument(0), invocation.getArgument(1));
+            return null;
+        }).when(coreFeatureRequestFilter).doFilter(any(), any(), any());
     }
 
     @Test
@@ -100,7 +107,8 @@ class AdminAnalyticsControllerTest {
     @Test
     @WithMockUser(roles = "MANAGER")
     void productPerformance_managerCanReadPagedMetrics() throws Exception {
-        when(analyticsDashboardService.productPerformance(any(), any(Integer.class), any(Integer.class)))
+        when(analyticsDashboardService.productPerformance(
+                any(), any(Integer.class), any(Integer.class), any(), any(), any()))
                 .thenReturn(new PageResponse<>(List.of(new ProductPerformanceResponse(
                         7L,
                         "Mechanical Keyboard",
@@ -124,7 +132,8 @@ class AdminAnalyticsControllerTest {
                 .andExpect(jsonPath("$.data.content[0].questionCount").value(6))
                 .andExpect(jsonPath("$.data.totalElements").value(1));
 
-        verify(analyticsDashboardService).productPerformance(any(), any(Integer.class), any(Integer.class));
+        verify(analyticsDashboardService).productPerformance(
+                any(), any(Integer.class), any(Integer.class), any(), any(), any());
     }
 
     @Test

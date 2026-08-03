@@ -13,7 +13,13 @@ describe('DashboardComponent funnel visualization', () => {
     dashboardService = jasmine.createSpyObj('DashboardService', [
       'getDashboardStats',
       'getFunnelSummary',
-      'getAnalyticsOverview'
+      'getAnalyticsOverview',
+      'getPromotionPerformance',
+      'getPromotionTrend',
+      'getProductPerformance',
+      'createExport',
+      'getExport',
+      'downloadExport'
     ]);
     dashboardService.getDashboardStats.and.returnValue(of({
       success: true,
@@ -57,6 +63,29 @@ describe('DashboardComponent funnel visualization', () => {
         orderConversionRate: 0.05,
         returningCustomerRate: 0.25,
         lastUpdatedAt: '2026-08-01T12:00:00Z'
+      }
+    }));
+    dashboardService.getPromotionPerformance.and.returnValue(of({
+      success: true, message: '', timestamp: '', data: [{
+        campaign: 'Summer Launch', placement: 'HOME_TRENDING', strategy: 'TRENDING',
+        impressions: 100, clicks: 32, clickThroughRate: 0.32,
+        addToCarts: 15, attributedOrders: 6, lastUpdatedAt: '2026-08-01T12:00:00Z'
+      }]
+    }));
+    dashboardService.getPromotionTrend.and.returnValue(of({
+      success: true, message: '', timestamp: '', data: [
+        { date: '2026-07-31', impressions: 20, clicks: 6, addToCarts: 3, attributedOrders: 1 },
+        { date: '2026-08-01', impressions: 30, clicks: 10, addToCarts: 5, attributedOrders: 2 }
+      ]
+    }));
+    dashboardService.getProductPerformance.and.returnValue(of({
+      success: true, message: '', timestamp: '', data: {
+        content: [{
+          productId: 1, productName: 'Demo Camera', categoryId: 1,
+          productViews: 30, wishlists: 12, addToCarts: 18, orders: 6,
+          averageRating: 4.5, questionCount: 3, lastUpdatedAt: '2026-08-01T12:00:00Z'
+        }],
+        page: 0, size: 8, totalElements: 1, totalPages: 1, last: true
       }
     }));
 
@@ -156,5 +185,26 @@ describe('DashboardComponent funnel visualization', () => {
     expect(funnel.getAttribute('aria-describedby')).toBe('funnel-description');
     expect(progressBars.length).toBe(4);
     expect(progressBars[1].getAttribute('aria-valuenow')).toBe('40');
+  });
+
+  it('renders product performance and campaign comparison data', () => {
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Product Performance');
+    expect(text).toContain('Demo Camera');
+    expect(text).toContain('Campaign & Placement Performance');
+    expect(text).toContain('Summer Launch');
+    expect(text).toContain('32%');
+  });
+
+  it('requests server-side sorting when a metric header changes', () => {
+    dashboardService.getProductPerformance.calls.reset();
+
+    fixture.componentInstance.sortProducts('orders');
+
+    expect(dashboardService.getProductPerformance).toHaveBeenCalled();
+    const args = dashboardService.getProductPerformance.calls.mostRecent().args;
+    expect(args[5]).toBe('orders');
+    expect(args[6]).toBe('desc');
   });
 });
