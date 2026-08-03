@@ -8,9 +8,11 @@ import com.training.marketplace.dto.response.AnalyticsRetentionResponse;
 import com.training.marketplace.dto.response.FunnelStepResponse;
 import com.training.marketplace.dto.response.FunnelSummaryResponse;
 import com.training.marketplace.dto.response.ProductPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionRecommendationPerformanceResponse;
 import com.training.marketplace.security.JwtAuthenticationFilter;
 import com.training.marketplace.security.RateLimitingFilter;
 import com.training.marketplace.security.SecurityConfig;
+import com.training.marketplace.observability.CoreFeatureRequestFilter;
 import com.training.marketplace.service.AnalyticsDashboardService;
 import com.training.marketplace.service.AnalyticsEventService;
 import com.training.marketplace.service.FunnelAnalyticsService;
@@ -53,6 +55,7 @@ class AdminAnalyticsControllerTest {
     @MockBean private AnalyticsDashboardService analyticsDashboardService;
     @MockBean private JwtAuthenticationFilter jwtAuthenticationFilter;
     @MockBean private RateLimitingFilter rateLimitingFilter;
+    @MockBean private CoreFeatureRequestFilter coreFeatureRequestFilter;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -66,6 +69,11 @@ class AdminAnalyticsControllerTest {
             chain.doFilter(invocation.getArgument(0), invocation.getArgument(1));
             return null;
         }).when(rateLimitingFilter).doFilter(any(), any(), any());
+        doAnswer(invocation -> {
+            FilterChain chain = invocation.getArgument(2);
+            chain.doFilter(invocation.getArgument(0), invocation.getArgument(1));
+            return null;
+        }).when(coreFeatureRequestFilter).doFilter(any(), any(), any());
     }
 
     @Test
@@ -99,7 +107,8 @@ class AdminAnalyticsControllerTest {
     @Test
     @WithMockUser(roles = "MANAGER")
     void productPerformance_managerCanReadPagedMetrics() throws Exception {
-        when(analyticsDashboardService.productPerformance(any(), any(Integer.class), any(Integer.class)))
+        when(analyticsDashboardService.productPerformance(
+                any(), any(Integer.class), any(Integer.class), any(), any(), any()))
                 .thenReturn(new PageResponse<>(List.of(new ProductPerformanceResponse(
                         7L,
                         "Mechanical Keyboard",
@@ -123,7 +132,39 @@ class AdminAnalyticsControllerTest {
                 .andExpect(jsonPath("$.data.content[0].questionCount").value(6))
                 .andExpect(jsonPath("$.data.totalElements").value(1));
 
-        verify(analyticsDashboardService).productPerformance(any(), any(Integer.class), any(Integer.class));
+        verify(analyticsDashboardService).productPerformance(
+                any(), any(Integer.class), any(Integer.class), any(), any(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void promotionRecommendationPerformance_managerCanReadAttribution() throws Exception {
+        when(analyticsDashboardService.promotionRecommendationPerformance(any()))
+                .thenReturn(List.of(new PromotionRecommendationPerformanceResponse(
+                        "summer",
+                        "HOME_BEST_SELLERS",
+                        "BEST_SELLER",
+                        200,
+                        50,
+                        new BigDecimal("0.2500"),
+                        20,
+                        8,
+                        Instant.parse("2026-07-31T00:00:00Z"))));
+
+        mockMvc.perform(get("/api/v1/admin/analytics/promotion-recommendation/performance")
+                        .param("from", "2026-07-01T00:00:00Z")
+                        .param("to", "2026-08-01T00:00:00Z")
+                        .param("campaign", "summer")
+                        .param("placement", "HOME_BEST_SELLERS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].campaign").value("summer"))
+                .andExpect(jsonPath("$.data[0].impressions").value(200))
+                .andExpect(jsonPath("$.data[0].clicks").value(50))
+                .andExpect(jsonPath("$.data[0].clickThroughRate").value(0.2500))
+                .andExpect(jsonPath("$.data[0].attributedOrders").value(8))
+                .andExpect(jsonPath("$.data[0].lastUpdatedAt").value("2026-07-31T00:00:00Z"));
+
+        verify(analyticsDashboardService).promotionRecommendationPerformance(any());
     }
 
     @Test
@@ -131,7 +172,8 @@ class AdminAnalyticsControllerTest {
     void funnel_managerCanReadSummary() throws Exception {
         Instant from = Instant.parse("2026-07-01T00:00:00Z");
         Instant to = Instant.parse("2026-08-01T00:00:00Z");
-        when(funnelAnalyticsService.summarize(from, to, null, null, null, null))
+        when(funnelAnalyticsService.summarize(
+                from, to, null, null, null, "HOME_BEST_SELLERS", null))
                 .thenReturn(new FunnelSummaryResponse(
                         from,
                         to,
@@ -143,9 +185,13 @@ class AdminAnalyticsControllerTest {
 
         mockMvc.perform(get("/api/v1/admin/analytics/funnel")
                         .param("from", "2026-07-01T00:00:00Z")
-                        .param("to", "2026-08-01T00:00:00Z"))
+                        .param("to", "2026-08-01T00:00:00Z")
+                        .param("placement", "HOME_BEST_SELLERS"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.steps[0].step").value("PRODUCT_VIEW"));
+
+        verify(funnelAnalyticsService).summarize(
+                from, to, null, null, null, "HOME_BEST_SELLERS", null);
     }
 
     @Test

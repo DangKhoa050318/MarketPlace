@@ -1,10 +1,14 @@
 package com.training.marketplace.repository;
 
+import com.training.marketplace.analytics.AnalyticsCacheNames;
 import com.training.marketplace.dto.request.AnalyticsDashboardFilter;
 import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.ProductPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionRecommendationPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionTrendPointResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -22,6 +26,7 @@ public class AnalyticsDashboardQueryRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
+    @Cacheable(cacheNames = AnalyticsCacheNames.OVERVIEW, sync = true)
     public AnalyticsOverviewResponse overview(AnalyticsDashboardFilter filter) {
         String sql = """
                 WITH filtered AS (
@@ -29,11 +34,11 @@ public class AnalyticsDashboardQueryRepository {
                       FROM analytics_events ae
                       LEFT JOIN products p ON p.id = ae.product_id
                      WHERE ae.occurred_at >= ? AND ae.occurred_at < ?
-                       AND (? IS NULL OR p.category_id = ?)
-                       AND (? IS NULL OR ae.product_id = ?)
-                       AND (? IS NULL OR ae.properties ->> 'campaign' = ?)
-                       AND (? IS NULL OR ae.placement = ?)
-                       AND (? IS NULL OR ae.properties ->> 'deviceType' = ?)
+                       AND (CAST(? AS BIGINT) IS NULL OR p.category_id = ?)
+                       AND (CAST(? AS BIGINT) IS NULL OR ae.product_id = ?)
+                       AND (CAST(? AS VARCHAR) IS NULL OR ae.properties ->> 'campaign' = ?)
+                       AND (CAST(? AS VARCHAR) IS NULL OR ae.placement = ?)
+                       AND (CAST(? AS VARCHAR) IS NULL OR ae.properties ->> 'deviceType' = ?)
                 ),
                 customers AS (
                     SELECT user_id, COUNT(*) order_count
@@ -66,8 +71,27 @@ public class AnalyticsDashboardQueryRepository {
                 instant(rs, "last_updated_at")), args.toArray());
     }
 
+    @Cacheable(cacheNames = AnalyticsCacheNames.PRODUCT_PERFORMANCE, sync = true)
     public PageResponse<ProductPerformanceResponse> productPerformance(
             AnalyticsDashboardFilter filter, int page, int size) {
+        return productPerformance(filter, page, size, null, "productViews", "desc");
+    }
+
+    @Cacheable(cacheNames = AnalyticsCacheNames.PRODUCT_PERFORMANCE, sync = true)
+    public PageResponse<ProductPerformanceResponse> productPerformance(
+            AnalyticsDashboardFilter filter, int page, int size,
+            String search, String sortBy, String sortDirection) {
+        String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+        String orderColumn = switch (sortBy == null ? "" : sortBy) {
+            case "productName" -> "product_name";
+            case "wishlists" -> "wishlists";
+            case "addToCarts" -> "add_to_carts";
+            case "orders" -> "orders";
+            case "averageRating" -> "average_rating";
+            case "questionCount" -> "question_count";
+            default -> "product_views";
+        };
+        String direction = "asc".equalsIgnoreCase(sortDirection) ? "ASC" : "DESC";
         String sql = """
                 WITH event_metrics AS (
                     SELECT ae.product_id,
@@ -77,9 +101,9 @@ public class AnalyticsDashboardQueryRepository {
                            MAX(ae.received_at) AS event_updated_at
                       FROM analytics_events ae
                      WHERE ae.occurred_at >= ? AND ae.occurred_at < ?
-                       AND (? IS NULL OR ae.properties ->> 'campaign' = ?)
-                       AND (? IS NULL OR ae.placement = ?)
-                       AND (? IS NULL OR ae.properties ->> 'deviceType' = ?)
+                       AND (CAST(? AS VARCHAR) IS NULL OR ae.properties ->> 'campaign' = ?)
+                       AND (CAST(? AS VARCHAR) IS NULL OR ae.placement = ?)
+                       AND (CAST(? AS VARCHAR) IS NULL OR ae.properties ->> 'deviceType' = ?)
                        AND ae.product_id IS NOT NULL
                      GROUP BY ae.product_id
                 ),
@@ -120,16 +144,19 @@ public class AnalyticsDashboardQueryRepository {
                   LEFT JOIN order_metrics om ON om.product_id = p.id
                   LEFT JOIN review_metrics rm ON rm.product_id = p.id
                   LEFT JOIN question_metrics qm ON qm.product_id = p.id
-                 WHERE (? IS NULL OR p.category_id = ?)
-                   AND (? IS NULL OR p.id = ?)
-                 ORDER BY product_views DESC, add_to_carts DESC, p.id ASC
+                 WHERE (CAST(? AS BIGINT) IS NULL OR p.category_id = ?)
+                   AND (CAST(? AS BIGINT) IS NULL OR p.id = ?)
+                   AND (CAST(? AS VARCHAR) IS NULL OR LOWER(p.name) LIKE LOWER('%%' || ? || '%%'))
+                 ORDER BY %s %s, p.id ASC
                  LIMIT ? OFFSET ?
-                """;
+                """.formatted(orderColumn, direction);
         List<Object> args = productPerformanceArgs(filter);
         args.add(filter.categoryId());
         args.add(filter.categoryId());
         args.add(filter.productId());
         args.add(filter.productId());
+        args.add(normalizedSearch);
+        args.add(normalizedSearch);
         args.add(size);
         args.add((long) page * size);
 
@@ -148,12 +175,98 @@ public class AnalyticsDashboardQueryRepository {
 
         Long total = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM products p
-                 WHERE (? IS NULL OR p.category_id = ?)
-                   AND (? IS NULL OR p.id = ?)
-                """, Long.class, filter.categoryId(), filter.categoryId(), filter.productId(), filter.productId());
+                 WHERE (CAST(? AS BIGINT) IS NULL OR p.category_id = ?)
+                   AND (CAST(? AS BIGINT) IS NULL OR p.id = ?)
+                   AND (CAST(? AS VARCHAR) IS NULL OR LOWER(p.name) LIKE LOWER('%' || ? || '%'))
+                """, Long.class, filter.categoryId(), filter.categoryId(), filter.productId(), filter.productId(),
+                normalizedSearch, normalizedSearch);
         long totalElements = total == null ? 0 : total;
         int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + size - 1) / size);
         return new PageResponse<>(content, page, size, totalElements, totalPages, page + 1 >= totalPages);
+    }
+
+    @Cacheable(cacheNames = AnalyticsCacheNames.PROMOTION_RECOMMENDATION, sync = true)
+    public List<PromotionRecommendationPerformanceResponse> promotionRecommendationPerformance(
+            AnalyticsDashboardFilter filter) {
+        String sql = """
+                SELECT NULLIF(ae.properties ->> 'campaign', '') AS campaign,
+                       ae.placement,
+                       ae.strategy,
+                       COUNT(*) FILTER (
+                           WHERE ae.event_type = 'RECOMMENDATION_IMPRESSION'
+                       ) AS impressions,
+                       COUNT(*) FILTER (
+                           WHERE ae.event_type = 'RECOMMENDATION_CLICK'
+                       ) AS clicks,
+                       COUNT(*) FILTER (
+                           WHERE ae.event_type = 'ADD_TO_CART'
+                             AND ae.recommendation_request_id IS NOT NULL
+                       ) AS add_to_carts,
+                       COUNT(DISTINCT ae.order_id) FILTER (
+                           WHERE ae.event_type = 'PURCHASE'
+                             AND ae.recommendation_request_id IS NOT NULL
+                             AND ae.order_id IS NOT NULL
+                       ) AS attributed_orders,
+                       MAX(ae.received_at) AS last_updated_at
+                  FROM analytics_events ae
+                  LEFT JOIN products p ON p.id = ae.product_id
+                 WHERE ae.occurred_at >= ? AND ae.occurred_at < ?
+                   AND ae.event_type IN (
+                       'RECOMMENDATION_IMPRESSION',
+                       'RECOMMENDATION_CLICK',
+                       'ADD_TO_CART',
+                       'PURCHASE'
+                   )
+                   AND (
+                       ae.recommendation_request_id IS NOT NULL
+                       OR NULLIF(ae.properties ->> 'campaign', '') IS NOT NULL
+                   )
+                   AND (CAST(? AS BIGINT) IS NULL OR p.category_id = ?)
+                   AND (CAST(? AS BIGINT) IS NULL OR ae.product_id = ?)
+                   AND (CAST(? AS VARCHAR) IS NULL OR ae.properties ->> 'campaign' = ?)
+                   AND (CAST(? AS VARCHAR) IS NULL OR ae.placement = ?)
+                   AND (CAST(? AS VARCHAR) IS NULL OR ae.properties ->> 'deviceType' = ?)
+                 GROUP BY NULLIF(ae.properties ->> 'campaign', ''), ae.placement, ae.strategy
+                 ORDER BY impressions DESC, clicks DESC, campaign NULLS LAST,
+                          ae.placement NULLS LAST, ae.strategy NULLS LAST
+                """;
+        return jdbcTemplate.query(sql, (rs, rowNum) ->
+                new PromotionRecommendationPerformanceResponse(
+                        rs.getString("campaign"),
+                        rs.getString("placement"),
+                        rs.getString("strategy"),
+                        rs.getLong("impressions"),
+                        rs.getLong("clicks"),
+                        BigDecimal.ZERO,
+                        rs.getLong("add_to_carts"),
+                        rs.getLong("attributed_orders"),
+                instant(rs, "last_updated_at")), filterArgs(filter).toArray());
+    }
+
+    @Cacheable(cacheNames = AnalyticsCacheNames.PROMOTION_TREND, sync = true)
+    public List<PromotionTrendPointResponse> promotionTrend(AnalyticsDashboardFilter filter) {
+        String sql = """
+                SELECT CAST(ae.occurred_at AS date) AS event_date,
+                       COUNT(*) FILTER (WHERE ae.event_type = 'RECOMMENDATION_IMPRESSION') AS impressions,
+                       COUNT(*) FILTER (WHERE ae.event_type = 'RECOMMENDATION_CLICK') AS clicks,
+                       COUNT(*) FILTER (WHERE ae.event_type = 'ADD_TO_CART') AS add_to_carts,
+                       COUNT(DISTINCT ae.order_id) FILTER (WHERE ae.event_type = 'PURCHASE') AS attributed_orders
+                  FROM analytics_events ae
+                 WHERE ae.occurred_at >= ? AND ae.occurred_at < ?
+                   AND ae.recommendation_request_id IS NOT NULL
+                   AND (CAST(? AS VARCHAR) IS NULL OR ae.properties ->> 'campaign' = ?)
+                   AND (CAST(? AS VARCHAR) IS NULL OR ae.placement = ?)
+                   AND (CAST(? AS VARCHAR) IS NULL OR ae.properties ->> 'deviceType' = ?)
+                 GROUP BY CAST(ae.occurred_at AS date)
+                 ORDER BY event_date
+                """;
+        return jdbcTemplate.query(sql, (rs, rowNum) -> new PromotionTrendPointResponse(
+                rs.getDate("event_date").toLocalDate(),
+                rs.getLong("impressions"), rs.getLong("clicks"),
+                rs.getLong("add_to_carts"), rs.getLong("attributed_orders")),
+                Timestamp.from(filter.from()), Timestamp.from(filter.to()),
+                filter.campaign(), filter.campaign(), filter.placement(), filter.placement(),
+                filter.deviceType(), filter.deviceType());
     }
 
     private List<Object> productPerformanceArgs(AnalyticsDashboardFilter filter) {

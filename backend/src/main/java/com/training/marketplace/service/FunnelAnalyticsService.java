@@ -12,5 +12,6 @@ public interface FunnelAnalyticsService {
             Long categoryId,
             Long productId,
             String campaign,
+            String placement,
             String deviceType);
 }

@@ -8,6 +8,8 @@ import com.training.marketplace.dto.response.AnalyticsOverviewResponse;
 import com.training.marketplace.dto.response.AnalyticsRetentionResponse;
 import com.training.marketplace.dto.response.FunnelSummaryResponse;
 import com.training.marketplace.dto.response.ProductPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionRecommendationPerformanceResponse;
+import com.training.marketplace.dto.response.PromotionTrendPointResponse;
 import com.training.marketplace.service.AnalyticsDashboardService;
 import com.training.marketplace.service.AnalyticsEventService;
 import com.training.marketplace.service.FunnelAnalyticsService;
@@ -17,6 +19,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,10 +29,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin/analytics")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
 @Tag(name = "Admin Analytics", description = "Funnel summaries and privacy operations")
 public class AdminAnalyticsController {
 
@@ -62,11 +67,43 @@ public class AdminAnalyticsController {
             @RequestParam(required = false) String placement,
             @RequestParam(required = false) String deviceType,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "productViews") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection) {
         return ApiResponse.success(analyticsDashboardService.productPerformance(
                 new AnalyticsDashboardFilter(from, to, categoryId, productId, campaign, placement, deviceType),
                 page,
-                size));
+                size,
+                search,
+                sortBy,
+                sortDirection));
+    }
+
+    @GetMapping("/promotion-recommendation/performance")
+    @Operation(summary = "Get promotion and recommendation performance")
+    public ApiResponse<List<PromotionRecommendationPerformanceResponse>> promotionRecommendationPerformance(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) String campaign,
+            @RequestParam(required = false) String placement,
+            @RequestParam(required = false) String deviceType) {
+        return ApiResponse.success(analyticsDashboardService.promotionRecommendationPerformance(
+                new AnalyticsDashboardFilter(from, to, categoryId, productId, campaign, placement, deviceType)));
+    }
+
+    @GetMapping("/promotion-recommendation/trend")
+    @Operation(summary = "Get daily promotion and recommendation trend")
+    public ApiResponse<List<PromotionTrendPointResponse>> promotionTrend(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) String campaign,
+            @RequestParam(required = false) String placement,
+            @RequestParam(required = false) String deviceType) {
+        return ApiResponse.success(analyticsDashboardService.promotionTrend(
+                new AnalyticsDashboardFilter(from, to, null, null, campaign, placement, deviceType)));
     }
 
     @GetMapping("/funnel")
@@ -77,9 +114,10 @@ public class AdminAnalyticsController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long productId,
             @RequestParam(required = false) String campaign,
+            @RequestParam(required = false) String placement,
             @RequestParam(required = false) String deviceType) {
         return ApiResponse.success(funnelAnalyticsService.summarize(
-                from, to, categoryId, productId, campaign, deviceType));
+                from, to, categoryId, productId, campaign, placement, deviceType));
     }
 
     @PostMapping("/retention/anonymize")
