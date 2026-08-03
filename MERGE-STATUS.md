@@ -1,13 +1,12 @@
 # Marketplace — Merge Status & Continuation Guide
 
 Tracks the merge of **OrderFlow** (storefront) + **StockPulse** (warehouse) into one modular
-monolith, per `../Project - Marketplace (Merged Spec).md` (v0.2: monolith · single-seller ·
+monolith, per `docs/Project - Marketplace (Merged Spec).md` (v0.2: monolith · single-seller ·
 2-tier catalog with `product_variants`).
 
-> **Trạng thái tổng: Stage 1 XONG (nền + schema). Backend CHƯA compile** — đây là trạng thái
-> giữa chừng có chủ đích: schema & entity đã đổi sang mô hình variant, nhưng service/mapper/DTO/
-> controller vẫn tham chiếu model cũ (Stage 2 sẽ reconcile). Danh sách file cần sửa liệt kê chính
-> xác bên dưới.
+> **Trạng thái tổng (2026-08-03): Stage 1–3 đã hoàn tất; backend compile/test-compile và frontend
+> build đều xanh.** Catalog, cart, order và inventory đã dùng `variantId`; tồn kho đi qua
+> `InventoryFacade`. Các checklist Stage 2 bên dưới đã được cập nhật theo code hiện tại.
 
 ---
 
@@ -87,12 +86,15 @@ xác (từ grep):**
   không ảnh hưởng API nghiệp vụ. Có thể tắt bằng `management.health.mail.enabled=false` nếu cần.
 
 ### 🔧 Còn lại (không chặn build/boot)
-- [ ] 4 integration test (`*IntegrationTest`, Testcontainers) **compile xanh**; chạy bằng
-      `docker compose up -d` rồi `./mvnw verify`. Chưa chạy đủ trong môi trường này.
+- [ ] Các integration test (`*IntegrationTest`, Testcontainers) **compile xanh**; chạy bằng
+      `./mvnw verify` khi Docker khả dụng. Đã thêm `PaymentReconciliationIntegrationTest` cho
+      success/failure, Rabbit retry và đối soát reservation.
 - [ ] *(tuỳ chọn)* Cầu async `order.confirmed → stock.export.queue`: hiện làm **đồng bộ** trong
       `OrderServiceImpl` (reserve khi đặt, fulfill khi SHIPPED) — đúng & chống oversell tốt hơn.
-- [ ] *(tuỳ chọn)* `jsonMessageConverter` (RabbitMQConfig) dùng ObjectMapper mặc định (không có JavaTimeModule);
-      nếu publish event có `Instant`/`LocalDateTime` cần cân nhắc thêm module để tránh lỗi serialize lúc chạy.
+- [x] `jsonMessageConverter` đã đăng ký `JavaTimeModule` và xuất ngày giờ dạng ISO-8601.
+- [ ] Payment provider thật chưa được chọn. `PaymentGateway`/ledger/reconciliation đã có và cấu hình
+      mặc định `disabled` để fail closed; cần adapter Stripe/VNPay/MoMo sau khi team chốt provider và
+      checkout contract tương ứng.
 
 Lệnh: `./mvnw -o clean compile` = **BUILD SUCCESS** · `./mvnw -o test-compile` = **BUILD SUCCESS** ·
 `./mvnw -o test -Dtest='!*IntegrationTest'` = **62 pass**.
@@ -102,47 +104,46 @@ Lệnh: `./mvnw -o clean compile` = **BUILD SUCCESS** · `./mvnw -o test-compile
 - [x] `ProductMapper` + `ProductVariantMapper`.
 - [x] `ProductService`/`Impl` + `ProductVariantService`/`Impl` + `ProductVariantRepository`.
 - [x] `ProductController` + `ProductVariantController`; `ProductRepository` (bỏ product-lock).
-- [ ] `Category*`: `CategoryServiceImpl`/`CategoryMapper`/DTO thêm `code`+`parentId` (+ validate cycle
-      như StockPulse `CategoryServiceImpl.validateParent`); merge với bản OrderFlow (slug). **CHƯA** — entity
-      Category đã có code+slug+parentId nhưng DTO/mapper/service chưa set code+parentId (chạy được, dữ liệu thiếu).
+- [x] `Category*`: DTO/mapper/service đã hỗ trợ `code`+`parentId`, gồm kiểm tra parent và cycle.
 
 ### 2b. Ordering (khóa theo variant + tồn từ stock_levels) — bắt buộc
-- [ ] `service/impl/OrderServiceImpl`: bỏ `product.getStock()/getPrice()`; giá lấy từ **variant**,
+- [x] `service/impl/OrderServiceImpl`: bỏ `product.getStock()/getPrice()`; giá lấy từ **variant**,
       tồn/khóa lấy từ **stock_levels** qua `InventoryFacade` (reserve/fulfill — §7 spec). Snapshot
       `sku/variantName` vào order_items.
-- [ ] `service/impl/CartServiceImpl` + `CartItemResponse` + `AddToCartRequest`/`UpdateCartItemRequest`:
+- [x] `service/impl/CartServiceImpl` + `CartItemResponse` + `AddToCartRequest`/`UpdateCartItemRequest`:
       cart key theo **variantId**, giá từ variant.
-- [ ] `mapper/OrderMapper`, `dto/.../CreateOrderRequest`: theo variant.
-- [ ] `consumer/PaymentConsumer`: tham chiếu productId → variant nếu cần.
+- [x] `mapper/OrderMapper`, `dto/.../CreateOrderRequest`: theo variant.
+- [x] `consumer/PaymentConsumer`: event/order item dùng variant; xử lý qua payment ledger idempotent.
 
 ### 2c. Inventory (StockPulse-origin → variant) — bắt buộc
-- [ ] `service/impl/StockLevelServiceImpl`, `StockMovementServiceImpl`: `productId` → `variantId`;
+- [x] `service/impl/StockLevelServiceImpl`, `StockMovementServiceImpl`: `productId` → `variantId`;
       lock theo variant_id order.
-- [ ] `repository/StockLevelRepository`, `StockSummaryRepository`, `ReorderSuggestionRepository` +
+- [x] `repository/StockLevelRepository`, `StockSummaryRepository`, `ReorderSuggestionRepository` +
       `repository/projection/*`: cột `product_id` → `variant_id` trong `@Query`.
-- [ ] `mapper/StockLevelMapper`, `StockMovementMapper`, `StockSummaryMapper`, stock DTOs: variant.
-- [ ] `messaging/StockUpdateConsumer`, `ReorderConsumer`, `StockEventPublisher`, `service/StockCacheKey`,
+- [x] `mapper/StockLevelMapper`, `StockMovementMapper`, `StockSummaryMapper`, stock DTOs: variant.
+- [x] `messaging/StockUpdateConsumer`, `ReorderConsumer`, `StockEventPublisher`, `service/StockCacheKey`,
       `RedisStockCacheService`: key `stock:{warehouseId}:{variantId}`.
-- [ ] `controller/StockController`, `MovementController`: item theo variant.
+- [x] `controller/StockController`, `MovementController`: item theo variant.
 
 ### 2d. IAM / Security — bắt buộc
-- [ ] `security/SecurityConfig`: cập nhật RBAC (spec §8) — `hasRole("USER")` → `CUSTOMER`; thêm matcher
+- [x] `security/SecurityConfig`: cập nhật RBAC (spec §8) — `hasRole("USER")` → `CUSTOMER`; thêm matcher
       cho STAFF/MANAGER (warehouse endpoints), giữ `RateLimitingFilter`.
 
 ### 2e. Config reconciliation
-- [ ] RabbitMQ: base = OrderFlow `RabbitMQConfig` (order/payment) + đã copy `StockRabbitTopology`
-      (stock.*). Kiểm tra bean không trùng; thêm cầu **`order.confirmed → stock.export.queue`** (§9).
-- [ ] Redis: OrderFlow `RedisConfig` là base; `RedisStockCacheService` có thể cần RedisTemplate riêng.
-- [ ] `AlertEmailProperties`, `OpenApiConfig`: kiểm tra khớp package/property.
+- [x] RabbitMQ: order/payment và stock topology đã merge, converter hỗ trợ Java time. Cầu export async
+      không cần cho luồng hiện tại vì reserve/fulfill đang đồng bộ qua `InventoryFacade`.
+- [x] Redis: có template chung và `stockRedisTemplate` riêng cho cache tồn kho.
+- [x] `AlertEmailProperties`, `OpenApiConfig`: đã compile/boot với package/property hiện tại.
 
 ### 2f. Điểm nối Order ↔ Stock (mới) — cốt lõi
-- [ ] Tạo `inventory/InventoryFacade` (interface) + impl: `reserve(variantItems, warehouseId)`,
-      `fulfill(order)`, `release(order)`. `ordering` gọi facade này (không đụng repo inventory trực tiếp).
-- [ ] Consumer `order.confirmed` → tạo phiếu EXPORT (link `source_order_id`) → complete → trừ tồn.
+- [x] `InventoryFacade` interface + implementation xử lý `reserve`, `fulfill`, `release` theo variant
+      và warehouse; ordering không đụng repository tồn kho.
+- [x] Luồng hiện tại reserve lúc đặt, release khi hủy/payment decline và fulfill khi SHIPPED. Đây là
+      lựa chọn đồng bộ thay cho consumer export.
 
 ### 2g. Tests
-- [ ] Sửa test copy từ 2 repo cho khớp model mới; thêm **concurrent oversell test trên 1 variant**.
-- [ ] `./mvnw clean test` xanh; app khởi động (`ddl-auto: validate` pass với schema V1–V8).
+- [x] Test đã khớp model variant; có concurrent oversell test và test thiếu hàng trước khi tạo order.
+- [x] Unit test, compile/test-compile và app boot đã được xác minh ở các progress log mới hơn.
 
 **Lệnh kiểm tra tiến độ Stage 2:**
 ```bash
@@ -366,3 +367,22 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
   customer funnel journey.
 - ℹ️ Frontend test tooling yêu cầu Node.js **20.9+** vì Playwright 1.62 không còn hỗ trợ
   Node.js 18.
+
+### Review hardening follow-up — 2026-08-03
+
+- ✅ #B: refresh JWT có `jti`; Redis giữ token hiện hành theo `refresh:{username}`; refresh
+  compare-and-rotate nguyên tử, logout compare-and-revoke. Angular gọi revoke trước khi kết thúc phiên.
+- ✅ #D: `PaymentConsumer` không còn mở transaction quanh gateway call và không còn biến mọi exception
+  thành payment failure. Gateway outage được ném lại để Rabbit retry/DLQ.
+- ✅ Payment ledger `payment_attempts` chống xử lý terminal event lặp, lưu provider transaction và hỗ trợ
+  `REFUND_REQUIRED`/idempotent refund khi order bị hủy trong lúc payment đang xử lý.
+- ✅ Payment decline cập nhật order + release reservation + refund coupon trong một transaction service có
+  pessimistic order lock; rollback cùng nhau nếu compensation lỗi.
+- ✅ #E đã đúng và có regression test: reserve thiếu hàng throw trước khi order được lưu/publish.
+- ✅ #G: sửa trạng thái tổng, checklist Stage 2 và link README để khớp code thực tế.
+- ✅ #H: thêm `PaymentReconciliationIntegrationTest` cho approved/declined và Rabbit retry. Test compile;
+  lần chạy 2026-08-03 skip 2/2 vì không tìm thấy Docker daemon.
+- ⚠️ #C: bỏ hoàn toàn `simulatePaymentGateway()`. Contract `PaymentGateway` và safe default `disabled`
+  đã có; adapter thật còn chờ team chọn provider và bổ sung payment method/token vào checkout.
+- ✅ Verify: backend unit test **255/255 PASS**; Angular unit test **39/39 PASS**; Angular production build
+  **SUCCESS** (2 CSS budget warnings); backend payment integration **2 SKIPPED** do Docker không khả dụng.

@@ -8,7 +8,7 @@ lại) thành **một modular monolith** (Spring Boot + Angular + PostgreSQL/Red
 - Đặc tả nền (đã merge): [`docs/Project - Marketplace (Merged Spec).md`](docs/Project%20-%20Marketplace%20(Merged%20Spec).md)
 - Feature mới — nguồn chân lý: [`docs/StockPulse-Ecommerce-Features-3-Week-Requirements.md`](docs/StockPulse-Ecommerce-Features-3-Week-Requirements.md)
   (các đề xuất khác chỉ để tham khảo: [New Features Proposal](docs/Project%20-%20Marketplace%20(New%20Features%20Proposal).md), [TongHop](docs/StockPulse-TongHop-Features-Requirements.md))
-- **Trạng thái merge & việc còn lại:** [`docs/MERGE-STATUS.md`](docs/MERGE-STATUS.md) ← đọc file này trước khi code tiếp
+- **Trạng thái merge & việc còn lại:** [`MERGE-STATUS.md`](MERGE-STATUS.md) ← đọc file này trước khi code tiếp
 
 ## Kiến trúc đã chốt
 Modular monolith · single-seller · catalog 2 tầng **SPU (`products`) → SKU (`product_variants`)**.
@@ -43,7 +43,14 @@ cd ../frontend && npm install && npm start   # http://localhost:4200
 
 Tài khoản seed (mật khẩu `admin123`): `admin`, `manager`, `staff`, `customer`.
 
-> ℹ️ Backend/frontend đã compile & boot được (xem [`docs/MERGE-STATUS.md`](docs/MERGE-STATUS.md)).
+> ⚠️ Seed chỉ dùng **local**. Khi deploy thật: đổi mật khẩu mạnh cho mọi tài khoản (đừng giữ `admin123`) và đặt `JWT_SECRET` **riêng cho từng môi trường** (app không còn giá trị default — bắt buộc set, xem `backend/.env.example`).
+
+Refresh token được lưu server-side trong Redis, rotate sau mỗi lần refresh và revoke tại
+`POST /api/v1/auth/logout`. Cấu hình payment mặc định là `disabled`: hệ thống không tự xác nhận
+đơn chưa thanh toán; cần cài adapter `PaymentGateway` thật và đặt `PAYMENT_PROVIDER` sau khi chọn
+nhà cung cấp.
+
+> ℹ️ Backend/frontend đã compile & boot được (xem [`MERGE-STATUS.md`](MERGE-STATUS.md)).
 > Chạy `docker compose down -v` một lần khi khởi tạo DB lần đầu.
 
 ## Flyway migrations — quy ước đặt tên (timestamp)
