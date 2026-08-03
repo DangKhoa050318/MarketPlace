@@ -60,14 +60,14 @@ class PromotionValidationServiceTest {
     }
 
     private CartItemResponse item(long variantId, String subtotal) {
-        return new CartItemResponse(variantId, "SKU" + variantId, "Product", "Variant",
+        return new CartItemResponse(variantId, 1L, "Product", "Variant", "SKU" + variantId,
                 new BigDecimal(subtotal), 1, new BigDecimal(subtotal), null);
     }
 
     private CartResponse cart(List<CartItemResponse> items) {
         BigDecimal total = items.stream().map(CartItemResponse::subtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new CartResponse(1L, items, total, items.size());
+        return new CartResponse(1L, items, total, BigDecimal.ZERO, items.size());
     }
 
     // ------- T-302

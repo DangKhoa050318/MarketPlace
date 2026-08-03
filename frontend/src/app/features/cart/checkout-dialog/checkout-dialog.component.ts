@@ -39,12 +39,14 @@ export interface CheckoutDialogData {
         <!-- Order Summary Box -->
         <div class="checkout-summary-box glass-panel">
           <div class="summary-item">
-            <span class="label">Total Items</span>
-            <strong class="val">{{ data.cart.totalItems }} units</strong>
+            <span class="label">Subtotal ({{ data.cart.totalItems }} items)</span>
+            <strong class="val">{{ data.cart.totalAmount | currency:'USD':'symbol':'1.2-2' }}</strong>
+            <span class="shipping-note" *ngIf="shippingFee() === 0">Shipping: <strong>FREE</strong></span>
+            <span class="shipping-note" *ngIf="shippingFee() > 0">Shipping: <strong>{{ shippingFee() | currency:'USD':'symbol':'1.2-2' }}</strong></span>
           </div>
           <div class="summary-item align-right">
             <span class="label">Total Payment</span>
-            <span *ngIf="data.couponCode" class="strike">{{ data.cart.totalAmount | currency:'USD':'symbol':'1.2-2' }}</span>
+            <span *ngIf="data.couponCode" class="strike">{{ (data.cart.totalAmount + shippingFee()) | currency:'USD':'symbol':'1.2-2' }}</span>
             <strong class="total-amount text-gradient-cyan">{{ payableTotal() | currency:'USD':'symbol':'1.2-2' }}</strong>
           </div>
         </div>
@@ -163,6 +165,16 @@ export interface CheckoutDialogData {
       font-weight: 900;
     }
 
+    .shipping-note {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .shipping-note strong {
+      color: #10b981;
+    }
+
     .strike {
       text-decoration: line-through;
       color: var(--text-muted);
@@ -217,10 +229,17 @@ export class CheckoutDialogComponent {
     });
   }
 
+  shippingFee(): number {
+    const subtotal = this.data.cart.totalAmount ?? 0;
+    if (subtotal === 0 || subtotal >= 150) return 0;
+    return 5;
+  }
+
   payableTotal(): number {
     const subtotal = this.data.cart.totalAmount ?? 0;
     const discount = this.data.couponCode ? (this.data.discountAmount || 0) : 0;
-    return Math.max(0, subtotal - discount);
+    const shipping = this.shippingFee();
+    return Math.max(0, subtotal - discount + shipping);
   }
 
   onCancel(): void {

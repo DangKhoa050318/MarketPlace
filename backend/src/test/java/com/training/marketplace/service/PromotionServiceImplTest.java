@@ -206,6 +206,6 @@ class PromotionServiceImplTest {
     }
 
     private CartResponse anyCart() {
-        return new CartResponse(1L, List.of(), new BigDecimal("500.00"), 0);
+        return new CartResponse(1L, List.of(), new BigDecimal("500.00"), BigDecimal.ZERO, 0);
     }
 }

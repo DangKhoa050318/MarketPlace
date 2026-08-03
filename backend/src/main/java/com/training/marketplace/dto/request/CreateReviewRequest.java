@@ -18,5 +18,14 @@ public record CreateReviewRequest(
 
         @NotBlank(message = "Content cannot be empty")
         @Size(min = 10, max = 1000, message = "Content must be between 10 and 1000 characters")
-        String content
-) {}
+        String content,
+
+        @Size(max = 500, message = "Image URL cannot exceed 500 characters")
+        String imageUrl,
+
+        Long orderItemId
+) {
+    public CreateReviewRequest(Integer rating, String title, String content, String imageUrl) {
+        this(rating, title, content, imageUrl, null);
+    }
+}

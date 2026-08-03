@@ -138,6 +138,26 @@ class UserServiceTest {
     }
 
     @Test
+    void update_banStatus_updatesActiveToFalse() {
+        // Given
+        var entity = buildUser(1L, "testuser", "test@example.com");
+        var request = new UpdateUserRequest(null, null, false);
+        var response = new UserResponse(1L, "testuser", "test@example.com", "Test User", "CUSTOMER", false, LocalDateTime.now());
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(entity));
+        when(userRepository.save(entity)).thenReturn(entity);
+        when(userMapper.toResponse(entity)).thenReturn(response);
+
+        // When
+        var result = userService.update(1L, request);
+
+        // Then
+        assertThat(entity.isActive()).isFalse();
+        assertThat(result.active()).isFalse();
+        verify(userRepository).save(entity);
+    }
+
+    @Test
     void delete_existingUser_deletesSuccessfully() {
         // Given
         var entity = buildUser(1L, "testuser", "test@example.com");

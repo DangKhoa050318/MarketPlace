@@ -24,4 +24,8 @@ public interface ReviewService {
     RatingSummaryResponse getRatingSummary(Long productId);
 
     ProductReviewResponse adminUpdateStatus(Long reviewId, ReviewStatus status);
+
+    java.util.List<Long> getMyReviewedProductIds(String username);
+
+    java.util.List<Long> getMyReviewedOrderItemIds(String username);
 }

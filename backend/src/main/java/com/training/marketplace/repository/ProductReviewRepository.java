@@ -30,4 +30,12 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, Lo
     List<Object[]> countReviewsGroupByRating(@Param("productId") Long productId);
 
     Page<ProductReview> findByUserIdAndDeletedAtIsNull(Long userId, Pageable pageable);
+
+    boolean existsByUserIdAndOrderItemIdAndDeletedAtIsNull(Long userId, Long orderItemId);
+
+    @Query("SELECT DISTINCT r.product.id FROM ProductReview r WHERE r.user.id = :userId AND r.deletedAt IS NULL")
+    List<Long> findReviewedProductIdsByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT DISTINCT r.orderItem.id FROM ProductReview r WHERE r.user.id = :userId AND r.orderItem.id IS NOT NULL AND r.deletedAt IS NULL")
+    List<Long> findReviewedOrderItemIdsByUserId(@Param("userId") Long userId);
 }

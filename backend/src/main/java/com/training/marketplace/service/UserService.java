@@ -10,6 +10,8 @@ public interface UserService {
 
     Page<UserResponse> getAll(Pageable pageable);
 
+    Page<UserResponse> getAll(String search, com.training.marketplace.enums.Role role, Boolean active, Pageable pageable);
+
     UserResponse getById(Long id);
 
     UserResponse create(CreateUserRequest request);

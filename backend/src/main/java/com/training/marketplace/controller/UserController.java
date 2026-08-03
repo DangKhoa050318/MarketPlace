@@ -33,14 +33,17 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
-    @Operation(summary = "List all users with pagination")
+    @Operation(summary = "List all users with pagination and filters")
     public ApiResponse<PageResponse<UserResponse>> getAll(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) com.training.marketplace.enums.Role role,
+            @RequestParam(required = false) Boolean active,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortDir) {
         Sort sort = Sort.by(Sort.Direction.fromString(sortDir), sortBy);
-        var result = userService.getAll(PageRequest.of(page, size, sort));
+        var result = userService.getAll(search, role, active, PageRequest.of(page, size, sort));
         return ApiResponse.success(PageResponse.from(result, r -> r));
     }
 
