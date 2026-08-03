@@ -8,9 +8,9 @@ These instructions apply to the entire repository.
 - `backend/` is Spring Boot 3.2 on Java 17. The base package is
   `com.training.marketplace`.
 - `frontend/` is Angular 17 with standalone components.
-- Read `README.md` for local setup and `MERGE-STATUS.md` for current implementation
-  status before starting substantial work. Treat newer progress entries in
-  `MERGE-STATUS.md` as authoritative when older checklist sections conflict.
+- Read `README.md` for local setup and `PROJECT-STATUS.md` for current project
+  progress before starting substantial work. Treat `PROJECT-STATUS.md` as the
+  authoritative status when older per-feature docs conflict.
 
 ## Architecture invariants
 
@@ -106,5 +106,5 @@ docker compose up -d
 - When changing an API contract, update backend DTOs/controllers, frontend
   models/services, tests, OpenAPI documentation, and Postman assets as
   applicable.
-- Update `README.md` or `MERGE-STATUS.md` when setup, architecture, verified
+- Update `README.md` or `PROJECT-STATUS.md` when setup, architecture, verified
   status, or known follow-up work materially changes.

@@ -8,7 +8,7 @@ lại) thành **một modular monolith** (Spring Boot + Angular + PostgreSQL/Red
 - Đặc tả nền (đã merge): [`docs/Project - Marketplace (Merged Spec).md`](docs/Project%20-%20Marketplace%20(Merged%20Spec).md)
 - Feature mới — nguồn chân lý: [`docs/StockPulse-Ecommerce-Features-3-Week-Requirements.md`](docs/StockPulse-Ecommerce-Features-3-Week-Requirements.md)
   (các đề xuất khác chỉ để tham khảo: [New Features Proposal](docs/Project%20-%20Marketplace%20(New%20Features%20Proposal).md), [TongHop](docs/StockPulse-TongHop-Features-Requirements.md))
-- **Trạng thái merge & việc còn lại:** [`docs/MERGE-STATUS.md`](docs/MERGE-STATUS.md) ← đọc file này trước khi code tiếp
+- **Tiến độ dự án & việc còn lại:** [`PROJECT-STATUS.md`](PROJECT-STATUS.md) ← đọc file này trước khi code tiếp
 
 ## Kiến trúc đã chốt
 Modular monolith · single-seller · catalog 2 tầng **SPU (`products`) → SKU (`product_variants`)**.
@@ -20,7 +20,7 @@ Tồn kho là nguồn chân lý ở `stock_levels` theo `(variant_id, warehouse_
 Marketplace/
 ├── backend/    Spring Boot (base package com.training.marketplace), Flyway V1–V9
 ├── frontend/   Angular 17
-├── docs/       đặc tả (Merged Spec, MERGE-STATUS, requirements, feature specs)
+├── docs/       đặc tả (Merged Spec, requirements, feature specs, demo scripts)
 ├── AGENTS.md   quy ước code
 └── README.md
 ```
@@ -45,5 +45,5 @@ Tài khoản seed (mật khẩu `admin123`): `admin`, `manager`, `staff`, `custo
 
 > ⚠️ Seed chỉ dùng **local**. Khi deploy thật: đổi mật khẩu mạnh cho mọi tài khoản (đừng giữ `admin123`) và đặt `JWT_SECRET` **riêng cho từng môi trường** (app không còn giá trị default — bắt buộc set, xem `backend/.env.example`).
 
-> ℹ️ Backend/frontend đã compile & boot được (xem [`docs/MERGE-STATUS.md`](docs/MERGE-STATUS.md)).
+> ℹ️ Backend/frontend đã compile & boot được (xem [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
 > Chạy `docker compose down -v` một lần khi khởi tạo DB lần đầu.
