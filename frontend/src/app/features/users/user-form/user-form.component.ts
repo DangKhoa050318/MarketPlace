@@ -85,7 +85,7 @@ import { NotificationService } from '../../../core/services/notification.service
           <!-- Active Toggle (Edit Mode) -->
           <div *ngIf="isEdit" class="toggle-container">
             <mat-slide-toggle formControlName="active" color="primary">
-              Account Active Status
+              Account Active Status (Uncheck to Ban User)
             </mat-slide-toggle>
           </div>
 

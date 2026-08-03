@@ -37,8 +37,9 @@ public class SecurityConfig {
                         exceptions.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/actuator/**").permitAll()
-                        // Q&A and Content Moderation
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/actuator/**", "/uploads/**").permitAll()
+                        // Q&A, Reviews, and Content Moderation
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/products/*/reviews").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/products/*/questions").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/questions/*/answers").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/answers/*/official").hasAnyRole("STAFF", "MANAGER", "ADMIN")

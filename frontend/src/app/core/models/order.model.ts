@@ -3,6 +3,7 @@ export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | '
 export interface OrderItem {
   id: number;
   variantId: number;
+  productId?: number;
   sku?: string;
   productName: string;
   variantName?: string;
@@ -19,6 +20,7 @@ export interface Order {
   shippingAddress?: string;
   totalAmount: number;
   discountAmount?: number;
+  shippingFee?: number;
   couponCode?: string;
   status: OrderStatus;
   warehouseId?: number;
@@ -26,6 +28,12 @@ export interface Order {
   items: OrderItem[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateOrderRequest {
+  shippingAddress: string;
+  note?: string;
+  couponCode?: string;
 }
 
 export interface UpdateOrderStatusRequest {

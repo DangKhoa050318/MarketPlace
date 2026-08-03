@@ -68,6 +68,9 @@ public class ProductReview extends BaseEntity {
     @Builder.Default
     private Long helpfulCount = 0L;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 }

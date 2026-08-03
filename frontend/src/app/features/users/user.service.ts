@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../../core/models/api-response.model';
@@ -34,8 +34,22 @@ export class UserService {
 
   constructor(private http: HttpClient) {}
 
-  getAll(page = 0, size = 20): Observable<ApiResponse<PageResponse<User>>> {
-    return this.http.get<ApiResponse<PageResponse<User>>>(`${this.apiUrl}?page=${page}&size=${size}`);
+  getAll(page = 0, size = 20, search?: string, role?: string, active?: boolean): Observable<ApiResponse<PageResponse<User>>> {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('size', size.toString());
+
+    if (search && search.trim()) {
+      params = params.set('search', search.trim());
+    }
+    if (role && role !== 'ALL') {
+      params = params.set('role', role);
+    }
+    if (active !== undefined && active !== null) {
+      params = params.set('active', active.toString());
+    }
+
+    return this.http.get<ApiResponse<PageResponse<User>>>(this.apiUrl, { params });
   }
 
   getById(id: number): Observable<ApiResponse<User>> {

@@ -34,7 +34,7 @@ class RedisSerializationTest {
     void roundTripsRecordDtoToConcreteType() {
         GenericJackson2JsonRedisSerializer ser = serializer();
         CartItemResponse item = new CartItemResponse(
-                5L, "WH1000XM5-BLK", "Sony WH-1000XM5", "Black",
+                5L, 1L, "Sony WH-1000XM5", "Black", "WH1000XM5-BLK",
                 new BigDecimal("399.99"), 2, new BigDecimal("799.98"), null);
 
         Object back = ser.deserialize(ser.serialize(item));

@@ -127,7 +127,7 @@ class CartServiceTest {
                 new org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer(mapper);
 
         CartItemResponse item = new CartItemResponse(
-                10L, "SKU-10", "Phone", "Silver",
+                10L, 100L, "SKU-10", "Phone", "Silver",
                 BigDecimal.valueOf(500), 2, BigDecimal.valueOf(1000), "http://img.jpg"
         );
 

@@ -38,12 +38,12 @@ class ReviewRequestValidationTest {
     @Test
     @DisplayName("REQ-STP-T-101: blank and short review content is rejected")
     void rejectsInvalidContent() {
-        assertThat(propertyViolations(new CreateReviewRequest(5, "Good", " "), "content")).isNotEmpty();
-        assertThat(propertyViolations(new CreateReviewRequest(5, "Good", "too short"), "content")).isNotEmpty();
+        assertThat(propertyViolations(new CreateReviewRequest(5, "Good", " ", null), "content")).isNotEmpty();
+        assertThat(propertyViolations(new CreateReviewRequest(5, "Good", "too short", null), "content")).isNotEmpty();
     }
 
     private CreateReviewRequest validRequest(int rating) {
-        return new CreateReviewRequest(rating, "Useful review", "This review has enough detail.");
+        return new CreateReviewRequest(rating, "Useful review", "This review has enough detail.", null);
     }
 
     private Set<ConstraintViolation<CreateReviewRequest>> propertyViolations(

@@ -1,4 +1,4 @@
-/* OrderFlow Modern Solid Design System (Clean Professional Theme) */
+/* MarketFlow Modern Solid Design System (Clean Professional Theme) */
 
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
 
@@ -316,3 +316,116 @@ html, body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
 }
+
+/* User Dropdown Menu Panel Overlay Styling */
+.user-dropdown-panel.mat-mdc-menu-panel {
+  min-width: 240px !important;
+  max-width: 280px !important;
+  border-radius: 14px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 12px 30px -6px rgba(15, 23, 42, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.04) !important;
+  background: #ffffff !important;
+  overflow: hidden !important;
+  padding: 6px 0 !important;
+  margin-top: 6px !important;
+}
+
+.user-dropdown-panel .mat-mdc-menu-content {
+  padding: 0 !important;
+}
+
+.user-dropdown-panel .menu-header {
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 4px;
+}
+
+.user-dropdown-panel .menu-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-dropdown-panel .header-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #ffffff;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+  flex-shrink: 0;
+}
+
+.user-dropdown-panel .menu-user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.user-dropdown-panel .menu-user-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-dropdown-panel .menu-user-role {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #4f46e5;
+  background: #eef2ff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.user-dropdown-panel .mat-mdc-menu-item {
+  min-height: 40px !important;
+  height: 40px !important;
+  margin: 2px 6px !important;
+  border-radius: 8px !important;
+  padding: 0 12px !important;
+  color: #334155 !important;
+  font-weight: 550 !important;
+  font-size: 0.88rem !important;
+  transition: all 0.15s ease !important;
+}
+
+.user-dropdown-panel .mat-mdc-menu-item:hover {
+  background-color: #eef2ff !important;
+  color: #4f46e5 !important;
+}
+
+.user-dropdown-panel .mat-mdc-menu-item mat-icon {
+  margin-right: 10px !important;
+  color: #64748b !important;
+  font-size: 20px !important;
+  width: 20px !important;
+  height: 20px !important;
+  transition: color 0.15s ease !important;
+}
+
+.user-dropdown-panel .mat-mdc-menu-item:hover mat-icon {
+  color: #4f46e5 !important;
+}
+
+.user-dropdown-panel .logout-menu-item:hover {
+  background-color: #fef2f2 !important;
+}
+
+.user-dropdown-panel .logout-menu-item:hover mat-icon,
+.user-dropdown-panel .logout-menu-item:hover span {
+  color: #ef4444 !important;
+}
+

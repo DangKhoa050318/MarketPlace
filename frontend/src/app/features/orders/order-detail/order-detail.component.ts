@@ -65,6 +65,17 @@ import { NotificationService } from '../../../core/services/notification.service
             </div>
 
             <div class="info-item">
+              <mat-icon class="info-icon">local_shipping</mat-icon>
+              <div>
+                <span class="info-label">Shipping Fee</span>
+                <p class="info-val">
+                  <span *ngIf="!order.shippingFee || order.shippingFee === 0" class="free-shipping-tag">FREE</span>
+                  <span *ngIf="order.shippingFee && order.shippingFee > 0">{{ order.shippingFee | currency:'USD':'symbol':'1.2-2' }}</span>
+                </p>
+              </div>
+            </div>
+
+            <div class="info-item">
               <mat-icon class="info-icon">payments</mat-icon>
               <div>
                 <span class="info-label">Total Amount</span>
@@ -80,14 +91,23 @@ import { NotificationService } from '../../../core/services/notification.service
 
           <table mat-table [dataSource]="order.items" class="full-width">
             <ng-container matColumnDef="productName">
-              <th mat-header-cell *matHeaderCellDef>Product Name</th>
+              <th mat-header-cell *matHeaderCellDef>Product</th>
               <td mat-cell *matCellDef="let item">
                 <div class="product-cell">
                   <mat-icon class="item-icon">inventory_2</mat-icon>
                   <div>
                     <strong class="item-name">{{ item.productName }}</strong>
-                    <span class="item-pid">ID: #{{ item.productId }}</span>
                   </div>
+                </div>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="variantInfo">
+              <th mat-header-cell *matHeaderCellDef>Variant & SKU</th>
+              <td mat-cell *matCellDef="let item">
+                <div class="variant-info-stack">
+                  <span *ngIf="item.variantName" class="variant-name-badge">{{ item.variantName }}</span>
+                  <span *ngIf="item.sku" class="sku-code">SKU: {{ item.sku }}</span>
                 </div>
               </td>
             </ng-container>
@@ -121,6 +141,17 @@ import { NotificationService } from '../../../core/services/notification.service
     </div>
   `,
   styles: [`
+    .review-btn {
+      color: #0284c7 !important;
+      border-color: rgba(2, 132, 199, 0.4) !important;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .review-btn mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
     .order-detail-container {
       padding: 24px;
       display: flex;
@@ -202,6 +233,15 @@ import { NotificationService } from '../../../core/services/notification.service
       margin: 4px 0 0 0;
       font-weight: 600;
     }
+    .free-shipping-tag {
+      color: #10b981;
+      font-weight: 800;
+      background: #ecfdf5;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-size: 0.8rem;
+    }
     .total-price {
       font-size: 1.2rem;
       font-weight: 800;
@@ -228,9 +268,41 @@ import { NotificationService } from '../../../core/services/notification.service
     .item-name {
       display: block;
       font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
     }
-    .item-pid {
+    .variant-info-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 4px 0;
+    }
+    .variant-name-badge {
+      display: inline-block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      background: #eef2ff;
+      color: #4f46e5;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      width: fit-content;
+    }
+    .sku-id-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       font-size: 0.75rem;
+    }
+    .sku-code {
+      font-family: monospace;
+      font-weight: 700;
+      color: #334155;
+      background: #f1f5f9;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .variant-id-tag {
       color: var(--text-muted);
     }
     .qty-cell {
@@ -244,7 +316,7 @@ import { NotificationService } from '../../../core/services/notification.service
 export class OrderDetailComponent implements OnInit {
   order: Order | null = null;
   loading = true;
-  displayedColumns = ['productName', 'unitPrice', 'quantity', 'subtotal'];
+  displayedColumns = ['productName', 'variantInfo', 'unitPrice', 'quantity', 'subtotal'];
 
   constructor(
     private route: ActivatedRoute,

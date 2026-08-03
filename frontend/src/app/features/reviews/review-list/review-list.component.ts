@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { ProductReview } from '../../../core/models/review.model';
 import { ReviewSort } from '../../../core/services/review.service';
 import { VoteService } from '../../../core/services/vote.service';
@@ -17,21 +18,28 @@ import { NotificationService } from '../../../core/services/notification.service
   standalone: true,
   imports: [
     CommonModule, FormsModule, MatButtonModule, MatIconModule, MatPaginatorModule,
-    MatProgressSpinnerModule, MatSelectModule
+    MatProgressSpinnerModule, MatSelectModule, MatFormFieldModule
   ],
   template: `
     <section>
       <div class="toolbar">
         <h3>Customer reviews</h3>
-        <div>
-          <mat-select aria-label="Filter by stars" [(ngModel)]="rating" (selectionChange)="filtersChanged()">
-            <mat-option [value]="undefined">All ratings</mat-option>
-            @for (star of stars; track star) { <mat-option [value]="star">{{ star }} stars</mat-option> }
-          </mat-select>
-          <mat-select aria-label="Sort reviews" [(ngModel)]="sort" (selectionChange)="filtersChanged()">
-            <mat-option value="newest">Newest</mat-option>
-            <mat-option value="helpful">Most helpful</mat-option>
-          </mat-select>
+        <div class="filter-controls">
+          <mat-form-field appearance="outline" class="filter-select">
+            <mat-label>Rating</mat-label>
+            <mat-select aria-label="Filter by stars" [(ngModel)]="selectedRating" (selectionChange)="filtersChanged()">
+              <mat-option value="ALL">All ratings</mat-option>
+              <mat-option *ngFor="let star of stars" [value]="star.toString()">{{ star }} ⭐</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filter-select">
+            <mat-label>Sort by</mat-label>
+            <mat-select aria-label="Sort reviews" [(ngModel)]="sort" (selectionChange)="filtersChanged()">
+              <mat-option value="newest">Newest</mat-option>
+              <mat-option value="helpful">Most helpful</mat-option>
+            </mat-select>
+          </mat-form-field>
         </div>
       </div>
 
@@ -64,6 +72,11 @@ import { NotificationService } from '../../../core/services/notification.service
             </div>
             <h4>{{ review.title }}</h4>
             <p>{{ review.content }}</p>
+            @if (review.imageUrl) {
+              <div class="review-image-container">
+                <img [src]="review.imageUrl" [alt]="review.title" class="review-img">
+              </div>
+            }
             <div class="review-actions">
               <button
                 mat-button
@@ -90,7 +103,8 @@ import { NotificationService } from '../../../core/services/notification.service
   `,
   styles: [`
     .toolbar,.review-head { display:flex; justify-content:space-between; align-items:center; gap:16px; }
-    .toolbar > div { display:flex; gap:12px; } mat-select { width:140px; }
+    .filter-controls { display:flex; gap:12px; align-items:center; }
+    .filter-select { width:150px; margin-bottom:-1.25em; font-size:0.85rem; }
     .review { border-top:1px solid #e2e8f0; padding:20px 0; }
     .review h4 { margin:10px 0 4px; } .review p { margin:0; white-space:pre-wrap; }
     .stars { display:flex; color:#f59e0b; } .stars mat-icon { font-size:18px; width:18px; height:18px; }
@@ -98,6 +112,9 @@ import { NotificationService } from '../../../core/services/notification.service
     .badges { display:flex; gap:10px; margin-top:8px; }
     .verified { display:inline-flex; align-items:center; color:#047857; font-weight:700; }
     .verified mat-icon { font-size:16px; width:16px; height:16px; margin-right:3px; }
+    .review-image-container { margin-top: 10px; }
+    .review-img { max-width: 160px; max-height: 160px; object-fit: cover; border-radius: 10px; border: 1px solid #cbd5e1; cursor: pointer; transition: transform 0.2s ease; }
+    .review-img:hover { transform: scale(1.03); }
     .review-actions { display:flex; justify-content:space-between; align-items:center; margin-top:12px; }
     .vote-btn { border-radius:16px; font-size:.82rem; color:#64748b; }
     .vote-btn.voted { color:#0284c7; background:#f0f9ff; }
@@ -119,7 +136,7 @@ export class ReviewListComponent {
   @Output() retry = new EventEmitter<void>();
   @Output() edit = new EventEmitter<ProductReview>();
 
-  rating?: number;
+  selectedRating = 'ALL';
   sort: ReviewSort = 'newest';
   readonly stars = [1, 2, 3, 4, 5];
 
@@ -130,7 +147,8 @@ export class ReviewListComponent {
   ) {}
 
   filtersChanged(): void {
-    this.filterChange.emit({ rating: this.rating, sort: this.sort });
+    const ratingVal = this.selectedRating !== 'ALL' ? Number(this.selectedRating) : undefined;
+    this.filterChange.emit({ rating: ratingVal, sort: this.sort });
   }
 
   vote(review: ProductReview & { isVotedByCurrentUser?: boolean }): void {

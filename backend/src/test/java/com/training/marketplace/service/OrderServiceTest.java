@@ -66,9 +66,9 @@ class OrderServiceTest {
 
         // variantId=10, sku, productName, variantName, unitPrice, qty, subtotal, imageUrl
         CartItemResponse cartItem = new CartItemResponse(
-                10L, "LAP-1", "Laptop", "Silver / 16GB",
+                10L, 100L, "LAP-1", "Laptop", "Silver / 16GB",
                 BigDecimal.valueOf(100.00), 2, BigDecimal.valueOf(200.00), null);
-        cartResponse = new CartResponse(1L, List.of(cartItem), BigDecimal.valueOf(200.00), 2);
+        cartResponse = new CartResponse(1L, List.of(cartItem), BigDecimal.valueOf(200.00), BigDecimal.ZERO, 2);
 
         testOrder = Order.builder()
                 .user(testUser).warehouseId(1L).status(OrderStatus.PENDING)
@@ -78,7 +78,7 @@ class OrderServiceTest {
 
         testOrderResponse = new OrderResponse(
                 100L, 1L, "testuser", "test@example.com", "123 Main St",
-                BigDecimal.valueOf(200.00), BigDecimal.ZERO, null, OrderStatus.PENDING, null, List.of(),
+                BigDecimal.valueOf(200.00), BigDecimal.ZERO, BigDecimal.ZERO, null, OrderStatus.PENDING, null, List.of(),
                 LocalDateTime.now(), LocalDateTime.now());
     }
 
@@ -106,7 +106,7 @@ class OrderServiceTest {
     void createOrder_emptyCart_throwsException() {
         CreateOrderRequest request = new CreateOrderRequest("123 Main St", null, null);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(cartService.getCart(1L)).thenReturn(new CartResponse(1L, List.of(), BigDecimal.ZERO, 0));
+        when(cartService.getCart(1L)).thenReturn(new CartResponse(1L, List.of(), BigDecimal.ZERO, BigDecimal.ZERO, 0));
 
         assertThatThrownBy(() -> orderService.createOrder(1L, request))
                 .isInstanceOf(BadRequestException.class)

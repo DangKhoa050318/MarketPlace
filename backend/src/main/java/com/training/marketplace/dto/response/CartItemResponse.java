@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record CartItemResponse(
         Long variantId,
+        Long productId,
         String sku,
         String productName,
         String variantName,

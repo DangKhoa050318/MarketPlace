@@ -187,7 +187,7 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
         assertThat(eligAfterResp.getBody().getData().isVerifiedPurchase()).isTrue();
 
         // 4. Submit a 5-star Review
-        CreateReviewRequest createReq = new CreateReviewRequest(5, "Amazing Keyboard!", "The key feel and sound are absolutely top notch.");
+        CreateReviewRequest createReq = new CreateReviewRequest(5, "Amazing Keyboard!", "The key feel and sound are absolutely top notch.", null);
         HttpEntity<CreateReviewRequest> createEntity = new HttpEntity<>(createReq, headers);
         ResponseEntity<ApiResponse<ProductReviewResponse>> createResp = restTemplate.exchange(
                 "/api/v1/products/" + testProduct.getId() + "/reviews",
@@ -221,7 +221,7 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
         assertThat(dupResp.getStatusCode()).isIn(HttpStatus.CONFLICT, HttpStatus.BAD_REQUEST);
 
         // 7. Update Review -> 4 stars
-        UpdateReviewRequest updateReq = new UpdateReviewRequest(4, "Great Keyboard (Updated)", "Updated review: very good overall after 2 weeks.");
+        UpdateReviewRequest updateReq = new UpdateReviewRequest(4, "Great Keyboard (Updated)", "Updated review: very good overall after 2 weeks.", null);
         HttpEntity<UpdateReviewRequest> updateEntity = new HttpEntity<>(updateReq, headers);
         ResponseEntity<ApiResponse<ProductReviewResponse>> updateResp = restTemplate.exchange(
                 "/api/v1/reviews/" + createdReview.getId(),

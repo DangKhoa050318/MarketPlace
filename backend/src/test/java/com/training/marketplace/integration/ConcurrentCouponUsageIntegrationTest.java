@@ -46,9 +46,9 @@ class ConcurrentCouponUsageIntegrationTest extends BaseIntegrationTest {
 
     private CartResponse cart(long userId) {
         return new CartResponse(userId,
-                List.of(new CartItemResponse(10L, "SKU10", "Product", "Variant",
+                List.of(new CartItemResponse(10L, 1L, "Product", "Variant", "SKU10",
                         new BigDecimal("500.00"), 1, new BigDecimal("500.00"), null)),
-                new BigDecimal("500.00"), 1);
+                new BigDecimal("500.00"), BigDecimal.ZERO, 1);
     }
 
     @Test
