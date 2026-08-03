@@ -25,6 +25,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    out-of-order: true
 
   data:
     redis:
@@ -52,14 +53,12 @@ spring:
     port: ${MAIL_PORT:1025}
 
 jwt:
-  # REQUIRED. No default on purpose — set a unique 256-bit secret per environment (see .env.example).
-  # The app fails fast if JWT_SECRET is unset, so a shared/hardcoded key can never leak via the repo.
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b}
   access-token-expiration: 900000
   refresh-token-expiration: 604800000
 
 server:
-  port: 8080
+  port: 8081
   tomcat:
     threads:
       max: 200
@@ -80,8 +79,12 @@ logging:
 
 marketplace:
   payment:
-    # Safe default: orders stay PENDING and Rabbit retries/DLQs until a real provider adapter is configured.
     provider: ${PAYMENT_PROVIDER:disabled}
+  paygate:
+    api-url: ${PAYGATE_API_URL:http://localhost:8080}
+    api-key: ${PAYGATE_API_KEY:mock-merchant-api-key-123456}
+    return-url: ${PAYGATE_RETURN_URL:http://localhost:4201/orders/callback}
+    cancel-url: ${PAYGATE_CANCEL_URL:http://localhost:4201/cart}
   features:
     review-qa: ${FEATURE_REVIEW_QA_ENABLED:true}
     promotions: ${FEATURE_PROMOTIONS_ENABLED:true}

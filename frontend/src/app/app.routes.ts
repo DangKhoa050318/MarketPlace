@@ -34,6 +34,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/orders/order-list/order-list.component').then(m => m.OrderListComponent)
       },
       {
+        path: 'orders/callback',
+        loadComponent: () => import('./features/orders/payment-callback/payment-callback.component').then(m => m.PaymentCallbackComponent)
+      },
+      {
         path: 'orders/:id',
         canActivate: [authGuard],
         loadComponent: () => import('./features/orders/order-detail/order-detail.component').then(m => m.OrderDetailComponent)

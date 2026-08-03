@@ -6,11 +6,13 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSelectModule } from '@angular/material/select';
 import { Cart } from '../../../core/models/cart.model';
+import { PaymentMethod } from '../../../core/models/order.model';
 
 export interface CheckoutDialogData {
   cart: Cart;
-  couponCode?: string | null;   // applied on the cart page (F-306); shown read-only here
+  couponCode?: string | null;
   discountAmount?: number;
 }
 
@@ -24,13 +26,14 @@ export interface CheckoutDialogData {
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
-    MatIconModule
+    MatIconModule,
+    MatSelectModule
   ],
   template: `
     <div class="checkout-modal-container">
       <div class="modal-header">
         <h2 class="dialog-title text-gradient-cyan">
-          <mat-icon class="title-icon">local_shipping</mat-icon> Checkout
+          <mat-icon class="title-icon">shopping_cart_checkout</mat-icon> Production Checkout & Payment
         </h2>
         <button mat-icon-button (click)="onCancel()" class="close-btn"><mat-icon>close</mat-icon></button>
       </div>
@@ -45,35 +48,135 @@ export interface CheckoutDialogData {
             <span class="shipping-note" *ngIf="shippingFee() > 0">Shipping: <strong>{{ shippingFee() | currency:'USD':'symbol':'1.2-2' }}</strong></span>
           </div>
           <div class="summary-item align-right">
-            <span class="label">Total Payment</span>
+            <span class="label">Total Payable</span>
             <span *ngIf="data.couponCode" class="strike">{{ (data.cart.totalAmount + shippingFee()) | currency:'USD':'symbol':'1.2-2' }}</span>
             <strong class="total-amount text-gradient-cyan">{{ payableTotal() | currency:'USD':'symbol':'1.2-2' }}</strong>
           </div>
         </div>
 
-        <!-- Applied coupon (read-only; entered on the cart page) -->
+        <!-- Applied Coupon -->
         <div *ngIf="data.couponCode" class="coupon-applied-line">
           <mat-icon>local_offer</mat-icon>
-          Coupon <strong>{{ data.couponCode }}</strong> applied — you save
+          Coupon <strong>{{ data.couponCode }}</strong> applied — Savings:
           {{ (data.discountAmount || 0) | currency:'USD':'symbol':'1.2-2' }}.
         </div>
 
-        <form [formGroup]="form" (ngSubmit)="onSubmit()" class="checkout-form">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Shipping Address</mat-label>
-            <input matInput formControlName="shippingAddress" placeholder="Enter your delivery address..." required />
-            <mat-icon matSuffix>location_on</mat-icon>
-            <mat-error *ngIf="form.get('shippingAddress')?.hasError('required')">
-              Shipping address is required
-            </mat-error>
-          </mat-form-field>
+        <!-- Payment Method Options -->
+        <div class="payment-section">
+          <h3 class="section-heading"><mat-icon>payments</mat-icon> Select Payment Method</h3>
+          <div class="payment-options-grid">
+            <!-- Option 1: COD -->
+            <div
+              class="payment-card"
+              [class.active]="selectedMethod === 'COD'"
+              (click)="selectMethod('COD')">
+              <div class="radio-indicator"></div>
+              <mat-icon class="method-icon cod-icon">local_post_office</mat-icon>
+              <div class="method-details">
+                <span class="method-title">Cash on Delivery (COD)</span>
+                <span class="method-desc">Pay cash upon receiving items. Instant order confirmation.</span>
+              </div>
+              <span class="badge-recommended">Default</span>
+            </div>
 
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Order Notes (Optional)</mat-label>
-            <textarea matInput formControlName="note" rows="2" placeholder="Notes for delivery..."></textarea>
-            <mat-icon matSuffix>note_add</mat-icon>
-          </mat-form-field>
-        </form>
+            <!-- Option 2: PayGate E-Wallet / Card Gateway -->
+            <div
+              class="payment-card"
+              [class.active]="selectedMethod === 'CREDIT_CARD'"
+              (click)="selectMethod('CREDIT_CARD')">
+              <div class="radio-indicator"></div>
+              <mat-icon class="method-icon card-icon">account_balance_wallet</mat-icon>
+              <div class="method-details">
+                <span class="method-title">PayGate E-Wallet / Card Gateway</span>
+                <span class="method-desc">Pay online securely via PayGate portal with OTP verification.</span>
+              </div>
+            </div>
+
+            <!-- Option 3: BNPL (Buy Now Pay Later) -->
+            <div
+              class="payment-card"
+              [class.active]="selectedMethod === 'PAYGATE_BNPL'"
+              (click)="selectMethod('PAYGATE_BNPL')">
+              <div class="radio-indicator"></div>
+              <mat-icon class="method-icon bnpl-icon">event_repeat</mat-icon>
+              <div class="method-details">
+                <span class="method-title">Buy Now Pay Later</span>
+                <span class="method-desc">Pay 30% upfront today, split the rest into 0% interest installments via PayGate.</span>
+              </div>
+              <span class="badge-promo">0% Interest</span>
+            </div>
+          </div>
+
+          <!-- Extra Breakdown for BNPL -->
+          <div *ngIf="selectedMethod === 'PAYGATE_BNPL'" class="bnpl-details-box glass-panel fade-in">
+            <div class="bnpl-term-header">
+              <span>Choose Financing Term:</span>
+              <div class="term-pills">
+                <button
+                  type="button"
+                  *ngFor="let term of [1, 3, 6, 12]"
+                  class="term-pill"
+                  [class.selected]="selectedBnplMonths === term"
+                  (click)="selectedBnplMonths = term">
+                  {{ term }} Month{{ term > 1 ? 's' : '' }}
+                </button>
+              </div>
+            </div>
+
+            <div class="credit-limit-banner">
+              <mat-icon class="limit-icon">verified_user</mat-icon>
+              <span>PayGate Approved Credit Limit: <strong>{{ paygateCreditLimit | currency:'USD':'symbol':'1.2-2' }}</strong></span>
+            </div>
+
+            <div class="bnpl-breakdown-grid">
+              <div class="breakdown-col">
+                <span class="b-label">Financed Amount (PayGate)</span>
+                <strong class="b-val text-cyan">{{ financeAmount() | currency:'USD':'symbol':'1.2-2' }}</strong>
+              </div>
+              <div class="breakdown-col">
+                <span class="b-label">Upfront Payment Required</span>
+                <strong class="b-val text-gradient-cyan">{{ upfrontAmount() | currency:'USD':'symbol':'1.2-2' }}</strong>
+              </div>
+              <div class="breakdown-col highlight">
+                <span class="b-label">Monthly Payment</span>
+                <strong class="b-val text-amber">{{ monthlyPayment() | currency:'USD':'symbol':'1.2-2' }} / mo</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form for Shipping & Note -->
+        <div class="delivery-section">
+          <h3 class="section-heading"><mat-icon class="heading-icon text-cyan">local_shipping</mat-icon> Delivery Information</h3>
+          <form [formGroup]="form" class="checkout-form">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Shipping Address</mat-label>
+              <input matInput formControlName="shippingAddress" placeholder="Enter your full delivery address..." required />
+              <mat-icon matSuffix class="text-cyan">location_on</mat-icon>
+              <mat-error *ngIf="form.get('shippingAddress')?.hasError('required')">
+                Shipping address is required
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Order Notes (Optional)</mat-label>
+              <textarea matInput formControlName="note" rows="2" placeholder="Instructions for delivery driver..."></textarea>
+              <mat-icon matSuffix class="text-cyan">note_add</mat-icon>
+            </mat-form-field>
+          </form>
+        </div>
+
+        <!-- Paygate Contract Payload Preview Toggle -->
+        <div class="paygate-spec-preview">
+          <button type="button" class="preview-toggle-btn" (click)="showPaygateSpec = !showPaygateSpec">
+            <mat-icon>{{ showPaygateSpec ? 'expand_less' : 'developer_mode' }}</mat-icon>
+            {{ showPaygateSpec ? 'Hide API Session Payload' : 'Inspect API Session Payload Contract' }}
+          </button>
+
+          <div *ngIf="showPaygateSpec" class="payload-code-box fade-in">
+            <pre><code>{{ getPayloadPreviewJson() }}</code></pre>
+          </div>
+        </div>
       </mat-dialog-content>
 
       <mat-dialog-actions align="end" class="dialog-actions">
@@ -83,7 +186,8 @@ export interface CheckoutDialogData {
           class="btn-glowing"
           (click)="onSubmit()"
           [disabled]="form.invalid || submitting">
-          <mat-icon>shopping_bag</mat-icon> {{ submitting ? 'Processing...' : 'Confirm Order' }}
+          <mat-icon>{{ selectedMethod === 'COD' ? 'shopping_bag' : 'open_in_new' }}</mat-icon>
+          {{ submitting ? 'Processing...' : (selectedMethod === 'COD' ? 'Confirm COD Order' : 'Proceed to PayGate Portal') }}
         </button>
       </mat-dialog-actions>
     </div>
@@ -97,7 +201,7 @@ export interface CheckoutDialogData {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 16px 20px 8px;
+      padding: 16px 20px 10px;
       border-bottom: 1px solid var(--glass-border-subtle);
     }
 
@@ -105,7 +209,7 @@ export interface CheckoutDialogData {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 1.3rem;
+      font-size: 1.25rem;
       font-weight: 800;
       margin: 0;
     }
@@ -126,6 +230,7 @@ export interface CheckoutDialogData {
       display: flex;
       flex-direction: column;
       gap: 16px;
+      max-height: 75vh;
     }
 
     .checkout-summary-box {
@@ -191,11 +296,173 @@ export interface CheckoutDialogData {
       color: #16a34a;
     }
 
-    .coupon-applied-line mat-icon {
-      font-size: 18px;
+    .section-heading {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0 10px;
+    }
+
+    .payment-options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .payment-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 2px solid #e2e8f0;
+      background: #ffffff;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .payment-card:hover {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+    }
+
+    .payment-card.active {
+      border-color: #0284c7;
+      background: #f0f9ff;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.12);
+    }
+
+    .radio-indicator {
       width: 18px;
       height: 18px;
+      border-radius: 50%;
+      border: 2px solid #cbd5e1;
+      position: relative;
     }
+
+    .payment-card.active .radio-indicator {
+      border-color: #0284c7;
+      background: #0284c7;
+    }
+
+    .payment-card.active .radio-indicator::after {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ffffff;
+    }
+
+    .method-icon {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+    .cod-icon { color: #16a34a; }
+    .card-icon { color: #0284c7; }
+    .bnpl-icon { color: #d97706; }
+
+    .method-details {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .method-title {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: #0f172a;
+    }
+
+    .method-desc {
+      font-size: 0.78rem;
+      color: #64748b;
+    }
+
+    .badge-recommended, .badge-promo {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 12px;
+      text-transform: uppercase;
+    }
+    .badge-recommended { background: #dcfce7; color: #15803d; }
+    .badge-promo { background: #fef3c7; color: #b45309; }
+
+    .bnpl-details-box {
+      margin-top: 10px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .bnpl-term-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 10px;
+    }
+
+    .term-pills {
+      display: flex;
+      gap: 6px;
+    }
+
+    .term-pill {
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #475569;
+      cursor: pointer;
+    }
+
+    .term-pill.selected {
+      border-color: #d97706;
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    .bnpl-breakdown-grid {
+      display: flex;
+      justify-content: space-between;
+      background: #ffffff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .breakdown-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .b-label {
+      font-size: 0.7rem;
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    .b-val {
+      font-size: 0.9rem;
+    }
+
+    .text-amber { color: #d97706; }
+    .text-cyan { color: #0284c7; }
 
     .checkout-form {
       display: flex;
@@ -212,10 +479,70 @@ export interface CheckoutDialogData {
       display: flex;
       gap: 10px;
     }
+
+    .paygate-spec-preview {
+      margin-top: 4px;
+    }
+
+    .preview-toggle-btn {
+      background: none;
+      border: none;
+      color: #0284c7;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0;
+    }
+
+    .payload-code-box {
+      margin-top: 8px;
+      background: #0f172a;
+      color: #38bdf8;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      overflow-x: auto;
+    }
+
+    .credit-limit-banner {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: rgba(2, 132, 199, 0.08);
+      border-radius: 8px;
+      font-size: 0.78rem;
+      color: #0369a1;
+      margin-bottom: 10px;
+    }
+
+    .limit-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #0284c7;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.25s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   `]
 })
 export class CheckoutDialogComponent {
   form: FormGroup;
+  selectedMethod: PaymentMethod = 'COD';
+  selectedBnplMonths = 3;
+  paygateCreditLimit = 150.00; // PayGate Approved Credit Limit
+  showPaygateSpec = false;
   submitting = false;
 
   constructor(
@@ -224,9 +551,13 @@ export class CheckoutDialogComponent {
     @Inject(MAT_DIALOG_DATA) public data: CheckoutDialogData
   ) {
     this.form = this.fb.group({
-      shippingAddress: ['', [Validators.required, Validators.minLength(5)]],
+      shippingAddress: ['123 Main St, San Jose, CA 95112', [Validators.required, Validators.minLength(5)]],
       note: ['']
     });
+  }
+
+  selectMethod(method: PaymentMethod): void {
+    this.selectedMethod = method;
   }
 
   shippingFee(): number {
@@ -242,6 +573,67 @@ export class CheckoutDialogComponent {
     return Math.max(0, subtotal - discount + shipping);
   }
 
+  financeAmount(): number {
+    const total = this.payableTotal();
+    if (this.selectedMethod !== 'PAYGATE_BNPL') {
+      return 0;
+    }
+    const financed = Math.min(total, this.paygateCreditLimit);
+    return Math.round(financed * 100) / 100;
+  }
+
+  upfrontAmount(): number {
+    const total = this.payableTotal();
+    if (this.selectedMethod !== 'PAYGATE_BNPL') {
+      return total;
+    }
+    const upfront = Math.max(0, total - this.financeAmount());
+    return Math.round(upfront * 100) / 100;
+  }
+
+  monthlyPayment(): number {
+    const financed = this.financeAmount();
+    if (this.selectedBnplMonths <= 0 || financed <= 0) return 0;
+    return Math.round((financed / this.selectedBnplMonths) * 100) / 100;
+  }
+
+  getPayloadPreviewJson(): string {
+    if (this.selectedMethod === 'PAYGATE_BNPL') {
+      return JSON.stringify({
+        apiKey: 'mock-merchant-api-key-123456',
+        orderId: 'ORD_AUTO_GEN',
+        paymentMethod: 'PAYGATE_BNPL',
+        paymentType: 'BNPL_FINANCING',
+        totalAmount: this.payableTotal(),
+        upfrontAmount: this.upfrontAmount(),
+        financeAmount: this.financeAmount(),
+        bnplMonths: this.selectedBnplMonths,
+        monthlyPayment: this.monthlyPayment(),
+        description: `Tra gop PayGate BNPL (${this.selectedBnplMonths} thang) cho don hang Marketplace`,
+        returnUrl: 'http://localhost:4200/orders/callback',
+        cancelUrl: 'http://localhost:4200/cart'
+      }, null, 2);
+    } else if (this.selectedMethod === 'CREDIT_CARD') {
+      return JSON.stringify({
+        apiKey: 'mock-merchant-api-key-123456',
+        orderId: 'ORD_AUTO_GEN',
+        paymentMethod: 'CREDIT_CARD',
+        paymentType: 'FULL_PAYMENT',
+        amount: this.payableTotal(),
+        description: 'Thanh toan 100% qua PayGate E-Wallet / Card Gateway',
+        returnUrl: 'http://localhost:4200/orders/callback',
+        cancelUrl: 'http://localhost:4200/cart'
+      }, null, 2);
+    } else {
+      return JSON.stringify({
+        shippingAddress: this.form.value.shippingAddress || '123 Delivery Street',
+        note: this.form.value.note || '',
+        paymentMethod: 'COD',
+        couponCode: this.data.couponCode || null
+      }, null, 2);
+    }
+  }
+
   onCancel(): void {
     this.dialogRef.close();
   }
@@ -251,7 +643,11 @@ export class CheckoutDialogComponent {
       this.dialogRef.close({
         shippingAddress: this.form.value.shippingAddress,
         note: this.form.value.note,
-        couponCode: this.data.couponCode || undefined
+        couponCode: this.data.couponCode || undefined,
+        paymentMethod: this.selectedMethod,
+        upfrontAmount: this.upfrontAmount(),
+        financeAmount: this.financeAmount(),
+        bnplMonths: this.selectedMethod === 'PAYGATE_BNPL' ? this.selectedBnplMonths : undefined
       });
     }
   }

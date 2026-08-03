@@ -10,7 +10,10 @@ import com.training.marketplace.dto.response.OrderResponse;
 import com.training.marketplace.entity.Order;
 import com.training.marketplace.entity.OrderItem;
 import com.training.marketplace.entity.User;
+import com.training.marketplace.dto.response.PaygatePayloadResponse;
 import com.training.marketplace.enums.OrderStatus;
+import com.training.marketplace.enums.PaymentMethod;
+import com.training.marketplace.enums.PaymentStatus;
 import com.training.marketplace.enums.Role;
 import com.training.marketplace.event.OrderCreatedEvent;
 import com.training.marketplace.exception.BadRequestException;
@@ -56,6 +59,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final OrderEventPublisher orderEventPublisher;
     private final PromotionService promotionService;
+    private final com.training.marketplace.service.PaygateClientService paygateClientService;
 
     @Override
     @Transactional
@@ -122,7 +126,38 @@ public class OrderServiceImpl implements OrderService {
             order.setCouponCode(appliedCoupon.code());
         }
         order.setDiscountAmount(discount);
-        order.setTotalAmount(calculatedTotal.subtract(discount).add(shippingFee));
+
+        BigDecimal grandTotal = calculatedTotal.subtract(discount).add(shippingFee);
+        if (grandTotal.compareTo(BigDecimal.ZERO) < 0) {
+            grandTotal = BigDecimal.ZERO;
+        }
+        order.setTotalAmount(grandTotal);
+
+        PaymentMethod paymentMethod = request.paymentMethod() != null ? request.paymentMethod() : PaymentMethod.COD;
+        BigDecimal upfront = request.upfrontAmount();
+        BigDecimal finance = request.financeAmount();
+
+        if (paymentMethod == PaymentMethod.COD || paymentMethod == PaymentMethod.CREDIT_CARD) {
+            upfront = grandTotal;
+            finance = BigDecimal.ZERO;
+        } else if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
+            if (upfront == null || upfront.compareTo(BigDecimal.ZERO) <= 0) {
+                upfront = grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
+            }
+            finance = grandTotal.subtract(upfront);
+        }
+
+        order.setPaymentMethod(paymentMethod);
+        order.setUpfrontAmount(upfront != null ? upfront : grandTotal);
+        order.setFinanceAmount(finance != null ? finance : BigDecimal.ZERO);
+
+        if (paymentMethod == PaymentMethod.COD) {
+            order.setStatus(OrderStatus.CONFIRMED);
+            order.setPaymentStatus(PaymentStatus.UNPAID);
+        } else {
+            order.setStatus(OrderStatus.PENDING);
+            order.setPaymentStatus(PaymentStatus.PENDING_PAYGATE);
+        }
 
         Order savedOrder = orderRepository.save(order);
 
@@ -152,9 +187,54 @@ public class OrderServiceImpl implements OrderService {
                 LocalDateTime.now(),
                 eventItems));
 
-        log.info("Order created: orderId={}, userId={}, warehouseId={}, total={}",
-                savedOrder.getId(), userId, warehouseId, calculatedTotal);
-        return orderMapper.toResponse(savedOrder);
+        log.info("Order created: orderId={}, userId={}, paymentMethod={}, status={}, total={}",
+                savedOrder.getId(), userId, paymentMethod, savedOrder.getStatus(), grandTotal);
+
+        OrderResponse baseResponse = orderMapper.toResponse(savedOrder);
+        PaygatePayloadResponse paygatePayload = null;
+        if (paymentMethod != PaymentMethod.COD) {
+            var pgSession = paygateClientService.createCheckoutSession(
+                    savedOrder.getId(),
+                    savedOrder.getTotalAmount(),
+                    "Thanh toan don hang #" + savedOrder.getId() + " tren Marketplace"
+            );
+            String targetPaymentUrl = (pgSession != null && pgSession.data() != null)
+                    ? pgSession.data().paymentUrl()
+                    : "http://localhost:4201/checkout?orderId=" + savedOrder.getId();
+
+            paygatePayload = new PaygatePayloadResponse(
+                    savedOrder.getId(),
+                    userId,
+                    "MC_API_KEY_MARKETPLACE_DEMO",
+                    savedOrder.getTotalAmount(),
+                    savedOrder.getUpfrontAmount(),
+                    savedOrder.getFinanceAmount(),
+                    paymentMethod.name(),
+                    targetPaymentUrl
+            );
+        }
+
+        return new OrderResponse(
+                baseResponse.id(),
+                baseResponse.userId(),
+                baseResponse.username(),
+                baseResponse.userEmail(),
+                baseResponse.shippingAddress(),
+                baseResponse.totalAmount(),
+                baseResponse.discountAmount(),
+                baseResponse.shippingFee(),
+                baseResponse.couponCode(),
+                baseResponse.status(),
+                baseResponse.paymentMethod(),
+                baseResponse.paymentStatus(),
+                baseResponse.upfrontAmount(),
+                baseResponse.financeAmount(),
+                paygatePayload,
+                baseResponse.note(),
+                baseResponse.items(),
+                baseResponse.createdAt(),
+                baseResponse.updatedAt()
+        );
     }
 
     @Override

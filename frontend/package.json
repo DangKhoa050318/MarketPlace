@@ -6,8 +6,8 @@
   },
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --proxy-config proxy.conf.json",
-    "dev": "ng serve --proxy-config proxy.conf.json",
+    "start": "ng serve --port 4201 --proxy-config proxy.conf.json",
+    "dev": "ng serve --port 4201 --proxy-config proxy.conf.json",
     "build": "ng build",
     "test": "ng test",
     "e2e": "playwright test"
