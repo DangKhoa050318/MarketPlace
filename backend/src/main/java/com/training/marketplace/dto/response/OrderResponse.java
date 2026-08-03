@@ -13,6 +13,7 @@ public record OrderResponse(
         String shippingAddress,
         BigDecimal totalAmount,
         BigDecimal discountAmount,
+        BigDecimal shippingFee,
         String couponCode,
         OrderStatus status,
         String note,

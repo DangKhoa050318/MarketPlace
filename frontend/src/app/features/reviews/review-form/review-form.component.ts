@@ -6,12 +6,13 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { ProductReview, ReviewPayload } from '../../../core/models/review.model';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 @Component({
   selector: 'app-review-form',
   standalone: true,
   imports: [
-    CommonModule, ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule
+    CommonModule, ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressSpinnerModule
   ],
   template: `
     <form [formGroup]="form" (ngSubmit)="submit()" class="review-form">
@@ -40,11 +41,23 @@ import { ProductReview, ReviewPayload } from '../../../core/models/review.model'
         <mat-hint align="end">{{ form.controls.content.value.length }}/1000</mat-hint>
         <mat-error>Review must contain 10–1000 characters.</mat-error>
       </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Image URL (Optional)</mat-label>
+        <input matInput formControlName="imageUrl" placeholder="https://example.com/photo.jpg" maxlength="500">
+        <mat-icon matSuffix>image</mat-icon>
+      </mat-form-field>
+      @if (form.controls.imageUrl.value) {
+        <div class="image-preview">
+          <span>Image Preview:</span>
+          <img [src]="form.controls.imageUrl.value" alt="Review Image Preview" (error)="imageError = true">
+        </div>
+      }
       @if (error) { <p class="error" role="alert">{{ error }}</p> }
       <div class="actions">
         @if (review) { <button mat-button type="button" (click)="cancel.emit()">Cancel</button> }
-        <button mat-raised-button color="primary" type="submit" [disabled]="saving">
-          {{ saving ? 'Saving…' : (review ? 'Update review' : 'Publish review') }}
+        <button mat-raised-button color="primary" type="submit" [disabled]="saving" class="btn-submit">
+          <mat-spinner *ngIf="saving" diameter="18"></mat-spinner>
+          <span>{{ saving ? 'Saving…' : (review ? 'Update review' : 'Publish review') }}</span>
         </button>
       </div>
     </form>
@@ -55,7 +68,12 @@ import { ProductReview, ReviewPayload } from '../../../core/models/review.model'
     .star-selector { display:flex; }
     .star-button { border:0; background:transparent; color:#f59e0b; cursor:pointer; padding:2px; }
     .star-button mat-icon { font-size:30px; width:30px; height:30px; }
+    .image-preview { display:flex; flex-direction:column; gap:6px; font-size:0.8rem; color:#64748b; }
+    .image-preview img { max-width:120px; max-height:120px; object-fit:cover; border-radius:8px; border:1px solid #e2e8f0; }
     .actions { display:flex; justify-content:flex-end; gap:8px; }
+    .btn-submit { display:inline-flex !important; align-items:center !important; justify-content:center !important; }
+    :host ::ng-deep .btn-submit .mdc-button__label { display:inline-flex !important; align-items:center !important; justify-content:center !important; gap:8px !important; }
+    :host ::ng-deep .btn-submit .mat-mdc-progress-spinner circle { stroke:#ffffff !important; }
     .error { color:#dc2626; margin:0; font-size:.85rem; }
   `]
 })
@@ -65,11 +83,13 @@ export class ReviewFormComponent implements OnChanges {
   @Input() error = '';
   @Output() save = new EventEmitter<ReviewPayload>();
   @Output() cancel = new EventEmitter<void>();
+  imageError = false;
   readonly stars = [1, 2, 3, 4, 5];
   readonly form = this.fb.nonNullable.group({
     rating: [0, [Validators.required, Validators.min(1), Validators.max(5)]],
     title: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100)]],
-    content: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(1000)]]
+    content: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(1000)]],
+    imageUrl: ['']
   });
 
   constructor(private fb: FormBuilder) {}
@@ -79,7 +99,8 @@ export class ReviewFormComponent implements OnChanges {
       this.form.reset({
         rating: this.review.rating,
         title: this.review.title,
-        content: this.review.content
+        content: this.review.content,
+        imageUrl: this.review.imageUrl || ''
       });
     }
   }
@@ -98,7 +119,8 @@ export class ReviewFormComponent implements OnChanges {
     this.save.emit({
       rating: value.rating,
       title: value.title.trim(),
-      content: value.content.trim()
+      content: value.content.trim(),
+      imageUrl: value.imageUrl?.trim() || undefined
     });
   }
 }

@@ -16,7 +16,7 @@ describe('ReviewFormComponent', () => {
   });
 
   it('rejects ratings outside 1–5 and short content', () => {
-    component.form.setValue({ rating: 0, title: 'Good', content: 'short' });
+    component.form.patchValue({ rating: 0, title: 'Good', content: 'short' });
     expect(component.form.invalid).toBeTrue();
     component.form.controls.rating.setValue(6);
     expect(component.form.controls.rating.invalid).toBeTrue();
@@ -24,7 +24,7 @@ describe('ReviewFormComponent', () => {
   });
 
   it('accepts boundary ratings 1 and 5', () => {
-    component.form.setValue({
+    component.form.patchValue({
       rating: 1,
       title: 'Useful review',
       content: 'This content is long enough.'
@@ -36,7 +36,7 @@ describe('ReviewFormComponent', () => {
 
   it('emits a trimmed valid payload', () => {
     spyOn(component.save, 'emit');
-    component.form.setValue({
+    component.form.patchValue({
       rating: 5,
       title: '  Excellent  ',
       content: '  A genuinely excellent product.  '
@@ -45,7 +45,8 @@ describe('ReviewFormComponent', () => {
     expect(component.save.emit).toHaveBeenCalledWith({
       rating: 5,
       title: 'Excellent',
-      content: 'A genuinely excellent product.'
+      content: 'A genuinely excellent product.',
+      imageUrl: undefined
     });
   });
 });

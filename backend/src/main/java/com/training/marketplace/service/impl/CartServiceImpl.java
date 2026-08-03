@@ -58,8 +58,13 @@ public class CartServiceImpl implements CartService {
             }
         }
 
+        BigDecimal shippingFee = (totalAmount.compareTo(BigDecimal.ZERO) > 0
+                && totalAmount.compareTo(new BigDecimal("150.00")) < 0)
+                ? new BigDecimal("5.00")
+                : BigDecimal.ZERO;
+
         refreshTtl(key);
-        return new CartResponse(userId, items, totalAmount, totalItems);
+        return new CartResponse(userId, items, totalAmount, shippingFee, totalItems);
     }
 
     @Override
@@ -128,7 +133,7 @@ public class CartServiceImpl implements CartService {
                 : (product != null ? product.getImageUrl() : null);
         BigDecimal unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
         BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
-        return new CartItemResponse(variant.getId(), variant.getSku(), productName,
+        return new CartItemResponse(variant.getId(), variant.getProductId(), variant.getSku(), productName,
                 variant.getVariantName(), unitPrice, quantity, subtotal, imageUrl);
     }
 

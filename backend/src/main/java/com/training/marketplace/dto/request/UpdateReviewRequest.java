@@ -18,5 +18,8 @@ public record UpdateReviewRequest(
 
         @NotBlank(message = "Content cannot be empty")
         @Size(min = 10, max = 1000, message = "Content must be between 10 and 1000 characters")
-        String content
+        String content,
+
+        @Size(max = 500, message = "Image URL cannot exceed 500 characters")
+        String imageUrl
 ) {}

@@ -63,57 +63,65 @@ import { Observable } from 'rxjs';
             </a>
           </nav>
 
-          <!-- User Profile & Actions -->
-          <div class="user-controls">
-            @if (authService.isAuthenticated()) {
-            <a mat-icon-button routerLink="/cart" class="cart-btn" title="View Cart">
-              <mat-icon [matBadge]="cartCount$ | async" [matBadgeHidden]="(cartCount$ | async) === 0" matBadgeColor="warn">shopping_bag</mat-icon>
-            </a>
-            <div class="user-profile-menu" [matMenuTriggerFor]="userMenu">
-              <div class="avatar-ring">
-                <span class="avatar-initial">{{ (authService.getUsername() || 'U')[0].toUpperCase() }}</span>
+            <!-- User Profile & Actions -->
+            <div class="user-controls">
+              @if (authService.isAuthenticated()) {
+              <a mat-icon-button routerLink="/cart" class="cart-btn" title="View Cart">
+                <mat-icon [matBadge]="cartCount$ | async" [matBadgeHidden]="(cartCount$ | async) === 0" matBadgeColor="warn">shopping_bag</mat-icon>
+              </a>
+              <div class="user-profile-menu" [matMenuTriggerFor]="userMenu">
+                <div class="avatar-ring">
+                  <span class="avatar-initial">{{ (authService.getUsername() || 'U')[0].toUpperCase() }}</span>
+                </div>
+                <div class="user-info-brief">
+                  <span class="user-name">{{ authService.getUsername() }}</span>
+                </div>
+                <mat-icon class="dropdown-icon">expand_more</mat-icon>
               </div>
-              <div class="user-info-brief">
-                <span class="user-name">{{ authService.getUsername() }}</span>
-              </div>
-              <mat-icon class="dropdown-icon">expand_more</mat-icon>
-            </div>
-            } @else {
-              <a mat-stroked-button routerLink="/login">Đăng nhập</a>
-              <a mat-flat-button routerLink="/register" class="signup-button">Tạo tài khoản</a>
-            }
+              } @else {
+                <a mat-stroked-button routerLink="/login">Đăng nhập</a>
+                <a mat-flat-button routerLink="/register" class="signup-button">Tạo tài khoản</a>
+              }
 
-            <mat-menu #userMenu="matMenu" class="glass-menu">
-              <div class="menu-header">
-                <div class="menu-user-title">{{ authService.getUsername() }}</div>
-              </div>
-              <button mat-menu-item routerLink="/products">
-                <mat-icon>storefront</mat-icon>
-                <span>Browse Products</span>
-              </button>
-              <button mat-menu-item routerLink="/cart">
-                <mat-icon>shopping_cart</mat-icon>
-                <span>My Cart</span>
-              </button>
-              <button mat-menu-item routerLink="/wishlist">
-                <mat-icon>favorite</mat-icon>
-                <span>Wishlist</span>
-              </button>
-              <button mat-menu-item routerLink="/orders">
-                <mat-icon>receipt_long</mat-icon>
-                <span>My Orders</span>
-              </button>
-              <button *ngIf="authService.getRole() === 'ADMIN'" mat-menu-item routerLink="/admin/dashboard">
-                <mat-icon color="primary">admin_panel_settings</mat-icon>
-                <span>Admin Dashboard</span>
-              </button>
-              <mat-divider></mat-divider>
-              <button mat-menu-item (click)="authService.logout()" class="logout-menu-item">
-                <mat-icon color="warn">logout</mat-icon>
-                <span style="color: #ef4444;">Sign Out</span>
-              </button>
-            </mat-menu>
-          </div>
+              <mat-menu #userMenu="matMenu" class="user-dropdown-panel" xPosition="before">
+                <div class="menu-header">
+                  <div class="menu-user-info">
+                    <div class="avatar-ring header-avatar">
+                      <span class="avatar-initial">{{ (authService.getUsername() || 'U')[0].toUpperCase() }}</span>
+                    </div>
+                    <div class="menu-user-details">
+                      <span class="menu-user-title">{{ authService.getUsername() }}</span>
+                      <span class="menu-user-role">{{ authService.getRole() || 'CUSTOMER' }}</span>
+                    </div>
+                  </div>
+                </div>
+                <button mat-menu-item routerLink="/products">
+                  <mat-icon>storefront</mat-icon>
+                  <span>Browse Products</span>
+                </button>
+                <button mat-menu-item routerLink="/cart">
+                  <mat-icon>shopping_cart</mat-icon>
+                  <span>My Cart</span>
+                </button>
+                <button mat-menu-item routerLink="/wishlist">
+                  <mat-icon>favorite</mat-icon>
+                  <span>Wishlist</span>
+                </button>
+                <button mat-menu-item routerLink="/orders">
+                  <mat-icon>receipt_long</mat-icon>
+                  <span>My Orders</span>
+                </button>
+                <button *ngIf="authService.getRole() === 'ADMIN'" mat-menu-item routerLink="/admin/dashboard">
+                  <mat-icon style="color: #7c3aed;">space_dashboard</mat-icon>
+                  <span>Admin Dashboard</span>
+                </button>
+                <mat-divider style="margin: 4px 0;"></mat-divider>
+                <button mat-menu-item (click)="authService.logout()" class="logout-menu-item">
+                  <mat-icon style="color: #ef4444;">logout</mat-icon>
+                  <span style="color: #ef4444;">Sign Out</span>
+                </button>
+              </mat-menu>
+            </div>
         </div>
       </header>
 
@@ -314,43 +322,52 @@ import { Observable } from 'rxjs';
     .user-profile-menu {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 5px 12px;
-      border-radius: 10px;
+      gap: 8px;
+      padding: 3px 10px 3px 4px;
+      border-radius: 12px;
       background: #ffffff;
       border: 1px solid var(--border-subtle);
       box-shadow: var(--shadow-sm);
       cursor: pointer;
+      height: 38px;
+      box-sizing: border-box;
       transition: all 0.15s ease;
+      user-select: none;
     }
 
     .user-profile-menu:hover {
       border-color: var(--border-strong);
+      background: #f8fafc;
     }
 
     .avatar-ring {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 8px;
-      background: var(--primary);
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 700;
       color: #fff;
       font-size: 0.85rem;
+      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+      flex-shrink: 0;
     }
 
     .user-info-brief {
       display: flex;
-      flex-direction: column;
-      line-height: 1.2;
+      align-items: center;
     }
 
     .user-name {
-      font-weight: 700;
+      font-weight: 650;
       font-size: 0.85rem;
       color: #0f172a;
+      max-width: 120px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .dropdown-icon {
@@ -358,16 +375,11 @@ import { Observable } from 'rxjs';
       font-size: 18px;
       width: 18px;
       height: 18px;
+      transition: transform 0.15s ease, color 0.15s ease;
     }
 
-    .menu-header {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .menu-user-title {
-      font-weight: 700;
-      color: #0f172a;
+    .user-profile-menu:hover .dropdown-icon {
+      color: var(--text-main);
     }
 
     .page-content {

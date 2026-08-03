@@ -68,6 +68,10 @@ public class AuthServiceImpl implements AuthService {
                 .or(() -> userRepository.findByEmail(identifier))
                 .orElseThrow(() -> new BadRequestException("User not found"));
 
+        if (!user.isActive()) {
+            throw new BadRequestException("User account has been banned or deactivated. Please contact support.");
+        }
+
         String accessToken = jwtTokenProvider.generateAccessToken(user.getUsername());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUsername());
         storeRefreshToken(user.getUsername(), refreshToken);
@@ -88,6 +92,10 @@ public class AuthServiceImpl implements AuthService {
         }
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BadRequestException("User not found"));
+
+        if (!user.isActive()) {
+            throw new BadRequestException("User account has been banned or deactivated. Please contact support.");
+        }
 
         String accessToken = jwtTokenProvider.generateAccessToken(username);
         String refreshToken = jwtTokenProvider.generateRefreshToken(username);

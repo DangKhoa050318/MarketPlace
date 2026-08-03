@@ -36,7 +36,7 @@ describe('ReviewListComponent', () => {
 
   it('emits rating and sort filters', () => {
     spyOn(component.filterChange, 'emit');
-    component.rating = 5;
+    component.selectedRating = '5';
     component.sort = 'helpful';
     component.filtersChanged();
     expect(component.filterChange.emit).toHaveBeenCalledWith({ rating: 5, sort: 'helpful' });

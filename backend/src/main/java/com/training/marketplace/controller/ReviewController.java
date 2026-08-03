@@ -93,4 +93,20 @@ public class ReviewController {
         reviewService.softDeleteReview(id, authentication.getName());
         return ResponseEntity.ok(ApiResponse.success("Review deleted successfully", null));
     }
+
+    @GetMapping("/api/v1/reviews/my-reviewed-product-ids")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'STAFF', 'MANAGER', 'ADMIN')")
+    @Operation(summary = "Get user reviewed product IDs", description = "Retrieve list of product IDs reviewed by current authenticated user")
+    public ResponseEntity<ApiResponse<java.util.List<Long>>> getMyReviewedProductIds(Authentication authentication) {
+        java.util.List<Long> productIds = reviewService.getMyReviewedProductIds(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.success(productIds));
+    }
+
+    @GetMapping("/api/v1/reviews/my-reviewed-order-item-ids")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'STAFF', 'MANAGER', 'ADMIN')")
+    @Operation(summary = "Get user reviewed order item IDs", description = "Retrieve list of order item IDs reviewed by current authenticated user")
+    public ResponseEntity<ApiResponse<java.util.List<Long>>> getMyReviewedOrderItemIds(Authentication authentication) {
+        java.util.List<Long> itemIds = reviewService.getMyReviewedOrderItemIds(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.success(itemIds));
+    }
 }
