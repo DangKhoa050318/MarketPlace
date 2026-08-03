@@ -21,7 +21,7 @@ Legend: ✅ done · 🟡 partial · ⏳ chưa bắt đầu.
 |---|---|---|---|
 | Nền — merge OrderFlow + StockPulse (Stage 1–3) | cả nhóm | ✅ done | `dev` — compile/boot, catalog 2 tầng, `InventoryFacade` chống oversell |
 | **STP-01** Reviews, Q&A & Moderation | GiangHV9 | ✅ done | `dev` — reviews/ratings, Q&A, helpful vote, moderation + audit log |
-| **STP-02** Promotions & Merchandising | KhoaNXD1 | 🟡 partial | **Wk1 Coupon Engine ✅ `dev`** (`PromotionController`, khoá bi quan chống vượt lượt). **Wk2 Campaign/Collection/Banner backend + admin UI F-401→403 ✅ trên nhánh `feature/stp-02-campaigns-collections-merchandising` — CHƯA merge `dev`**; F-404→406 + tests T-401→406 ⏳; PO chốt D-1/D-5 chờ (`docs/feature-stp-02-po-decisions.md`) |
+| **STP-02** Promotions & Merchandising | KhoaNXD1 | 🟡 gần xong | **Wk1 Coupon ✅ `dev`**. **Wk2 Merchandising ✅ trên nhánh `feature/stp-02-campaigns-collections-merchandising`** (đã merge `dev`, build xanh): backend + admin UI **F-401→403** + storefront **F-404/405/406** + unit tests. Còn: integration/E2E **T-402/403/406** (Docker/Playwright-gated) + PO **D-1/D-5** (`docs/feature-stp-02-po-decisions.md`). **Sẵn sàng PR về `dev`** |
 | **STP-03** Personalized Recommendations | HoangNQ17 | ✅ done | `dev` — similar / co-viewed / co-purchased / best-seller, eligibility filter, storefront carousel (B-501→508, F-501→506, T-501→506) |
 | **STP-04** Analytics / CX / Journey | TriTVV2 | ✅ done | `dev` — `AdminAnalyticsController`, export, funnel/KPI, `JourneyMergeController` (gộp hành trình ẩn danh ↔ đăng nhập) |
 | **STP-05** Bundle | Giang + Khoa (Wk3) | ⏳ | chưa bắt đầu |
@@ -416,3 +416,14 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
   đã có; adapter thật còn chờ team chọn provider và bổ sung payment method/token vào checkout.
 - ✅ Verify: backend unit test **255/255 PASS**; Angular unit test **39/39 PASS**; Angular production build
   **SUCCESS** (2 CSS budget warnings); backend payment integration **2 SKIPPED** do Docker không khả dụng.
+
+### FEATURE-STP-02 Week 2 — Merchandising storefront + tests — 2026-08-04
+
+- ✅ Nhánh `feature/stp-02-campaigns-collections-merchandising` **đã merge `dev`** (ngang dev, +32 commit); backend compile + FE build lại **xanh** sau merge (auto-merge sạch cả ngữ nghĩa).
+- ✅ **F-404** storefront render (chỉ từ dữ liệu backend, hiệu lực do server quyết): `MerchandisingBannerComponent` (slot HOME_HERO), `CampaignStripComponent` (**surface** coupon — D-1 không auto-apply), `CollectionShowcaseComponent` (sản phẩm theo `display_order`), gộp trong `StorefrontMerchandisingComponent` nhúng ở trang `/products`.
+- ✅ **F-405** analytics hooks: `MerchandisingImpressionDirective` (IntersectionObserver ≥50%, fire **1 lần**) + `MerchandisingService.recordEvent` (impression khi hiển thị, click **trước** điều hướng; idempotent theo `eventId`, dedup server-side).
+- ✅ **F-406** effectiveness table (ADMIN): `MerchandisingEffectivenessComponent` gọi `GET /api/v1/admin/merchandising/summary` → impressions/clicks/CTR/attributed orders; thêm route `admin/merchandising/effectiveness` + link sidebar.
+- ✅ Tests: **T-401** window validation + **T-404** event dedup/CTR/last-click attribution (`CampaignServiceImplTest`, `MerchandisingEventServiceImplTest`, +14 unit); **T-405** Angular (`merchandising.service.spec`, `campaign-strip.component.spec`, +7).
+- ✅ Verify: backend unit **270/270 PASS**; Angular unit **46/46 PASS**; `npm run build` **SUCCESS** (2 CSS budget warnings cũ).
+- ⏳ Còn lại (Docker/Playwright-gated — khớp quyết định CI hiện chỉ chạy unit test): **T-402/T-403** integration (CRUD/publish + reorder-in-1-transaction), **T-406** E2E; và PO chốt **D-1/D-5**.
+- ▶️ **Sẵn sàng mở PR nhánh → `dev`.**

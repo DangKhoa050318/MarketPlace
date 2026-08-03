@@ -53,6 +53,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/recently-viewed", "/api/v1/recently-viewed/**").permitAll()
                         .requestMatchers("/api/v1/anonymous-wishlist", "/api/v1/anonymous-wishlist/**").permitAll()
                         .requestMatchers("/api/v1/analytics/events", "/api/v1/analytics/events/**").permitAll()
+
+                        // FEATURE-STP-02 Week 2 — public storefront merchandising (visibility computed server-side)
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/campaigns", "/api/v1/campaigns/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/collections", "/api/v1/collections/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/banners", "/api/v1/banners/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/merchandising/events").permitAll()
                         // Catalog writes: MANAGER/ADMIN (hard delete ADMIN only)
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/products/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/products/**").hasAnyRole("MANAGER", "ADMIN")
