@@ -30,6 +30,9 @@ import { WishlistService } from '../../../core/services/wishlist.service';
 import {
   RecommendationCarouselComponent
 } from '../../../shared/components/recommendation-carousel/recommendation-carousel.component';
+import {
+  StorefrontMerchandisingComponent
+} from '../../storefront/merchandising/storefront-merchandising.component';
 
 @Component({
   selector: 'app-product-list',
@@ -37,7 +40,7 @@ import {
   imports: [
     CommonModule, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatIconModule,
     MatPaginatorModule, MatProgressSpinnerModule, MatSelectModule, RecommendationCarouselComponent,
-    ScrollRevealDirective
+    ScrollRevealDirective, StorefrontMerchandisingComponent
   ],
   template: `
     <!-- Hero Banner Carousel -->
@@ -84,6 +87,8 @@ import {
         }
       </div>
     </section>
+
+    <app-storefront-merchandising appScrollReveal></app-storefront-merchandising>
 
     <app-recommendation-carousel appScrollReveal
       [title]="query.categoryId ? 'Bán chạy trong danh mục' : 'Sản phẩm bán chạy'"

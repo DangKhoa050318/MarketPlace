@@ -118,6 +118,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/merchandising/banner-form/banner-form.component').then(m => m.BannerFormComponent)
       },
       {
+        path: 'admin/merchandising/effectiveness',
+        loadComponent: () => import('./features/admin/merchandising/effectiveness/merchandising-effectiveness.component').then(m => m.MerchandisingEffectivenessComponent)
+      },
+      {
         path: 'admin/users',
         loadComponent: () => import('./features/users/user-list/user-list.component').then(m => m.UserListComponent)
       },

@@ -77,6 +77,10 @@ import { AuthService } from '../../core/services/auth.service';
             <mat-icon>view_carousel</mat-icon>
             <span>Banners</span>
           </a>
+          <a *ngIf="hasRole(['ADMIN'])" routerLink="/admin/merchandising/effectiveness" routerLinkActive="active">
+            <mat-icon>insights</mat-icon>
+            <span>Effectiveness</span>
+          </a>
 
           <span class="nav-heading">Warehouse & Stock</span>
           <a *ngIf="hasRole(['ADMIN', 'MANAGER', 'STAFF'])" routerLink="/warehouses" routerLinkActive="active">
