@@ -10,6 +10,36 @@ monolith, per `docs/Project - Marketplace (Merged Spec).md` (v0.2: monolith · s
 
 ---
 
+## 📋 Feature workstreams — tổng quan toàn dự án (cập nhật 2026-08-03)
+
+> File này giờ là **tracker tiến độ toàn dự án** (không chỉ merge 2 app cũ). Đã gộp nội dung
+> `PROJECT-STATUS.md` vào đây — file đó đã bỏ. Chi tiết từng mục xem các log theo ngày bên dưới.
+
+Legend: ✅ done · 🟡 partial · ⏳ chưa bắt đầu.
+
+| Feature | Owner | Trạng thái | Ở đâu / ghi chú |
+|---|---|---|---|
+| Nền — merge OrderFlow + StockPulse (Stage 1–3) | cả nhóm | ✅ done | `dev` — compile/boot, catalog 2 tầng, `InventoryFacade` chống oversell |
+| **STP-01** Reviews, Q&A & Moderation | GiangHV9 | ✅ done | `dev` — reviews/ratings, Q&A, helpful vote, moderation + audit log |
+| **STP-02** Promotions & Merchandising | KhoaNXD1 | 🟡 partial | **Wk1 Coupon Engine ✅ `dev`** (`PromotionController`, khoá bi quan chống vượt lượt). **Wk2 Campaign/Collection/Banner backend + admin UI F-401→403 ✅ trên nhánh `feature/stp-02-campaigns-collections-merchandising` — CHƯA merge `dev`**; F-404→406 + tests T-401→406 ⏳; PO chốt D-1/D-5 chờ (`docs/feature-stp-02-po-decisions.md`) |
+| **STP-03** Personalized Recommendations | HoangNQ17 | ✅ done | `dev` — similar / co-viewed / co-purchased / best-seller, eligibility filter, storefront carousel (B-501→508, F-501→506, T-501→506) |
+| **STP-04** Analytics / CX / Journey | TriTVV2 | ✅ done | `dev` — `AdminAnalyticsController`, export, funnel/KPI, `JourneyMergeController` (gộp hành trình ẩn danh ↔ đăng nhập) |
+| **STP-05** Bundle | Giang + Khoa (Wk3) | ⏳ | chưa bắt đầu |
+| **STP-06** Comparison | Hoang + Tri (Wk3) | ⏳ | chưa bắt đầu; cần model brand/attribute (EAV) catalog hiện chưa có |
+| Feature-03 Merchant working-capital loan (liên kết GatePay) | KhoaNXD1 | ⏳ blocked | GatePay (Trí) chưa giao API `/merchant-loans/*`; MarketPlace là client/proxy. Plan: `docs/feature-03-working-capital-marketplace.md` |
+| PR #37 — shipping fee + order variant UI + image upload + review-per-order-item | — | ✅ done | `dev` (merged 2026-08-03): phí ship theo đơn, upload ảnh review, review theo từng order item |
+
+**Base-code hardening (main-branch security review):** A/F/J/K/L (PR #36) + B/C/D/E/H (c90309b) + G — chi tiết ở log **"Review hardening follow-up — 2026-08-03"** bên dưới.
+⚠️ Vận hành: `JWT_SECRET` **bắt buộc** set (app fail-fast nếu thiếu); `PAYMENT_PROVIDER=disabled` (fail-closed — đơn giữ PENDING tới khi cắm provider thật).
+
+**Doc map (giữ lại — đã kiểm tra 2026-08-03, chưa doc nào tới lúc xoá):**
+- `README.md` (setup) · `AGENTS.md` (convention) · `docs/StockPulse-Ecommerce-Features-3-Week-Requirements.md` (**source of truth**) · `docs/Project - Marketplace (Merged Spec).md` (đặc tả nền).
+- STP-03 reference: `docs/recommendation-api.md`, `docs/similar|best-seller|co-occurrence-recommendation.md`, `docs/recommendation-eligibility-filter.md`, `docs/recommendation-demo-data.md`, `docs/analytics-event-schema-v1.md`.
+- STP-02: `docs/feature-stp-02-week2-plan.md` (plan — **lưu ý D-4 nói reuse `analytics_events` nhưng code thực tế dùng bảng riêng `merchandising_events`**), `docs/feature-stp-02-po-decisions.md` (chờ PO), `docs/feature-stp-02-demo.md`.
+- Demo & reference: `docs/demo-full-project.md` (kịch bản demo toàn dự án), `docs/FEATURES-AND-API-FLOWS.md` (mô tả API theo code — mục "12 file null-byte" đã cũ, các file đó đã khôi phục).
+
+---
+
 ## ✅ Stage 1 — ĐÃ XONG (physical merge + foundation)
 
 - [x] Tạo folder `Marketplace/` (base = OrderFlow); copy `backend/` + `frontend/`.
