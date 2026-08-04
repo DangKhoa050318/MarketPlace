@@ -106,43 +106,6 @@ export interface CheckoutDialogData {
               <span class="badge-promo">0% Interest</span>
             </div>
           </div>
-
-          <!-- Extra Breakdown for BNPL -->
-          <div *ngIf="selectedMethod === 'PAYGATE_BNPL'" class="bnpl-details-box glass-panel fade-in">
-            <div class="bnpl-term-header">
-              <span>Choose Financing Term:</span>
-              <div class="term-pills">
-                <button
-                  type="button"
-                  *ngFor="let term of [1, 3, 6, 12]"
-                  class="term-pill"
-                  [class.selected]="selectedBnplMonths === term"
-                  (click)="selectedBnplMonths = term">
-                  {{ term }} Month{{ term > 1 ? 's' : '' }}
-                </button>
-              </div>
-            </div>
-
-            <div class="credit-limit-banner">
-              <mat-icon class="limit-icon">verified_user</mat-icon>
-              <span>PayGate Approved Credit Limit: <strong>{{ paygateCreditLimit | currency:'USD':'symbol':'1.2-2' }}</strong></span>
-            </div>
-
-            <div class="bnpl-breakdown-grid">
-              <div class="breakdown-col">
-                <span class="b-label">Financed Amount (PayGate)</span>
-                <strong class="b-val text-cyan">{{ financeAmount() | currency:'USD':'symbol':'1.2-2' }}</strong>
-              </div>
-              <div class="breakdown-col">
-                <span class="b-label">Upfront Payment Required</span>
-                <strong class="b-val text-gradient-cyan">{{ upfrontAmount() | currency:'USD':'symbol':'1.2-2' }}</strong>
-              </div>
-              <div class="breakdown-col highlight">
-                <span class="b-label">Monthly Payment</span>
-                <strong class="b-val text-amber">{{ monthlyPayment() | currency:'USD':'symbol':'1.2-2' }} / mo</strong>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- Form for Shipping & Note -->
@@ -164,18 +127,6 @@ export interface CheckoutDialogData {
               <mat-icon matSuffix class="text-cyan">note_add</mat-icon>
             </mat-form-field>
           </form>
-        </div>
-
-        <!-- Paygate Contract Payload Preview Toggle -->
-        <div class="paygate-spec-preview">
-          <button type="button" class="preview-toggle-btn" (click)="showPaygateSpec = !showPaygateSpec">
-            <mat-icon>{{ showPaygateSpec ? 'expand_less' : 'developer_mode' }}</mat-icon>
-            {{ showPaygateSpec ? 'Hide API Session Payload' : 'Inspect API Session Payload Contract' }}
-          </button>
-
-          <div *ngIf="showPaygateSpec" class="payload-code-box fade-in">
-            <pre><code>{{ getPayloadPreviewJson() }}</code></pre>
-          </div>
         </div>
       </mat-dialog-content>
 

@@ -81,10 +81,10 @@ marketplace:
   payment:
     provider: ${PAYMENT_PROVIDER:disabled}
   paygate:
-    api-url: ${PAYGATE_API_URL:http://localhost:8080}
+    api-url: ${PAYGATE_API_URL:http://localhost:8081}
     api-key: ${PAYGATE_API_KEY:mock-merchant-api-key-123456}
-    return-url: ${PAYGATE_RETURN_URL:http://localhost:4201/orders/callback}
-    cancel-url: ${PAYGATE_CANCEL_URL:http://localhost:4201/cart}
+    return-url: ${PAYGATE_RETURN_URL:http://localhost:4200/orders/callback}
+    cancel-url: ${PAYGATE_CANCEL_URL:http://localhost:4200/cart}
   features:
     review-qa: ${FEATURE_REVIEW_QA_ENABLED:true}
     promotions: ${FEATURE_PROMOTIONS_ENABLED:true}
