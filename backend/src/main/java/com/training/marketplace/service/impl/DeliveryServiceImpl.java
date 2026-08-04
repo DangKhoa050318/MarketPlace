@@ -147,8 +147,10 @@ public class DeliveryServiceImpl implements DeliveryService {
                 delivery.getStatus(), request.status(), request.eventType());
         delivery.setStatus(request.status());
         if (request.status() == DeliveryStatus.DELIVERED) {
-            delivery.setDeliveredAt(LocalDateTime.now());
+            LocalDateTime deliveredAt = LocalDateTime.now();
+            delivery.setDeliveredAt(deliveredAt);
             order.setStatus(OrderStatus.DELIVERED);
+            order.setDeliveredAt(deliveredAt);
             orderRepository.save(order);
         }
 
