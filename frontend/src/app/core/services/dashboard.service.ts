@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PageResponse } from '../models/api-response.model';
@@ -89,6 +89,14 @@ export interface AnalyticsExportJob {
   expiresAt: string | null;
 }
 
+export interface AnalyticsFilters {
+  categoryId?: number;
+  productId?: number;
+  campaign?: string;
+  placement?: string;
+  deviceType?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -101,21 +109,15 @@ export class DashboardService {
     return this.http.get<ApiResponse<DashboardStats>>(`${this.apiUrl}/stats`);
   }
 
-  getFunnelSummary(from: Date, to: Date): Observable<ApiResponse<FunnelSummary>> {
+  getFunnelSummary(from: Date, to: Date, filters: AnalyticsFilters = {}): Observable<ApiResponse<FunnelSummary>> {
     return this.http.get<ApiResponse<FunnelSummary>>(`${environment.apiUrl}/admin/analytics/funnel`, {
-      params: {
-        from: from.toISOString(),
-        to: to.toISOString()
-      }
+      params: this.analyticsParams(from, to, filters)
     });
   }
 
-  getAnalyticsOverview(from: Date, to: Date): Observable<ApiResponse<AnalyticsOverview>> {
+  getAnalyticsOverview(from: Date, to: Date, filters: AnalyticsFilters = {}): Observable<ApiResponse<AnalyticsOverview>> {
     return this.http.get<ApiResponse<AnalyticsOverview>>(`${environment.apiUrl}/admin/analytics/overview`, {
-      params: {
-        from: from.toISOString(),
-        to: to.toISOString()
-      }
+      params: this.analyticsParams(from, to, filters)
     });
   }
 
@@ -126,33 +128,46 @@ export class DashboardService {
     size: number,
     search: string,
     sortBy: string,
-    sortDirection: 'asc' | 'desc'
+    sortDirection: 'asc' | 'desc',
+    filters: AnalyticsFilters = {}
   ): Observable<ApiResponse<PageResponse<ProductPerformance>>> {
+    let params = this.analyticsParams(from, to, filters)
+      .set('page', page)
+      .set('size', size)
+      .set('sortBy', sortBy)
+      .set('sortDirection', sortDirection);
+    if (search.trim()) params = params.set('search', search.trim());
     return this.http.get<ApiResponse<PageResponse<ProductPerformance>>>(
       `${environment.apiUrl}/admin/analytics/products/performance`,
-      { params: { from: from.toISOString(), to: to.toISOString(), page, size, search, sortBy, sortDirection } }
+      { params }
     );
   }
 
-  getPromotionPerformance(from: Date, to: Date): Observable<ApiResponse<PromotionPerformance[]>> {
+  getPromotionPerformance(from: Date, to: Date, filters: AnalyticsFilters = {}): Observable<ApiResponse<PromotionPerformance[]>> {
     return this.http.get<ApiResponse<PromotionPerformance[]>>(
       `${environment.apiUrl}/admin/analytics/promotion-recommendation/performance`,
-      { params: { from: from.toISOString(), to: to.toISOString() } }
+      { params: this.analyticsParams(from, to, filters) }
     );
   }
 
-  getPromotionTrend(from: Date, to: Date): Observable<ApiResponse<PromotionTrendPoint[]>> {
+  getPromotionTrend(from: Date, to: Date, filters: AnalyticsFilters = {}): Observable<ApiResponse<PromotionTrendPoint[]>> {
     return this.http.get<ApiResponse<PromotionTrendPoint[]>>(
       `${environment.apiUrl}/admin/analytics/promotion-recommendation/trend`,
-      { params: { from: from.toISOString(), to: to.toISOString() } }
+      { params: this.analyticsParams(from, to, filters) }
     );
   }
 
-  createExport(type: AnalyticsExportType, from: Date, to: Date): Observable<ApiResponse<AnalyticsExportJob>> {
+  createExport(
+    type: AnalyticsExportType,
+    from: Date,
+    to: Date,
+    filters: AnalyticsFilters = {}
+  ): Observable<ApiResponse<AnalyticsExportJob>> {
     return this.http.post<ApiResponse<AnalyticsExportJob>>(`${environment.apiUrl}/admin/analytics/exports`, {
       type,
       from: from.toISOString(),
-      to: to.toISOString()
+      to: to.toISOString(),
+      ...filters
     });
   }
 
@@ -164,5 +179,17 @@ export class DashboardService {
     return this.http.get(`${environment.apiUrl}/admin/analytics/exports/${id}/download`, {
       responseType: 'blob'
     });
+  }
+
+  private analyticsParams(from: Date, to: Date, filters: AnalyticsFilters): HttpParams {
+    let params = new HttpParams()
+      .set('from', from.toISOString())
+      .set('to', to.toISOString());
+    if (filters.categoryId != null) params = params.set('categoryId', filters.categoryId);
+    if (filters.productId != null) params = params.set('productId', filters.productId);
+    if (filters.campaign) params = params.set('campaign', filters.campaign);
+    if (filters.placement) params = params.set('placement', filters.placement);
+    if (filters.deviceType) params = params.set('deviceType', filters.deviceType);
+    return params;
   }
 }

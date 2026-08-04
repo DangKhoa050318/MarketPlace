@@ -8,6 +8,7 @@ import { forkJoin } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import {
+  AnalyticsFilters,
   AnalyticsOverview,
   AnalyticsExportJob,
   AnalyticsExportType,
@@ -66,6 +67,30 @@ import {
           <mat-icon>calendar_month</mat-icon>
           Apply
         </button>
+      </section>
+
+      <section class="analytics-filters" aria-label="Analytics filters">
+        <label><span>Category ID</span><input type="number" min="1" [(ngModel)]="filterCategoryId"></label>
+        <label><span>Product ID</span><input type="number" min="1" [(ngModel)]="filterProductId"></label>
+        <label><span>Campaign</span><input type="search" [(ngModel)]="filterCampaign" placeholder="Campaign name"></label>
+        <label><span>Placement</span>
+          <select [(ngModel)]="filterPlacement">
+            <option value="">All placements</option>
+            <option value="CAMPAIGN_STRIP">Campaign strip</option>
+            <option value="HOME_BEST_SELLERS">Home best sellers</option>
+            <option value="PRODUCT_DETAIL_SIMILAR">Product detail similar</option>
+            <option value="CART_CROSS_SELL">Cart cross-sell</option>
+          </select>
+        </label>
+        <label><span>Device</span>
+          <select [(ngModel)]="filterDeviceType">
+            <option value="">All devices</option>
+            <option value="desktop">Desktop</option>
+            <option value="tablet">Tablet</option>
+            <option value="mobile">Mobile</option>
+          </select>
+        </label>
+        <button type="button" class="clear-filters" (click)="clearFilters()" [disabled]="loading">Clear</button>
       </section>
 
       <div *ngIf="errorMessage" class="error-banner surface-card" role="alert">
@@ -353,6 +378,10 @@ import {
             </div>
           </div>
           <div class="table-loading" *ngIf="productsLoading">Loading product metrics...</div>
+          <div class="table-error" *ngIf="!productsLoading && productsError" role="alert">
+            <span>{{ productsError }}</span>
+            <button type="button" (click)="loadProducts()">Try again</button>
+          </div>
           <div class="table-wrap" *ngIf="!productsLoading && productRows.length">
             <table>
               <thead><tr>
@@ -374,7 +403,7 @@ import {
               </tbody>
             </table>
           </div>
-          <div class="table-empty" *ngIf="!productsLoading && !productRows.length">No products match this filter.</div>
+          <div class="table-empty" *ngIf="!productsLoading && !productsError && !productRows.length">No products match this filter.</div>
           <div class="table-pagination">
             <span>{{ productTotal | number }} products</span>
             <button type="button" (click)="changeProductPage(-1)" [disabled]="productPage === 0" aria-label="Previous product page"><mat-icon>chevron_left</mat-icon></button>
@@ -423,6 +452,7 @@ import {
             <div><strong>{{ exportJob.status }}</strong><span *ngIf="exportJob.expiresAt">Download expires {{ exportJob.expiresAt | date:'medium' }}</span><span *ngIf="exportJob.errorMessage">{{ exportJob.errorMessage }}</span></div>
             <button type="button" *ngIf="exportJob.status === 'COMPLETED'" (click)="downloadExport()">Download CSV</button>
           </div>
+          <div class="export-error" *ngIf="exportError" role="alert">{{ exportError }}</div>
         </section>
       </ng-container>
     </section>
@@ -472,6 +502,21 @@ import {
     }
     .apply-range:disabled { opacity: .5; cursor: not-allowed; }
     .apply-range mat-icon { width: 18px; height: 18px; font-size: 18px; }
+    .analytics-filters {
+      display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)) auto;
+      align-items: end; gap: 10px;
+    }
+    .analytics-filters label { display: grid; gap: 4px; color: var(--text-secondary); font-size: .7rem; font-weight: 700; }
+    .analytics-filters input, .analytics-filters select {
+      min-width: 0; min-height: 36px; padding: 0 10px; box-sizing: border-box;
+      border: 1px solid #cbd5e1; border-radius: 6px; color: var(--text-main); background: #fff;
+      font: inherit; font-size: .78rem;
+    }
+    .clear-filters {
+      min-height: 36px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 6px;
+      color: #0369a1; background: #fff; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer;
+    }
+    .clear-filters:disabled { opacity: .5; cursor: not-allowed; }
 
     .analytics-section { display: grid; gap: 14px; }
     .analytics-status {
@@ -647,6 +692,8 @@ import {
     th mat-icon { width: 15px; height: 15px; font-size: 15px; }
     td a { color: #0369a1; font-weight: 700; text-decoration: none; }
     .table-loading, .table-empty { padding: 28px; color: var(--text-muted); text-align: center; font-size: .78rem; }
+    .table-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; border: 1px solid #fecaca; border-radius: 6px; color: #b91c1c; background: #fef2f2; font-size: .78rem; }
+    .table-error button { border: 0; color: #b91c1c; background: transparent; font: inherit; font-weight: 700; cursor: pointer; }
     .table-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 10px; color: var(--text-muted); font-size: .74rem; }
     .table-pagination span:first-child { margin-right: auto; }
     .table-pagination button { border-radius: 5px; }
@@ -683,6 +730,7 @@ import {
     .export-status { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 13px; border: 1px solid #bfdbfe; border-radius: 6px; background: #eff6ff; }
     .export-status div { flex: 1; }.export-status strong, .export-status span { display: block; }.export-status strong { font-size: .78rem; }.export-status span { color: var(--text-muted); font-size: .7rem; }
     .export-status button { border-radius: 6px; }
+    .export-error { grid-column: 1 / -1; padding: 12px; border: 1px solid #fecaca; border-radius: 6px; color: #b91c1c; background: #fef2f2; font-size: .76rem; }
 
     .error-banner {
       display: flex; align-items: center; gap: 12px; padding: 16px 20px; border: 1px solid rgba(248, 113, 113, .3);
@@ -704,6 +752,7 @@ import {
       .kpi-grid, .loading-grid { grid-template-columns: repeat(2, 1fr); }
       .analytics-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .analytics-loading { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .analytics-filters { grid-template-columns: repeat(3, minmax(130px, 1fr)); }
       .content-grid { grid-template-columns: 1fr; }
       .funnel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .campaign-row { grid-template-columns: 1fr; }
@@ -716,6 +765,8 @@ import {
       .range-presets { width: 100%; }
       .range-presets button { flex: 1; }
       .analytics-toolbar label { flex: 1 1 130px; }
+      .analytics-filters { grid-template-columns: 1fr 1fr; }
+      .analytics-filters .clear-filters { grid-column: 1 / -1; }
       .analytics-kpi-grid { grid-template-columns: 1fr; }
       .analytics-loading { grid-template-columns: 1fr; }
       .section-heading { align-items: flex-start; flex-direction: column; }
@@ -744,10 +795,16 @@ export class DashboardComponent implements OnInit {
   selectedRangeDays: number | null = 30;
   fromDate = '';
   toDate = '';
+  filterCategoryId: number | null = null;
+  filterProductId: number | null = null;
+  filterCampaign = '';
+  filterPlacement = '';
+  filterDeviceType = '';
   productRows: ProductPerformance[] = [];
   promotionRows: PromotionPerformance[] = [];
   promotionTrend: PromotionTrendPoint[] = [];
   productsLoading = false;
+  productsError = '';
   productSearch = '';
   productPage = 0;
   productSize = 8;
@@ -758,6 +815,7 @@ export class DashboardComponent implements OnInit {
   exportType: AnalyticsExportType = 'OVERVIEW';
   exportJob: AnalyticsExportJob | null = null;
   exportBusy = false;
+  exportError = '';
 
   constructor(
     public authService: AuthService,
@@ -780,6 +838,16 @@ export class DashboardComponent implements OnInit {
 
   get isDateRangeValid(): boolean {
     return Boolean(this.fromDate && this.toDate && this.fromDate <= this.toDate);
+  }
+
+  get analyticsFilters(): AnalyticsFilters {
+    return {
+      ...(this.filterCategoryId && this.filterCategoryId > 0 ? { categoryId: this.filterCategoryId } : {}),
+      ...(this.filterProductId && this.filterProductId > 0 ? { productId: this.filterProductId } : {}),
+      ...(this.filterCampaign.trim() ? { campaign: this.filterCampaign.trim() } : {}),
+      ...(this.filterPlacement ? { placement: this.filterPlacement } : {}),
+      ...(this.filterDeviceType ? { deviceType: this.filterDeviceType } : {})
+    };
   }
 
   get analyticsEmpty(): boolean {
@@ -819,6 +887,15 @@ export class DashboardComponent implements OnInit {
     this.loadAnalytics();
   }
 
+  clearFilters(): void {
+    this.filterCategoryId = null;
+    this.filterProductId = null;
+    this.filterCampaign = '';
+    this.filterPlacement = '';
+    this.filterDeviceType = '';
+    this.loadAnalytics();
+  }
+
   loadStats(): void {
     if (this.loading) {
       return;
@@ -855,10 +932,10 @@ export class DashboardComponent implements OnInit {
     this.promotionTrend = [];
 
     forkJoin({
-      overview: this.dashboardService.getAnalyticsOverview(from, to),
-      funnel: this.dashboardService.getFunnelSummary(from, to),
-      promotion: this.dashboardService.getPromotionPerformance(from, to),
-      trend: this.dashboardService.getPromotionTrend(from, to)
+      overview: this.dashboardService.getAnalyticsOverview(from, to, this.analyticsFilters),
+      funnel: this.dashboardService.getFunnelSummary(from, to, this.analyticsFilters),
+      promotion: this.dashboardService.getPromotionPerformance(from, to, this.analyticsFilters),
+      trend: this.dashboardService.getPromotionTrend(from, to, this.analyticsFilters)
     }).pipe(
       finalize(() => this.analyticsLoading = false)
     ).subscribe({
@@ -884,19 +961,24 @@ export class DashboardComponent implements OnInit {
     const from = new Date(`${this.fromDate}T00:00:00`);
     const to = new Date(`${this.toDate}T23:59:59.999`);
     this.productsLoading = true;
+    this.productsError = '';
     this.dashboardService.getProductPerformance(
       from, to, this.productPage, this.productSize, this.productSearch,
-      this.productSortBy, this.productSortDirection
+      this.productSortBy, this.productSortDirection, this.analyticsFilters
     ).pipe(finalize(() => this.productsLoading = false)).subscribe({
       next: response => {
-        this.productRows = response.success ? response.data.content : [];
-        this.productTotal = response.success ? response.data.totalElements : 0;
-        this.productTotalPages = response.success ? response.data.totalPages : 0;
+        if (!response.success) {
+          this.productsError = response.message || 'Product performance could not be loaded.';
+          this.resetProductRows();
+          return;
+        }
+        this.productRows = response.data.content;
+        this.productTotal = response.data.totalElements;
+        this.productTotalPages = response.data.totalPages;
       },
-      error: () => {
-        this.productRows = [];
-        this.productTotal = 0;
-        this.productTotalPages = 0;
+      error: error => {
+        this.productsError = error.error?.message || 'Product performance could not be loaded.';
+        this.resetProductRows();
       }
     });
   }
@@ -949,38 +1031,64 @@ export class DashboardComponent implements OnInit {
     const to = new Date(`${this.toDate}T23:59:59.999`);
     this.exportBusy = true;
     this.exportJob = null;
-    this.dashboardService.createExport(this.exportType, from, to).subscribe({
+    this.exportError = '';
+    this.dashboardService.createExport(this.exportType, from, to, this.analyticsFilters).subscribe({
       next: response => {
         this.exportBusy = false;
+        if (!response.success) {
+          this.exportError = response.message || 'The export could not be created.';
+          return;
+        }
         this.exportJob = response.data;
         this.pollExport(response.data.id);
       },
-      error: () => this.exportBusy = false
+      error: error => {
+        this.exportBusy = false;
+        this.exportError = error.error?.message || 'The export could not be created.';
+      }
     });
   }
 
   downloadExport(): void {
     if (!this.exportJob) return;
-    this.dashboardService.downloadExport(this.exportJob.id).subscribe(blob => {
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = this.exportJob?.fileName || 'analytics-export.csv';
-      anchor.click();
-      URL.revokeObjectURL(url);
+    this.exportError = '';
+    this.dashboardService.downloadExport(this.exportJob.id).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = this.exportJob?.fileName || 'analytics-export.csv';
+        anchor.click();
+        URL.revokeObjectURL(url);
+      },
+      error: error => this.exportError = error.error?.message || 'The export download failed.'
     });
   }
 
   private pollExport(id: string, attempt = 0): void {
-    if (attempt >= 20) return;
+    if (attempt >= 20) {
+      this.exportError = 'The export is taking longer than expected. Refresh its status and try again.';
+      return;
+    }
     setTimeout(() => this.dashboardService.getExport(id).subscribe({
       next: response => {
+        if (!response.success) {
+          this.exportError = response.message || 'The export status could not be loaded.';
+          return;
+        }
         this.exportJob = response.data;
         if (response.data.status === 'PENDING' || response.data.status === 'PROCESSING') {
           this.pollExport(id, attempt + 1);
         }
-      }
+      },
+      error: error => this.exportError = error.error?.message || 'The export status could not be loaded.'
     }), 750);
+  }
+
+  private resetProductRows(): void {
+    this.productRows = [];
+    this.productTotal = 0;
+    this.productTotalPages = 0;
   }
 
   private updateDateInputs(days: number): void {

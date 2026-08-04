@@ -40,6 +40,7 @@ public class AnalyticsExportServiceImpl implements AnalyticsExportService {
                 .campaign(blankToNull(request.campaign()))
                 .placement(blankToNull(request.placement()))
                 .deviceType(blankToNull(request.deviceType()))
+                .nextAttemptAt(Instant.now().plus(Duration.ofMinutes(10)))
                 .build();
         AnalyticsExportJob saved = analyticsExportJobRepository.saveAndFlush(job);
         analyticsExportProcessor.process(saved.getPublicId());
