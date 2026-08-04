@@ -250,11 +250,16 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse updateOrderStatusByAdmin(Long orderId, UpdateOrderStatusRequest request) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
         OrderStatus previousStatus = order.getStatus();
         validateStatusTransition(previousStatus, request.status());
+
+        if (previousStatus == OrderStatus.SHIPPED && request.status() == OrderStatus.DELIVERED) {
+            throw new BadRequestException(
+                    "Complete the delivery tracking record to mark a shipped order as delivered");
+        }
 
         // When the order ships, convert the reservation into an actual stock decrement.
         if (request.status() == OrderStatus.SHIPPED && order.getWarehouseId() != null) {

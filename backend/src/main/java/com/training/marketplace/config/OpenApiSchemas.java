@@ -3,6 +3,7 @@ package com.training.marketplace.config;
 import com.training.marketplace.common.ApiResponse;
 import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.response.CategoryResponse;
+import com.training.marketplace.dto.response.DeliveryResponse;
 import com.training.marketplace.dto.response.MovementResponse;
 import com.training.marketplace.dto.response.ProductResponse;
 import com.training.marketplace.dto.response.ProductSummaryResponse;
@@ -37,6 +38,10 @@ public final class OpenApiSchemas {
 
     @Schema(name = "CategoryResponseEnvelope")
     public static class CategoryResponseEnvelope extends ApiResponse<CategoryResponse> {
+    }
+
+    @Schema(name = "DeliveryResponseEnvelope")
+    public static class DeliveryResponseEnvelope extends ApiResponse<DeliveryResponse> {
     }
 
     @Schema(name = "CategoryPageResponseEnvelope")
