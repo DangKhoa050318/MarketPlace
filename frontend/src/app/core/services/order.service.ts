@@ -31,4 +31,8 @@ export class OrderService {
   cancelOrder(id: number): Observable<ApiResponse<Order>> {
     return this.http.put<ApiResponse<Order>>(`${this.apiUrl}/${id}/cancel`, {});
   }
+
+  confirmReceived(id: number): Observable<ApiResponse<Order>> {
+    return this.http.put<ApiResponse<Order>>(`${this.apiUrl}/${id}/confirm-received`, {});
+  }
 }

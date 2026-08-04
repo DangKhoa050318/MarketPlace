@@ -29,6 +29,10 @@ public class ProductReviewResponse {
     private Boolean isEdited;
     private Long helpfulCount;
     private String imageUrl;
+    private String variantName;
+    private String sku;
+    private String sellerReply;
+    private LocalDateTime sellerReplyAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -49,6 +53,10 @@ public class ProductReviewResponse {
                 .isEdited(review.getIsEdited())
                 .helpfulCount(review.getHelpfulCount())
                 .imageUrl(review.getImageUrl())
+                .variantName(review.getOrderItem() != null ? review.getOrderItem().getVariantName() : null)
+                .sku(review.getOrderItem() != null ? review.getOrderItem().getSku() : null)
+                .sellerReply(review.getSellerReply())
+                .sellerReplyAt(review.getSellerReplyAt())
                 .createdAt(review.getCreatedAt())
                 .updatedAt(review.getUpdatedAt())
                 .build();

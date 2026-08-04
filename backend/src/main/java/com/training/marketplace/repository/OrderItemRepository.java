@@ -17,9 +17,14 @@ import java.util.List;
 @Repository
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
+    // A product is reviewable only from a purchase the customer has actually received (order DELIVERED,
+    // anti-fake-review rule) AND within the review window (delivered on/after :since) — FEATURE-03 G5.
     @Query("SELECT oi FROM OrderItem oi JOIN oi.order o JOIN ProductVariant pv ON oi.variantId = pv.id " +
-           "WHERE o.user.id = :userId AND pv.productId = :productId AND o.status != com.training.marketplace.enums.OrderStatus.CANCELLED")
-    List<OrderItem> findEligibleOrderItemsForReview(@Param("userId") Long userId, @Param("productId") Long productId);
+           "WHERE o.user.id = :userId AND pv.productId = :productId " +
+           "AND o.status = com.training.marketplace.enums.OrderStatus.DELIVERED AND o.deliveredAt >= :since")
+    List<OrderItem> findEligibleOrderItemsForReview(@Param("userId") Long userId,
+                                                    @Param("productId") Long productId,
+                                                    @Param("since") LocalDateTime since);
 
     @Query("""
             SELECT pv.productId AS productId,

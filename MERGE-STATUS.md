@@ -398,6 +398,34 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
 - ℹ️ Frontend test tooling yêu cầu Node.js **20.9+** vì Playwright 1.62 không còn hỗ trợ
   Node.js 18.
 
+### FEATURE-03 Product Reviews — siết anti-fake-review (linkage GatePay↔MarketPlace) — 2026-08-04
+
+- ✅ **Backend Phase 1+2** (kế hoạch: `docs/feature-03-product-reviews-plan.md`): chỉ cho đánh giá sản
+  phẩm **đã mua & đơn DELIVERED**, đúng spec `FEATURE_03_PRODUCT_REVIEWS.md` của PayGate.
+  - `OrderItemRepository.findEligibleOrderItemsForReview`: lọc `status = DELIVERED` (trước là `!= CANCELLED`).
+  - `ReviewServiceImpl.createReview`: **chặn** người chưa mua/chưa nhận hàng (`ForbiddenException` 403),
+    bỏ nhánh tạo review `orderItem == null`; mọi review là verified purchase; `orderItemId` phải thuộc
+    tập eligible của user. `checkEligibility` chỉ `eligible=true` khi có đơn DELIVERED chưa review.
+  - `ProductReview`: bỏ annotation `uk_user_product` (đã DROP ở DB; DB dùng partial index `uk_user_order_item`).
+- ✅ Verify: `./mvnw test -Dtest='!*IntegrationTest'` = **270/270 PASS**; `test-compile` **BUILD SUCCESS**.
+  `ReviewIntegrationTest` đã cập nhật theo hành vi mới nhưng **chưa chạy** (cần Docker).
+- ✅ **Phase 4 (FE)**: nút "Review" (trang My Orders) chỉ hiện khi đơn **DELIVERED** + item chưa review
+  (`order-list.hasUnreviewedItems`); dọn dead code review-form/eligibility ở `product-detail`.
+- ✅ **Admin lọc review theo rating**: `GET /api/v1/admin/reviews` (filter `rating` 1–5 / `status` / `productId`
+  qua `JpaSpecificationExecutor`; MANAGER/ADMIN) + trang admin `/admin/reviews` (bảng + filter + Hide/Approve).
+- ✅ **Nâng cấp "đúng thực tế" G1–G7** — migration `V20260804120000` (`orders.delivered_at` + backfill,
+  `product_reviews.seller_reply/seller_reply_at`):
+  - **G1** sao + số review trên card sản phẩm (`GET /api/v1/products/ratings?ids=`).
+  - **G2** đánh giá chỉ-sao (`title`/`content` optional, lưu "" nếu trống).
+  - **G3** khách tự "Đã nhận hàng" (`PUT /api/v1/orders/{id}/confirm-received`, SHIPPED→DELIVERED, set `delivered_at`).
+  - **G4** shop trả lời review (`PUT /api/v1/admin/reviews/{id}/reply`; hiển thị "Shop response").
+  - **G5** thời hạn đánh giá `marketplace.review.window-days` (mặc định 90) tính từ `delivered_at`.
+  - **G6** khách sửa review **1 lần** (admin không giới hạn).
+  - **G7** hiện `variantName`/`sku` (mua mẫu nào) trong review.
+  - *Không làm (ngoài phạm vi MarketPlace):* thưởng-điểm-review (GatePay Loyalty), auto-lọc-spam,
+    xử-lý-review-khi-hoàn-tiền (MarketPlace chưa có luồng refund).
+- ✅ Verify (mới nhất): `./mvnw test -Dtest='!*IntegrationTest'` = **272/272 PASS**; `npm run build` = **SUCCESS**.
+
 ### Review hardening follow-up — 2026-08-03
 
 - ✅ #B: refresh JWT có `jti`; Redis giữ token hiện hành theo `refresh:{username}`; refresh

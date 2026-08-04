@@ -77,6 +77,10 @@ public class Order {
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
+    /** When the order reached DELIVERED (customer confirmed or admin marked). Drives the review window. */
+    @Column(name = "delivered_at")
+    private LocalDateTime deliveredAt;
+
     @Builder.Default
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<OrderItem> items = new ArrayList<>();

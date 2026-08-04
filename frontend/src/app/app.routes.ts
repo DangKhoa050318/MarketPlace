@@ -137,6 +137,10 @@ export const routes: Routes = [
         path: 'admin/moderation',
         loadComponent: () => import('./features/admin/moderation/moderation-queue/moderation-queue.component').then(m => m.ModerationQueueComponent)
       },
+      {
+        path: 'admin/reviews',
+        loadComponent: () => import('./features/admin/reviews/admin-review-list/admin-review-list.component').then(m => m.AdminReviewListComponent)
+      },
 
       // Stock & Warehouse Features (Merged from StockPulse)
       {

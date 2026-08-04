@@ -47,9 +47,16 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
               <p class="order-date">Placed on {{ order.createdAt | date:'medium' }}</p>
             </div>
 
-            <span class="badge-pill" [ngClass]="getStatusBadgeClass(order.status)">
-              {{ order.status }}
-            </span>
+            <div class="status-actions">
+              <span class="badge-pill" [ngClass]="getStatusBadgeClass(order.status)">
+                {{ order.status }}
+              </span>
+              <button *ngIf="order.status === 'SHIPPED'" mat-flat-button color="primary" class="confirm-btn"
+                      (click)="confirmReceived()" [disabled]="confirming">
+                <mat-icon>check_circle</mat-icon>
+                {{ confirming ? 'Đang xác nhận...' : 'Đã nhận hàng' }}
+              </button>
+            </div>
           </div>
 
           <div class="info-grid">

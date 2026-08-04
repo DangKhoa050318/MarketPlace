@@ -3,6 +3,7 @@ package com.training.marketplace.service.impl;
 import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.request.CreateReviewRequest;
 import com.training.marketplace.dto.request.UpdateReviewRequest;
+import com.training.marketplace.dto.response.ProductRatingSummaryResponse;
 import com.training.marketplace.dto.response.ProductReviewResponse;
 import com.training.marketplace.dto.response.RatingSummaryResponse;
 import com.training.marketplace.dto.response.ReviewEligibilityResponse;
@@ -22,12 +23,15 @@ import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.ReviewService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +47,10 @@ public class ReviewServiceImpl implements ReviewService {
     private final UserRepository userRepository;
     private final OrderItemRepository orderItemRepository;
 
+    /** G5: a delivered order is reviewable only within this many days of delivery. */
+    @Value("${marketplace.review.window-days:90}")
+    private long reviewWindowDays;
+
     @Override
     @Transactional(readOnly = true)
     public ReviewEligibilityResponse checkEligibility(Long productId, String username) {
@@ -52,26 +60,41 @@ public class ReviewServiceImpl implements ReviewService {
         Optional<ProductReview> existingReviewOpt = reviewRepository.findByUserIdAndProductIdAndDeletedAtIsNull(user.getId(), product.getId());
         ProductReviewResponse existingResponse = existingReviewOpt.map(ProductReviewResponse::from).orElse(null);
 
-        List<OrderItem> eligibleItems = orderItemRepository.findEligibleOrderItemsForReview(user.getId(), product.getId());
-        boolean isVerified = !eligibleItems.isEmpty();
-        Long orderItemId = isVerified ? eligibleItems.get(0).getId() : null;
+        LocalDateTime since = LocalDateTime.now().minusDays(reviewWindowDays);
+        List<OrderItem> eligibleItems = orderItemRepository.findEligibleOrderItemsForReview(user.getId(), product.getId(), since);
+        boolean isVerifiedPurchase = !eligibleItems.isEmpty();
 
-        if (existingReviewOpt.isPresent()) {
+        // Eligible only if there is a delivered purchase that has not been reviewed yet.
+        Optional<OrderItem> reviewableItem = eligibleItems.stream()
+                .filter(item -> !reviewRepository.existsByUserIdAndOrderItemIdAndDeletedAtIsNull(user.getId(), item.getId()))
+                .findFirst();
+
+        if (!isVerifiedPurchase) {
             return ReviewEligibilityResponse.builder()
                     .eligible(false)
-                    .isVerifiedPurchase(isVerified)
-                    .orderItemId(orderItemId)
+                    .isVerifiedPurchase(false)
+                    .orderItemId(null)
                     .existingReview(existingResponse)
-                    .message("You have already reviewed this product.")
+                    .message("You can only review products you have purchased and received.")
+                    .build();
+        }
+
+        if (reviewableItem.isEmpty()) {
+            return ReviewEligibilityResponse.builder()
+                    .eligible(false)
+                    .isVerifiedPurchase(true)
+                    .orderItemId(null)
+                    .existingReview(existingResponse)
+                    .message("You have already reviewed your purchase of this product.")
                     .build();
         }
 
         return ReviewEligibilityResponse.builder()
                 .eligible(true)
-                .isVerifiedPurchase(isVerified)
-                .orderItemId(orderItemId)
-                .existingReview(null)
-                .message(isVerified ? "Eligible to write a verified purchase review." : "Eligible to write a review.")
+                .isVerifiedPurchase(true)
+                .orderItemId(reviewableItem.get().getId())
+                .existingReview(existingResponse)
+                .message("Eligible to write a verified purchase review.")
                 .build();
     }
 
@@ -81,27 +104,36 @@ public class ReviewServiceImpl implements ReviewService {
         Product product = getProductOrThrow(productId);
         User user = getUserOrThrow(username);
 
-        List<OrderItem> eligibleItems = orderItemRepository.findEligibleOrderItemsForReview(user.getId(), product.getId());
-        OrderItem orderItem = null;
-
-        if (request.orderItemId() != null) {
-            orderItem = orderItemRepository.findById(request.orderItemId()).orElse(null);
-            if (orderItem != null && reviewRepository.existsByUserIdAndOrderItemIdAndDeletedAtIsNull(user.getId(), orderItem.getId())) {
-                throw new DuplicateResourceException("Review", "order_item_id", orderItem.getId());
-            }
+        // Anti-fake-review gate (FEATURE-03): only a customer who purchased this product AND
+        // received it (order DELIVERED) may review. Every review is therefore a verified purchase.
+        LocalDateTime since = LocalDateTime.now().minusDays(reviewWindowDays);
+        List<OrderItem> eligibleItems = orderItemRepository.findEligibleOrderItemsForReview(user.getId(), product.getId(), since);
+        if (eligibleItems.isEmpty()) {
+            throw new ForbiddenException(
+                    "You can only review a product you have purchased and received (order delivered) within the last "
+                            + reviewWindowDays + " days.");
         }
 
-        if (orderItem == null && !eligibleItems.isEmpty()) {
+        OrderItem orderItem;
+        if (request.orderItemId() != null) {
+            // The requested order item must be one of this user's delivered purchases of this product.
+            orderItem = eligibleItems.stream()
+                    .filter(item -> item.getId().equals(request.orderItemId()))
+                    .findFirst()
+                    .orElseThrow(() -> new BadRequestException("The selected order item is not eligible to review this product."));
+            if (reviewRepository.existsByUserIdAndOrderItemIdAndDeletedAtIsNull(user.getId(), orderItem.getId())) {
+                throw new DuplicateResourceException("Review", "order_item_id", orderItem.getId());
+            }
+        } else {
+            // Auto-pick the first delivered purchase that has not been reviewed yet.
             orderItem = eligibleItems.stream()
                     .filter(item -> !reviewRepository.existsByUserIdAndOrderItemIdAndDeletedAtIsNull(user.getId(), item.getId()))
                     .findFirst()
-                    .orElse(null);
+                    .orElseThrow(() -> new DuplicateResourceException("Review", "product_id", product.getId()));
         }
 
-        boolean isVerified = orderItem != null;
-
-        String sanitizedTitle = request.title().trim();
-        String sanitizedContent = request.content().trim();
+        String sanitizedTitle = request.title() != null ? request.title().trim() : "";
+        String sanitizedContent = request.content() != null ? request.content().trim() : "";
 
         ProductReview review = ProductReview.builder()
                 .user(user)
@@ -112,7 +144,7 @@ public class ReviewServiceImpl implements ReviewService {
                 .content(sanitizedContent)
                 .imageUrl(request.imageUrl() != null ? request.imageUrl().trim() : null)
                 .status(ReviewStatus.APPROVED)
-                .isVerifiedPurchase(isVerified)
+                .isVerifiedPurchase(true)
                 .isEdited(false)
                 .build();
 
@@ -137,9 +169,14 @@ public class ReviewServiceImpl implements ReviewService {
             throw new BadRequestException("Cannot update a deleted review");
         }
 
+        // G6: a customer may edit their own review only once (admins/managers are unrestricted).
+        if (isOwner && !isAdminOrManager && Boolean.TRUE.equals(review.getIsEdited())) {
+            throw new BadRequestException("You can only edit your review once.");
+        }
+
         review.setRating(request.rating());
-        review.setTitle(request.title().trim());
-        review.setContent(request.content().trim());
+        review.setTitle(request.title() != null ? request.title().trim() : "");
+        review.setContent(request.content() != null ? request.content().trim() : "");
         review.setImageUrl(request.imageUrl() != null ? request.imageUrl().trim() : null);
         review.setIsEdited(true);
 
@@ -182,6 +219,26 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional(readOnly = true)
+    public PageResponse<ProductReviewResponse> getReviewsForAdmin(Integer rating, ReviewStatus status, Long productId, Pageable pageable) {
+        // Base scope: active reviews only (exclude soft-deleted). Filters are additive and all optional.
+        Specification<ProductReview> spec = (root, query, cb) -> cb.isNull(root.get("deletedAt"));
+
+        if (rating != null && rating >= 1 && rating <= 5) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("rating"), rating));
+        }
+        if (status != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status));
+        }
+        if (productId != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("product").get("id"), productId));
+        }
+
+        Page<ProductReview> reviewPage = reviewRepository.findAll(spec, pageable);
+        return PageResponse.from(reviewPage, ProductReviewResponse::from);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public RatingSummaryResponse getRatingSummary(Long productId) {
         getProductOrThrow(productId);
 
@@ -216,6 +273,22 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ProductRatingSummaryResponse> getRatingSummaries(List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return List.of();
+        }
+        List<ProductRatingSummaryResponse> result = new ArrayList<>();
+        for (Object[] row : reviewRepository.aggregateRatingsByProductIds(productIds)) {
+            Long pid = (Long) row[0];
+            double avg = row[1] != null ? Math.round(((Number) row[1]).doubleValue() * 10.0) / 10.0 : 0.0;
+            long count = row[2] != null ? ((Number) row[2]).longValue() : 0L;
+            result.add(new ProductRatingSummaryResponse(pid, avg, count));
+        }
+        return result;
+    }
+
+    @Override
     @Transactional
     public ProductReviewResponse adminUpdateStatus(Long reviewId, ReviewStatus status) {
         ProductReview review = getReviewOrThrow(reviewId);
@@ -227,6 +300,17 @@ public class ReviewServiceImpl implements ReviewService {
         }
         ProductReview saved = reviewRepository.save(review);
         log.info("Admin updated review {} status to {}", reviewId, status);
+        return ProductReviewResponse.from(saved);
+    }
+
+    @Override
+    @Transactional
+    public ProductReviewResponse adminReply(Long reviewId, String reply) {
+        ProductReview review = getReviewOrThrow(reviewId);
+        review.setSellerReply(reply.trim());
+        review.setSellerReplyAt(LocalDateTime.now());
+        ProductReview saved = reviewRepository.save(review);
+        log.info("Admin/seller replied to review {}", reviewId);
         return ProductReviewResponse.from(saved);
     }
 
