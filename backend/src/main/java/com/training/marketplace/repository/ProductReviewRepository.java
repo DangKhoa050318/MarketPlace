@@ -29,6 +29,12 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, Lo
            "AND r.deletedAt IS NULL GROUP BY r.rating")
     List<Object[]> countReviewsGroupByRating(@Param("productId") Long productId);
 
+    // G1: batch average rating + review count per product (approved, non-deleted) for storefront cards.
+    @Query("SELECT r.product.id AS productId, AVG(r.rating) AS avg, COUNT(r) AS cnt FROM ProductReview r " +
+           "WHERE r.product.id IN :productIds AND r.status = com.training.marketplace.enums.ReviewStatus.APPROVED " +
+           "AND r.deletedAt IS NULL GROUP BY r.product.id")
+    List<Object[]> aggregateRatingsByProductIds(@Param("productIds") List<Long> productIds);
+
     Page<ProductReview> findByUserIdAndDeletedAtIsNull(Long userId, Pageable pageable);
 
     boolean existsByUserIdAndOrderItemIdAndDeletedAtIsNull(Long userId, Long orderItemId);

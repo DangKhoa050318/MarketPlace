@@ -1,4 +1,8 @@
 spring:
+  # Dev convenience: load the local, git-ignored backend/.env (properties format) so secrets like
+  # JWT_SECRET stay out of source and git. 'optional:' means prod/CI can supply real env vars instead.
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     url: jdbc:postgresql://localhost:5433/${DB_NAME:marketplace_db}
     username: ${DB_USER:postgres}
@@ -82,6 +86,9 @@ marketplace:
   payment:
     # Safe default: orders stay PENDING and Rabbit retries/DLQs until a real provider adapter is configured.
     provider: ${PAYMENT_PROVIDER:disabled}
+  review:
+    # Days after delivery during which a customer may still review a purchase (G5).
+    window-days: ${REVIEW_WINDOW_DAYS:90}
   features:
     review-qa: ${FEATURE_REVIEW_QA_ENABLED:true}
     promotions: ${FEATURE_PROMOTIONS_ENABLED:true}

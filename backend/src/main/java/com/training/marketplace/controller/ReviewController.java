@@ -4,6 +4,7 @@ import com.training.marketplace.common.ApiResponse;
 import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.request.CreateReviewRequest;
 import com.training.marketplace.dto.request.UpdateReviewRequest;
+import com.training.marketplace.dto.response.ProductRatingSummaryResponse;
 import com.training.marketplace.dto.response.ProductReviewResponse;
 import com.training.marketplace.dto.response.RatingSummaryResponse;
 import com.training.marketplace.dto.response.ReviewEligibilityResponse;
@@ -50,6 +51,14 @@ public class ReviewController {
     public ResponseEntity<ApiResponse<RatingSummaryResponse>> getRatingSummary(@PathVariable Long productId) {
         RatingSummaryResponse summary = reviewService.getRatingSummary(productId);
         return ResponseEntity.ok(ApiResponse.success(summary));
+    }
+
+    @GetMapping("/api/v1/products/ratings")
+    @Operation(summary = "Batch product rating summaries",
+            description = "Average rating + review count for a set of product ids (for storefront cards)")
+    public ResponseEntity<ApiResponse<java.util.List<ProductRatingSummaryResponse>>> getRatingSummaries(
+            @RequestParam java.util.List<Long> ids) {
+        return ResponseEntity.ok(ApiResponse.success(reviewService.getRatingSummaries(ids)));
     }
 
     @GetMapping("/api/v1/products/{productId}/reviews/eligibility")

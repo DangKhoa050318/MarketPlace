@@ -226,6 +226,24 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
+    public OrderResponse confirmReceived(Long userId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+        if (!order.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You are not authorized to update this order");
+        }
+        if (order.getStatus() != OrderStatus.SHIPPED) {
+            throw new BadRequestException("Only a shipped order can be confirmed as received");
+        }
+        order.setStatus(OrderStatus.DELIVERED);
+        order.setDeliveredAt(java.time.LocalDateTime.now());
+        Order saved = orderRepository.save(order);
+        log.info("Customer confirmed receipt of order {}", orderId);
+        return orderMapper.toResponse(saved);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public DashboardStatsResponse getDashboardStats() {
         long totalOrders = orderRepository.count();
@@ -277,6 +295,9 @@ public class OrderServiceImpl implements OrderService {
 
         log.info("Admin updating order {} status {} -> {}", orderId, previousStatus, request.status());
         order.setStatus(request.status());
+        if (request.status() == OrderStatus.DELIVERED && order.getDeliveredAt() == null) {
+            order.setDeliveredAt(java.time.LocalDateTime.now());
+        }
         if (request.note() != null && !request.note().isBlank()) {
             order.setNote(request.note());
         }

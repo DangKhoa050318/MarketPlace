@@ -4,14 +4,19 @@ export interface ProductReview {
   username: string;
   userFullName?: string;
   productId: number;
+  productName?: string;
   rating: number;
   title: string;
   content: string;
   imageUrl?: string;
+  variantName?: string;
+  sku?: string;
   status: 'APPROVED' | 'HIDDEN' | 'DELETED';
   isVerifiedPurchase: boolean;
   isEdited: boolean;
   helpfulCount: number;
+  sellerReply?: string;
+  sellerReplyAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +26,12 @@ export interface RatingSummary {
   averageRating: number;
   totalReviews: number;
   starCounts: Record<number, number>;
+}
+
+export interface ProductRatingSummary {
+  productId: number;
+  averageRating: number;
+  reviewCount: number;
 }
 
 export interface ReviewEligibility {
@@ -34,7 +45,7 @@ export interface ReviewEligibility {
 export interface ReviewPayload {
   rating: number;
   title?: string;
-  content: string;
+  content?: string;
   imageUrl?: string;
   orderItemId?: number;
 }

@@ -9,7 +9,6 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,10 +18,12 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-    name = "product_reviews",
-    uniqueConstraints = @UniqueConstraint(name = "uk_user_product", columnNames = {"user_id", "product_id"})
-)
+// Uniqueness is enforced in the database by the partial unique index `uk_user_order_item`
+// on (user_id, order_item_id) WHERE order_item_id IS NOT NULL — see migration
+// V20260803150000__allow_review_per_order_item.sql (the older uk_user_product was dropped there).
+// A JPA @UniqueConstraint cannot express a partial index, so it is intentionally not declared here;
+// ddl-auto=validate does not verify unique constraints, so the entity stays in sync with the DB.
+@Table(name = "product_reviews")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -73,4 +74,11 @@ public class ProductReview extends BaseEntity {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    /** Optional shop/seller reply to this review (G4). */
+    @Column(name = "seller_reply", columnDefinition = "TEXT")
+    private String sellerReply;
+
+    @Column(name = "seller_reply_at")
+    private LocalDateTime sellerReplyAt;
 }

@@ -68,13 +68,20 @@ import { NotificationService } from '../../../core/services/notification.service
               @if (review.isVerifiedPurchase) {
                 <span class="verified"><mat-icon>verified</mat-icon>Verified Purchase</span>
               }
+              @if (review.variantName) { <span class="variant">{{ review.variantName }}</span> }
               @if (review.isEdited) { <span>Edited</span> }
             </div>
-            <h4>{{ review.title }}</h4>
-            <p>{{ review.content }}</p>
+            @if (review.title) { <h4>{{ review.title }}</h4> }
+            @if (review.content) { <p>{{ review.content }}</p> }
             @if (review.imageUrl) {
               <div class="review-image-container">
                 <img [src]="review.imageUrl" [alt]="review.title" class="review-img">
+              </div>
+            }
+            @if (review.sellerReply) {
+              <div class="seller-reply">
+                <div class="seller-reply-head"><mat-icon>storefront</mat-icon> Shop response</div>
+                <p>{{ review.sellerReply }}</p>
               </div>
             }
             <div class="review-actions">
@@ -118,6 +125,11 @@ import { NotificationService } from '../../../core/services/notification.service
     .review-actions { display:flex; justify-content:space-between; align-items:center; margin-top:12px; }
     .vote-btn { border-radius:16px; font-size:.82rem; color:#64748b; }
     .vote-btn.voted { color:#0284c7; background:#f0f9ff; }
+    .variant { color:#4f46e5; background:#eef2ff; padding:2px 8px; border-radius:6px; font-weight:600; }
+    .seller-reply { margin-top:12px; padding:12px 14px; background:#f8fafc; border-left:3px solid #0284c7; border-radius:8px; }
+    .seller-reply-head { display:flex; align-items:center; gap:6px; color:#0369a1; font-weight:700; font-size:.82rem; }
+    .seller-reply-head mat-icon { font-size:17px; width:17px; height:17px; }
+    .seller-reply p { margin:6px 0 0; color:#475569; font-size:.85rem; white-space:pre-wrap; }
     .state { min-height:150px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; color:var(--text-muted); }
     .error { color:#b91c1c; }
     @media (max-width:600px) { .toolbar { align-items:flex-start; flex-direction:column; } }

@@ -74,6 +74,15 @@ public class OrderController {
         return ApiResponse.success("Order cancelled successfully", orderService.cancelUserOrder(userId, id));
     }
 
+    @PutMapping("/{id}/confirm-received")
+    @Operation(summary = "Confirm an order was received (SHIPPED -> DELIVERED) by current user")
+    public ApiResponse<OrderResponse> confirmReceived(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long userId = getUserId(authentication);
+        return ApiResponse.success("Order marked as received", orderService.confirmReceived(userId, id));
+    }
+
     private Long getUserId(Authentication authentication) {
         Authentication auth = authentication != null ? authentication : SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) {

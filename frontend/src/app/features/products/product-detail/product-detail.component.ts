@@ -17,7 +17,7 @@ import {
 } from '../../../core/models/analytics-event.model';
 import { ProductResponse, ProductVariant } from '../../../core/models/product.model';
 import {
-  ProductReview, RatingSummary, ReviewEligibility, ReviewPayload
+  ProductReview, RatingSummary
 } from '../../../core/models/review.model';
 import { ProductService } from '../../../core/services/product.service';
 import { ReviewService, ReviewSort } from '../../../core/services/review.service';
@@ -34,7 +34,6 @@ import {
   RecommendationCarouselComponent
 } from '../../../shared/components/recommendation-carousel/recommendation-carousel.component';
 import { RatingSummaryComponent } from '../../reviews/rating-summary/rating-summary.component';
-import { ReviewFormComponent } from '../../reviews/review-form/review-form.component';
 import { ReviewListComponent } from '../../reviews/review-list/review-list.component';
 import { ProductQuestionListComponent } from '../../questions/product-question-list/product-question-list.component';
 
@@ -43,7 +42,7 @@ import { ProductQuestionListComponent } from '../../questions/product-question-l
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule,
-    RatingSummaryComponent, ReviewFormComponent, ReviewListComponent, ProductQuestionListComponent, RecommendationCarouselComponent
+    RatingSummaryComponent, ReviewListComponent, ProductQuestionListComponent, RecommendationCarouselComponent
   ],
   template: `
     <a mat-button routerLink="/products" class="back-link"><mat-icon>arrow_back</mat-icon>Sản phẩm</a>
@@ -203,7 +202,6 @@ import { ProductQuestionListComponent } from '../../questions/product-question-l
     .reviews { display:flex; flex-direction:column; gap:22px; background: #fff; border: 1px solid #e2e8f0; }
     .state { min-height:300px; display:flex; align-items:center; justify-content:center; flex-direction:column; }
     .compact { min-height:100px; } .error,.inline-error { color:#b91c1c; }
-    .eligibility { background:#eff6ff; padding:12px; border-radius:8px; }
     @media (max-width:760px) { .product { grid-template-columns:1fr; } }
   `]
 })
@@ -226,18 +224,13 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
   wishlisted = false;
   wishlistBusy = false;
   summary?: RatingSummary;
-  eligibility?: ReviewEligibility;
   reviews: ProductReview[] = [];
-  editingReview?: ProductReview;
   productLoading = true;
   summaryLoading = true;
-  eligibilityLoading = true;
   reviewsLoading = true;
-  saving = false;
   productError = '';
   summaryError = '';
   reviewsError = '';
-  saveError = '';
   totalElements = 0;
   page = 0;
   pageSize = 5;
@@ -280,7 +273,6 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
       this.loadVariants();
       this.loadSummary();
       this.loadReviews();
-      this.loadEligibility();
       this.loadWishlistStatus(productId);
       this.recordRecentlyViewed(productId);
 
@@ -452,19 +444,6 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  loadEligibility(): void {
-    if (!this.authService.isAuthenticated()) {
-      this.eligibilityLoading = false;
-      return;
-    }
-    this.eligibilityLoading = true;
-    this.reviewService.getEligibility(this.productId).pipe(
-      takeUntil(this.productChange$),
-      takeUntil(this.destroy$),
-      finalize(() => this.eligibilityLoading = false)
-    ).subscribe({ next: response => this.eligibility = response.data, error: () => undefined });
-  }
-
   changeFilter(value: { rating?: number; sort: ReviewSort }): void {
     this.rating = value.rating;
     this.sort = value.sort;
@@ -475,28 +454,6 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
   changePage(event: PageEvent): void {
     this.page = event.pageIndex;
     this.loadReviews();
-  }
-
-  saveReview(payload: ReviewPayload): void {
-    this.saving = true;
-    this.saveError = '';
-    const request$ = this.editingReview
-      ? this.reviewService.update(this.editingReview.id, payload)
-      : this.reviewService.create(this.productId, payload);
-    request$.pipe(
-      takeUntil(this.productChange$),
-      takeUntil(this.destroy$),
-      finalize(() => this.saving = false)
-    ).subscribe({
-      next: () => {
-        this.editingReview = undefined;
-        this.page = 0;
-        this.loadSummary();
-        this.loadReviews();
-        this.loadEligibility();
-      },
-      error: error => this.saveError = error.error?.message || 'Không thể lưu nhận xét của bạn.'
-    });
   }
 
   private loadWishlistStatus(productId: number): void {
@@ -534,18 +491,14 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     this.wishlisted = false;
     this.wishlistBusy = false;
     this.summary = undefined;
-    this.eligibility = undefined;
     this.reviews = [];
-    this.editingReview = undefined;
     this.productLoading = true;
     this.variantsLoading = true;
     this.summaryLoading = true;
-    this.eligibilityLoading = true;
     this.reviewsLoading = true;
     this.productError = '';
     this.summaryError = '';
     this.reviewsError = '';
-    this.saveError = '';
     this.totalElements = 0;
     this.page = 0;
   }

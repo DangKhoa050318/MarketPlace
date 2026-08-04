@@ -36,10 +36,17 @@ class ReviewRequestValidationTest {
     }
 
     @Test
-    @DisplayName("REQ-STP-T-101: blank and short review content is rejected")
-    void rejectsInvalidContent() {
-        assertThat(propertyViolations(new CreateReviewRequest(5, "Good", " ", null), "content")).isNotEmpty();
-        assertThat(propertyViolations(new CreateReviewRequest(5, "Good", "too short", null), "content")).isNotEmpty();
+    @DisplayName("G2: a star-only review (no title/content) is valid")
+    void acceptsStarOnlyReview() {
+        assertThat(validator.validate(new CreateReviewRequest(5, null, null, null))).isEmpty();
+        assertThat(validator.validate(new CreateReviewRequest(4, "", "", null))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("G2: over-length title/content is rejected")
+    void rejectsOverLongText() {
+        assertThat(propertyViolations(new CreateReviewRequest(5, "t".repeat(101), "ok", null), "title")).isNotEmpty();
+        assertThat(propertyViolations(new CreateReviewRequest(5, "ok", "c".repeat(1001), null), "content")).isNotEmpty();
     }
 
     private CreateReviewRequest validRequest(int rating) {

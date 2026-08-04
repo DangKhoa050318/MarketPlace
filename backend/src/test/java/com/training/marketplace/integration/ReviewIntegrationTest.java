@@ -125,7 +125,7 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(userToken);
 
-        // 1. Check eligibility before purchase -> eligible = true, isVerifiedPurchase = false
+        // 1. Check eligibility before purchase -> not eligible (no delivered purchase yet)
         HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
         ResponseEntity<ApiResponse<ReviewEligibilityResponse>> eligBeforeResp = restTemplate.exchange(
                 "/api/v1/products/" + testProduct.getId() + "/reviews/eligibility",
@@ -134,10 +134,10 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
                 new ParameterizedTypeReference<>() {}
         );
         assertThat(eligBeforeResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(eligBeforeResp.getBody().getData().isEligible()).isTrue();
+        assertThat(eligBeforeResp.getBody().getData().isEligible()).isFalse();
         assertThat(eligBeforeResp.getBody().getData().isVerifiedPurchase()).isFalse();
 
-        // A client cannot forge the server-owned verified purchase flag.
+        // Anti-fake-review: a customer cannot review a product they have not purchased & received.
         Product spoofProduct = productRepository.save(Product.builder()
                 .name("Spoof Target " + UUID.randomUUID())
                 .slug("spoof-target-" + UUID.randomUUID())
@@ -146,8 +146,7 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
         HttpEntity<Map<String, Object>> spoofEntity = new HttpEntity<>(Map.of(
                 "rating", 5,
                 "title", "Unverified review",
-                "content", "The client attempts to forge verification.",
-                "isVerifiedPurchase", true
+                "content", "The client attempts to review without buying."
         ), headers);
         ResponseEntity<ApiResponse<ProductReviewResponse>> spoofResp = restTemplate.exchange(
                 "/api/v1/products/" + spoofProduct.getId() + "/reviews",
@@ -155,13 +154,13 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
                 spoofEntity,
                 new ParameterizedTypeReference<>() {}
         );
-        assertThat(spoofResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(spoofResp.getBody().getData().getIsVerifiedPurchase()).isFalse();
+        assertThat(spoofResp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
 
         // 2. Create a completed order for verified purchase check
         Order order = orderRepository.save(Order.builder()
                 .user(testUser)
                 .status(OrderStatus.DELIVERED)
+                .deliveredAt(java.time.LocalDateTime.now())
                 .totalAmount(new BigDecimal("99.99"))
                 .build());
 
