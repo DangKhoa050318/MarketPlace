@@ -356,6 +356,7 @@ export class OrderDetailComponent implements OnInit {
   loading = true;
   deliveryLoading = false;
   deliveryError = '';
+  confirming = false;
   displayedColumns = ['productName', 'variantInfo', 'unitPrice', 'quantity', 'subtotal'];
 
   constructor(
@@ -422,6 +423,27 @@ export class OrderDetailComponent implements OnInit {
       },
       error: () => {
         this.deliveryError = 'The warehouse has not published tracking details for this order.';
+      }
+    });
+  }
+
+  confirmReceived(): void {
+    if (!this.order || this.confirming) {
+      return;
+    }
+    const orderId = this.order.id;
+    this.confirming = true;
+    this.orderService.confirmReceived(orderId).pipe(
+      finalize(() => this.confirming = false)
+    ).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.notification.success('Đã xác nhận nhận hàng. Bạn có thể đánh giá sản phẩm ngay bây giờ.');
+          this.loadOrderDetail(orderId);
+        }
+      },
+      error: (err) => {
+        this.notification.error(err?.error?.message || 'Không thể xác nhận nhận hàng.');
       }
     });
   }
