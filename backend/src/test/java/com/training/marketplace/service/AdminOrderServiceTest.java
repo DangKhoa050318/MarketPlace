@@ -79,7 +79,7 @@ class AdminOrderServiceTest {
 
         sampleOrderResponse = new OrderResponse(
                 1L, 10L, "sampleuser", "user@example.com", "123 Street", new BigDecimal("150.00"),
-                BigDecimal.ZERO, null, OrderStatus.PENDING, null, Collections.emptyList(),
+                BigDecimal.ZERO, BigDecimal.ZERO, null, OrderStatus.PENDING, null, Collections.emptyList(),
                 LocalDateTime.now(), LocalDateTime.now()
         );
     }

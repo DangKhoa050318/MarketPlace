@@ -65,6 +65,22 @@ import { AuthService } from '../../core/services/auth.service';
             <mat-icon>local_offer</mat-icon>
             <span>Coupons</span>
           </a>
+          <a *ngIf="hasRole(['ADMIN'])" routerLink="/admin/campaigns" routerLinkActive="active">
+            <mat-icon>campaign</mat-icon>
+            <span>Campaigns</span>
+          </a>
+          <a *ngIf="hasRole(['ADMIN'])" routerLink="/admin/collections" routerLinkActive="active">
+            <mat-icon>collections_bookmark</mat-icon>
+            <span>Collections</span>
+          </a>
+          <a *ngIf="hasRole(['ADMIN'])" routerLink="/admin/banners" routerLinkActive="active">
+            <mat-icon>view_carousel</mat-icon>
+            <span>Banners</span>
+          </a>
+          <a *ngIf="hasRole(['ADMIN'])" routerLink="/admin/merchandising/effectiveness" routerLinkActive="active">
+            <mat-icon>insights</mat-icon>
+            <span>Effectiveness</span>
+          </a>
 
           <span class="nav-heading">Warehouse & Stock</span>
           <a *ngIf="hasRole(['ADMIN', 'MANAGER', 'STAFF'])" routerLink="/warehouses" routerLinkActive="active">

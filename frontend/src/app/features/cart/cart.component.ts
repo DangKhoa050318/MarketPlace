@@ -122,6 +122,22 @@ import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.compo
           <div class="summary-card glass-panel">
             <h3 class="summary-title text-gradient-cyan">Order Summary</h3>
 
+            <!-- Free Shipping Progress Banner -->
+            <div *ngIf="getFreeShippingNeeded() > 0" class="shipping-progress-box">
+              <div class="shipping-progress-text">
+                <mat-icon class="shipping-icon">local_shipping</mat-icon>
+                <span>Add <strong>{{ getFreeShippingNeeded() | currency:'USD':'symbol':'1.2-2' }}</strong> more for <strong>FREE Shipping</strong></span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-bar" [style.width.%]="shippingProgressPercent()"></div>
+              </div>
+            </div>
+
+            <div *ngIf="getFreeShippingNeeded() === 0" class="shipping-progress-box qualified">
+              <mat-icon class="shipping-icon">verified</mat-icon>
+              <span>You unlocked <strong>FREE Shipping</strong>!</span>
+            </div>
+
             <div class="summary-body">
               <div class="summary-line">
                 <span>Subtotal</span>
@@ -151,6 +167,13 @@ import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.compo
               <div class="summary-line discount-line" *ngIf="appliedCode">
                 <span>Discount</span>
                 <strong class="discount-val">− {{ discountAmount | currency:'USD':'symbol':'1.2-2' }}</strong>
+              </div>
+
+              <!-- Shipping Fee Line -->
+              <div class="summary-line">
+                <span>Shipping Fee</span>
+                <strong *ngIf="getShippingFee() === 0" class="free-shipping-tag">FREE</strong>
+                <strong *ngIf="getShippingFee() > 0">{{ getShippingFee() | currency:'USD':'symbol':'1.2-2' }}</strong>
               </div>
 
               <div class="summary-divider"></div>
@@ -521,6 +544,67 @@ import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.compo
       color: #16a34a;
     }
 
+    .free-shipping-tag {
+      color: #10b981;
+      font-weight: 800;
+      background: #ecfdf5;
+      padding: 1px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-size: 0.8rem;
+    }
+
+    .shipping-progress-box {
+      background: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .shipping-progress-box.qualified {
+      background: #ecfdf5;
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #047857;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .shipping-progress-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.83rem;
+      color: #334155;
+    }
+
+    .shipping-icon {
+      color: #4f46e5;
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
+    .progress-track {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #4f46e5, #10b981);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
     @media (max-width: 900px) {
       .cart-grid {
         grid-template-columns: 1fr;
@@ -552,9 +636,27 @@ export class CartComponent implements OnInit {
     private router: Router
   ) {}
 
+  getShippingFee(): number {
+    const subtotal = this.cart?.totalAmount ?? 0;
+    if (subtotal === 0 || subtotal >= 150) return 0;
+    return 5;
+  }
+
+  getFreeShippingNeeded(): number {
+    const subtotal = this.cart?.totalAmount ?? 0;
+    return Math.max(0, 150 - subtotal);
+  }
+
+  shippingProgressPercent(): number {
+    const subtotal = this.cart?.totalAmount ?? 0;
+    return Math.min(100, Math.round((subtotal / 150) * 100));
+  }
+
   payableTotal(): number {
     const subtotal = this.cart?.totalAmount ?? 0;
-    return Math.max(0, subtotal - (this.appliedCode ? this.discountAmount : 0));
+    const discount = this.appliedCode ? this.discountAmount : 0;
+    const shipping = this.getShippingFee();
+    return Math.max(0, subtotal - discount + shipping);
   }
 
   applyCoupon(): void {

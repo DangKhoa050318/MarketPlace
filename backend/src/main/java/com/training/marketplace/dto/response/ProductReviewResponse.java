@@ -28,6 +28,7 @@ public class ProductReviewResponse {
     private Boolean isVerifiedPurchase;
     private Boolean isEdited;
     private Long helpfulCount;
+    private String imageUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -47,6 +48,7 @@ public class ProductReviewResponse {
                 .isVerifiedPurchase(review.getIsVerifiedPurchase())
                 .isEdited(review.getIsEdited())
                 .helpfulCount(review.getHelpfulCount())
+                .imageUrl(review.getImageUrl())
                 .createdAt(review.getCreatedAt())
                 .updatedAt(review.getUpdatedAt())
                 .build();

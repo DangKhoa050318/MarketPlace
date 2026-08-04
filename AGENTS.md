@@ -44,9 +44,17 @@ These instructions apply to the entire repository.
   retain deterministic lock ordering to avoid overselling and deadlocks.
 - API routes remain under `/api/v1`. Update OpenAPI annotations/schemas when an
   endpoint contract changes.
-- Never edit an applied Flyway migration. Add the next numbered
-  `V<next>__<description>.sql` migration and keep entity mappings compatible
-  with `ddl-auto: validate`.
+- **Flyway migrations use timestamp versioning, not sequential numbers.** Name
+  every new migration `V<yyyyMMddHHmmss>__<description>.sql` using the moment you
+  create it — e.g. `V20260729143000__add_campaign_tables.sql`. This stops version
+  collisions between parallel feature branches (the old `V1`, `V2`, … scheme
+  repeatedly clashed on merge). Do **not** introduce sequential `Vn` versions.
+- Never edit an applied Flyway migration. Add a new timestamped migration and
+  keep entity mappings compatible with `ddl-auto: validate`. Migrations must
+  apply cleanly on a fresh database (`docker compose down -v`); order them by the
+  data dependencies they need, not by authoring time.
+- The `backend/scripts/check-migration-versions.sh` guard (run in CI) fails the
+  build on duplicate versions or any old-style `Vn` migration.
 - Keep secrets and machine-specific values out of source control. Add documented
   placeholders to `.env.example` when introducing configuration.
 

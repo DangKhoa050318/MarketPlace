@@ -9,8 +9,10 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { OrderService, Order } from '../../../core/services/order.service';
+import { ReviewService } from '../../../core/services/review.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-dialog.component';
 
 @Component({
   selector: 'app-order-list',
@@ -24,7 +26,8 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
     MatIconModule,
     MatChipsModule,
     MatProgressSpinnerModule,
-    MatDialogModule
+    MatDialogModule,
+    OrderReviewDialogComponent
   ],
   template: `
     <div class="orders-page-container">
@@ -71,11 +74,21 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
               </td>
             </ng-container>
 
-            <!-- Total Items -->
-            <ng-container matColumnDef="totalItems">
-              <th mat-header-cell *matHeaderCellDef>Items</th>
+            <!-- Total Items & Variant Preview -->
+            <ng-container matColumnDef="itemsPreview">
+              <th mat-header-cell *matHeaderCellDef>Purchased Items & Variants</th>
               <td mat-cell *matCellDef="let order">
-                {{ order.items ? order.items.length : 0 }} items
+                <div class="items-preview-stack">
+                  <div *ngFor="let item of (order.items || []).slice(0, 2)" class="variant-item-pill">
+                    <span class="item-product-name">{{ item.productName }}</span>
+                    <span *ngIf="item.variantName" class="item-variant-chip">{{ item.variantName }}</span>
+                    <span *ngIf="!item.variantName && item.sku" class="item-variant-chip">{{ item.sku }}</span>
+                    <span class="item-qty">x{{ item.quantity }}</span>
+                  </div>
+                  <div *ngIf="order.items && order.items.length > 2" class="more-items-badge">
+                    +{{ order.items.length - 2 }} more item(s)
+                  </div>
+                </div>
               </td>
             </ng-container>
 
@@ -112,6 +125,14 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
                     (click)="onCancelOrder(order)" 
                     title="Cancel Order">
                     <mat-icon>cancel</mat-icon>
+                  </button>
+                  <button
+                    *ngIf="hasUnreviewedItems(order)"
+                    mat-stroked-button
+                    class="btn-review-order"
+                    (click)="openOrderReviewModal(order)"
+                    title="Review Purchased Items">
+                    <mat-icon>rate_review</mat-icon> <span>Review</span>
                   </button>
                 </div>
               </td>
@@ -225,6 +246,80 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
       display: flex;
       gap: 4px;
     }
+    .items-preview-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px 0;
+    }
+    .variant-item-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.83rem;
+      background: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      padding: 3px 8px;
+      border-radius: 6px;
+      width: fit-content;
+      max-width: 340px;
+    }
+    .item-product-name {
+      font-weight: 650;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .item-variant-chip {
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: #eef2ff;
+      color: #4f46e5;
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+    .item-qty {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #0284c7;
+      background: #e0f2fe;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .more-items-badge {
+      font-size: 0.75rem;
+      font-weight: 650;
+      color: var(--text-muted);
+      margin-left: 2px;
+    }
+    .action-buttons {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      vertical-align: middle;
+    }
+    .btn-review-order {
+      color: #0284c7 !important;
+      border-color: rgba(2, 132, 199, 0.4) !important;
+      font-size: 0.8rem !important;
+      font-weight: 700 !important;
+      height: 32px !important;
+      line-height: 30px !important;
+      padding: 0 10px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      vertical-align: middle;
+      border-radius: 8px !important;
+    }
+    .btn-review-order mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      margin: 0;
+    }
     .glass-paginator {
       background: transparent !important;
       color: var(--text-main);
@@ -237,16 +332,54 @@ export class OrderListComponent implements OnInit {
   totalElements = 0;
   pageSize = 10;
   currentPage = 0;
-  displayedColumns = ['id', 'createdAt', 'totalItems', 'totalAmount', 'status', 'actions'];
+  displayedColumns = ['id', 'createdAt', 'itemsPreview', 'totalAmount', 'status', 'actions'];
+  reviewedOrderItemIds = new Set<number>();
 
   constructor(
     private orderService: OrderService,
+    private reviewService: ReviewService,
     private notification: NotificationService,
     private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
     this.loadOrders();
+    this.loadReviewedOrderItemIds();
+  }
+
+  loadReviewedOrderItemIds(): void {
+    this.reviewService.getMyReviewedOrderItemIds().subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.reviewedOrderItemIds = new Set(res.data);
+        }
+      },
+      error: () => {
+        // Silently handle unauthenticated or non-customer status
+      }
+    });
+  }
+
+  hasUnreviewedItems(order: Order): boolean {
+    if (order.status !== 'DELIVERED') return false;
+    if (!order.items || order.items.length === 0) return false;
+    return order.items.some(item => !this.reviewedOrderItemIds.has(item.id));
+  }
+
+  openOrderReviewModal(order: Order): void {
+    const dialogRef = this.dialog.open(OrderReviewDialogComponent, {
+      width: '620px',
+      data: {
+        order,
+        reviewedOrderItemIds: this.reviewedOrderItemIds
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(res => {
+      if (res?.reviewedOrderItemIds) {
+        this.reviewedOrderItemIds = new Set(res.reviewedOrderItemIds);
+      }
+    });
   }
 
   loadOrders(): void {

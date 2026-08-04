@@ -23,6 +23,7 @@ import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.AppliedCoupon;
 import com.training.marketplace.service.CartService;
 import com.training.marketplace.service.InventoryFacade;
+import com.training.marketplace.service.MerchandisingEventService;
 import com.training.marketplace.service.OrderService;
 import com.training.marketplace.service.PromotionService;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.training.marketplace.repository.ProductVariantRepository;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -47,12 +50,14 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final ProductVariantRepository variantRepository;
     private final UserRepository userRepository;
     private final CartService cartService;
     private final InventoryFacade inventoryFacade;
     private final OrderMapper orderMapper;
     private final OrderEventPublisher orderEventPublisher;
     private final PromotionService promotionService;
+    private final MerchandisingEventService merchandisingEventService;
 
     @Override
     @Transactional
@@ -92,6 +97,7 @@ public class OrderServiceImpl implements OrderService {
             calculatedTotal = calculatedTotal.add(subtotal);
             order.addItem(OrderItem.builder()
                     .variantId(item.variantId())
+                    .productId(item.productId())
                     .sku(item.sku())
                     .productName(item.productName())
                     .variantName(item.variantName())
@@ -100,6 +106,12 @@ public class OrderServiceImpl implements OrderService {
                     .subtotal(subtotal)
                     .build());
         }
+
+        // 3a. Calculate shipping fee ($5.00 if item subtotal < $150.00, FREE if >= $150.00)
+        BigDecimal shippingFee = calculatedTotal.compareTo(new BigDecimal("150.00")) >= 0
+                ? BigDecimal.ZERO
+                : new BigDecimal("5.00");
+        order.setShippingFee(shippingFee);
 
         // 3b. Apply coupon (optional). Locks the coupon row, validates against the cart, and
         //     increments used_count inside this transaction (no oversell of usage_limit).
@@ -112,7 +124,7 @@ public class OrderServiceImpl implements OrderService {
             order.setCouponCode(appliedCoupon.code());
         }
         order.setDiscountAmount(discount);
-        order.setTotalAmount(calculatedTotal.subtract(discount));
+        order.setTotalAmount(calculatedTotal.subtract(discount).add(shippingFee));
 
         Order savedOrder = orderRepository.save(order);
 
@@ -120,6 +132,14 @@ public class OrderServiceImpl implements OrderService {
         if (appliedCoupon != null) {
             promotionService.recordRedemption(
                     appliedCoupon.promotionCodeId(), userId, savedOrder.getId(), discount);
+        }
+
+        // 3d. Best-effort last-click merchandising attribution (B-408). Runs in its own transaction
+        //     (REQUIRES_NEW) and must never break order creation, so failures are swallowed.
+        try {
+            merchandisingEventService.attributeOrder(savedOrder.getId(), userId, savedOrder.getCreatedAt());
+        } catch (Exception ex) {
+            log.warn("Merchandising attribution skipped for order {}: {}", savedOrder.getId(), ex.getMessage());
         }
 
         // 4. Clear cart.
@@ -151,6 +171,7 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public PageResponse<OrderResponse> getUserOrders(Long userId, Pageable pageable) {
         Page<Order> page = orderRepository.findByUserId(userId, pageable);
+        page.getContent().forEach(this::ensureOrderItemProductIds);
         return PageResponse.from(page, orderMapper::toResponse);
     }
 
@@ -162,7 +183,19 @@ public class OrderServiceImpl implements OrderService {
         if (!order.getUser().getId().equals(userId)) {
             throw new BadRequestException("You are not authorized to view this order");
         }
+        ensureOrderItemProductIds(order);
         return orderMapper.toResponse(order);
+    }
+
+    private void ensureOrderItemProductIds(Order order) {
+        if (order.getItems() != null) {
+            for (com.training.marketplace.entity.OrderItem item : order.getItems()) {
+                if (item.getProductId() == null && item.getVariantId() != null) {
+                    variantRepository.findById(item.getVariantId())
+                            .ifPresent(v -> item.setProductId(v.getProductId()));
+                }
+            }
+        }
     }
 
     @Override

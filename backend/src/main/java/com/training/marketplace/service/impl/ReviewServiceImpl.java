@@ -21,6 +21,7 @@ import com.training.marketplace.repository.ProductReviewRepository;
 import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.ReviewService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReviewServiceImpl implements ReviewService {
@@ -79,13 +81,24 @@ public class ReviewServiceImpl implements ReviewService {
         Product product = getProductOrThrow(productId);
         User user = getUserOrThrow(username);
 
-        if (reviewRepository.existsByUserIdAndProductIdAndDeletedAtIsNull(user.getId(), product.getId())) {
-            throw new DuplicateResourceException("Review", "user_id/product_id", user.getId() + "/" + product.getId());
+        List<OrderItem> eligibleItems = orderItemRepository.findEligibleOrderItemsForReview(user.getId(), product.getId());
+        OrderItem orderItem = null;
+
+        if (request.orderItemId() != null) {
+            orderItem = orderItemRepository.findById(request.orderItemId()).orElse(null);
+            if (orderItem != null && reviewRepository.existsByUserIdAndOrderItemIdAndDeletedAtIsNull(user.getId(), orderItem.getId())) {
+                throw new DuplicateResourceException("Review", "order_item_id", orderItem.getId());
+            }
         }
 
-        List<OrderItem> eligibleItems = orderItemRepository.findEligibleOrderItemsForReview(user.getId(), product.getId());
-        boolean isVerified = !eligibleItems.isEmpty();
-        OrderItem orderItem = isVerified ? eligibleItems.get(0) : null;
+        if (orderItem == null && !eligibleItems.isEmpty()) {
+            orderItem = eligibleItems.stream()
+                    .filter(item -> !reviewRepository.existsByUserIdAndOrderItemIdAndDeletedAtIsNull(user.getId(), item.getId()))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        boolean isVerified = orderItem != null;
 
         String sanitizedTitle = request.title().trim();
         String sanitizedContent = request.content().trim();
@@ -97,6 +110,7 @@ public class ReviewServiceImpl implements ReviewService {
                 .rating(request.rating())
                 .title(sanitizedTitle)
                 .content(sanitizedContent)
+                .imageUrl(request.imageUrl() != null ? request.imageUrl().trim() : null)
                 .status(ReviewStatus.APPROVED)
                 .isVerifiedPurchase(isVerified)
                 .isEdited(false)
@@ -126,6 +140,7 @@ public class ReviewServiceImpl implements ReviewService {
         review.setRating(request.rating());
         review.setTitle(request.title().trim());
         review.setContent(request.content().trim());
+        review.setImageUrl(request.imageUrl() != null ? request.imageUrl().trim() : null);
         review.setIsEdited(true);
 
         ProductReview updated = reviewRepository.save(review);
@@ -210,8 +225,25 @@ public class ReviewServiceImpl implements ReviewService {
         } else {
             review.setDeletedAt(null);
         }
-        ProductReview updated = reviewRepository.save(review);
-        return ProductReviewResponse.from(updated);
+        ProductReview saved = reviewRepository.save(review);
+        log.info("Admin updated review {} status to {}", reviewId, status);
+        return ProductReviewResponse.from(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> getMyReviewedProductIds(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User username: " + username));
+        return reviewRepository.findReviewedProductIdsByUserId(user.getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> getMyReviewedOrderItemIds(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User username: " + username));
+        return reviewRepository.findReviewedOrderItemIdsByUserId(user.getId());
     }
 
     private Product getProductOrThrow(Long productId) {

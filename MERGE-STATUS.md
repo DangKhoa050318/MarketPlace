@@ -10,6 +10,36 @@ monolith, per `docs/Project - Marketplace (Merged Spec).md` (v0.2: monolith · s
 
 ---
 
+## 📋 Feature workstreams — tổng quan toàn dự án (cập nhật 2026-08-03)
+
+> File này giờ là **tracker tiến độ toàn dự án** (không chỉ merge 2 app cũ). Đã gộp nội dung
+> `PROJECT-STATUS.md` vào đây — file đó đã bỏ. Chi tiết từng mục xem các log theo ngày bên dưới.
+
+Legend: ✅ done · 🟡 partial · ⏳ chưa bắt đầu.
+
+| Feature | Owner | Trạng thái | Ở đâu / ghi chú |
+|---|---|---|---|
+| Nền — merge OrderFlow + StockPulse (Stage 1–3) | cả nhóm | ✅ done | `dev` — compile/boot, catalog 2 tầng, `InventoryFacade` chống oversell |
+| **STP-01** Reviews, Q&A & Moderation | GiangHV9 | ✅ done | `dev` — reviews/ratings, Q&A, helpful vote, moderation + audit log |
+| **STP-02** Promotions & Merchandising | KhoaNXD1 | 🟡 gần xong | **Wk1 Coupon ✅ `dev`**. **Wk2 Merchandising ✅ trên nhánh `feature/stp-02-campaigns-collections-merchandising`** (đã merge `dev`, build xanh): backend + admin UI **F-401→403** + storefront **F-404/405/406** + unit tests. Còn: integration/E2E **T-402/403/406** (Docker/Playwright-gated) + PO **D-1/D-5** (`docs/feature-stp-02-po-decisions.md`). **Sẵn sàng PR về `dev`** |
+| **STP-03** Personalized Recommendations | HoangNQ17 | ✅ done | `dev` — similar / co-viewed / co-purchased / best-seller, eligibility filter, storefront carousel (B-501→508, F-501→506, T-501→506) |
+| **STP-04** Analytics / CX / Journey | TriTVV2 | ✅ done | `dev` — `AdminAnalyticsController`, export, funnel/KPI, `JourneyMergeController` (gộp hành trình ẩn danh ↔ đăng nhập) |
+| **STP-05** Bundle | Giang + Khoa (Wk3) | ⏳ | chưa bắt đầu |
+| **STP-06** Comparison | Hoang + Tri (Wk3) | ⏳ | chưa bắt đầu; cần model brand/attribute (EAV) catalog hiện chưa có |
+| Feature-03 Merchant working-capital loan (liên kết GatePay) | KhoaNXD1 | ⏳ blocked | GatePay (Trí) chưa giao API `/merchant-loans/*`; MarketPlace là client/proxy. Plan: `docs/feature-03-working-capital-marketplace.md` |
+| PR #37 — shipping fee + order variant UI + image upload + review-per-order-item | — | ✅ done | `dev` (merged 2026-08-03): phí ship theo đơn, upload ảnh review, review theo từng order item |
+
+**Base-code hardening (main-branch security review):** A/F/J/K/L (PR #36) + B/C/D/E/H (c90309b) + G — chi tiết ở log **"Review hardening follow-up — 2026-08-03"** bên dưới.
+⚠️ Vận hành: `JWT_SECRET` **bắt buộc** set (app fail-fast nếu thiếu); `PAYMENT_PROVIDER=disabled` (fail-closed — đơn giữ PENDING tới khi cắm provider thật).
+
+**Doc map (giữ lại — đã kiểm tra 2026-08-03, chưa doc nào tới lúc xoá):**
+- `README.md` (setup) · `AGENTS.md` (convention) · `docs/StockPulse-Ecommerce-Features-3-Week-Requirements.md` (**source of truth**) · `docs/Project - Marketplace (Merged Spec).md` (đặc tả nền).
+- STP-03 reference: `docs/recommendation-api.md`, `docs/similar|best-seller|co-occurrence-recommendation.md`, `docs/recommendation-eligibility-filter.md`, `docs/recommendation-demo-data.md`, `docs/analytics-event-schema-v1.md`.
+- STP-02: `docs/feature-stp-02-week2-plan.md` (plan — **lưu ý D-4 nói reuse `analytics_events` nhưng code thực tế dùng bảng riêng `merchandising_events`**), `docs/feature-stp-02-po-decisions.md` (chờ PO), `docs/feature-stp-02-demo.md`.
+- Demo & reference: `docs/demo-full-project.md` (kịch bản demo toàn dự án), `docs/FEATURES-AND-API-FLOWS.md` (mô tả API theo code — mục "12 file null-byte" đã cũ, các file đó đã khôi phục).
+
+---
+
 ## ✅ Stage 1 — ĐÃ XONG (physical merge + foundation)
 
 - [x] Tạo folder `Marketplace/` (base = OrderFlow); copy `backend/` + `frontend/`.
@@ -404,9 +434,21 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
   `LOWER(carrier), UPPER(tracking_code)`.
 - ✅ Angular có typed delivery service, customer timeline với loading/error/retry, và admin form
   tạo/sửa delivery, ghi milestone, cập nhật trạng thái.
-- ✅ Verify: focused backend delivery/order/security tests **22/22 PASS**; toàn bộ backend unit test
-  **272/272 PASS**; toàn bộ Angular unit test **43/43 PASS**; Angular production build **SUCCESS**
+- ✅ Verify sau khi merge `origin/dev`: focused backend delivery/order/security tests **22/22 PASS**;
+  toàn bộ backend unit test **287/287 PASS**; toàn bộ Angular unit test **50/50 PASS**;
+  Angular production build **SUCCESS**
   (giữ nguyên 2 CSS budget warnings có sẵn).
 - ⚠️ `DeliveryTrackingIntegrationTest` đã thêm để kiểm tra concurrent create, normalized tracking
   query và migration thật; môi trường hiện tại không có lệnh/Docker daemon nên chưa thể thực thi
   Testcontainers.
+
+### FEATURE-STP-02 Week 2 — Merchandising storefront + tests — 2026-08-04
+
+- ✅ Nhánh `feature/stp-02-campaigns-collections-merchandising` **đã merge `dev`** (ngang dev, +32 commit); backend compile + FE build lại **xanh** sau merge (auto-merge sạch cả ngữ nghĩa).
+- ✅ **F-404** storefront render (chỉ từ dữ liệu backend, hiệu lực do server quyết): `MerchandisingBannerComponent` (slot HOME_HERO), `CampaignStripComponent` (**surface** coupon — D-1 không auto-apply), `CollectionShowcaseComponent` (sản phẩm theo `display_order`), gộp trong `StorefrontMerchandisingComponent` nhúng ở trang `/products`.
+- ✅ **F-405** analytics hooks: `MerchandisingImpressionDirective` (IntersectionObserver ≥50%, fire **1 lần**) + `MerchandisingService.recordEvent` (impression khi hiển thị, click **trước** điều hướng; idempotent theo `eventId`, dedup server-side).
+- ✅ **F-406** effectiveness table (ADMIN): `MerchandisingEffectivenessComponent` gọi `GET /api/v1/admin/merchandising/summary` → impressions/clicks/CTR/attributed orders; thêm route `admin/merchandising/effectiveness` + link sidebar.
+- ✅ Tests: **T-401** window validation + **T-404** event dedup/CTR/last-click attribution (`CampaignServiceImplTest`, `MerchandisingEventServiceImplTest`, +14 unit); **T-405** Angular (`merchandising.service.spec`, `campaign-strip.component.spec`, +7).
+- ✅ Verify: backend unit **270/270 PASS**; Angular unit **46/46 PASS**; `npm run build` **SUCCESS** (2 CSS budget warnings cũ).
+- ⏳ Còn lại (Docker/Playwright-gated — khớp quyết định CI hiện chỉ chạy unit test): **T-402/T-403** integration (CRUD/publish + reorder-in-1-transaction), **T-406** E2E; và PO chốt **D-1/D-5**.
+- ▶️ **Sẵn sàng mở PR nhánh → `dev`.**
