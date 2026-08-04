@@ -1,29 +1,27 @@
 package com.training.marketplace.controller;
 
+import com.training.marketplace.common.ApiResponse;
 import com.training.marketplace.dto.request.PaygateWebhookRequest;
-import com.training.marketplace.entity.Order;
-import com.training.marketplace.enums.OrderStatus;
-import com.training.marketplace.enums.PaymentStatus;
-import com.training.marketplace.repository.OrderRepository;
+import com.training.marketplace.service.PaymentWebhookService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
-import java.util.Optional;
+import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class PaymentWebhookControllerTest {
 
     @Mock
-    private OrderRepository orderRepository;
+    private PaymentWebhookService paymentWebhookService;
 
     @InjectMocks
     private PaymentWebhookController webhookController;
@@ -35,14 +33,6 @@ class PaymentWebhookControllerTest {
 
     @Test
     void handlePaygateWebhook_Success() {
-        Order order = new Order();
-        order.setId(100L);
-        order.setStatus(OrderStatus.PENDING);
-        order.setPaymentStatus(PaymentStatus.PENDING_PAYGATE);
-
-        when(orderRepository.findById(100L)).thenReturn(Optional.of(order));
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
         PaygateWebhookRequest request = new PaygateWebhookRequest(
                 "PAYMENT_COMPLETED",
                 "TXN_998877",
@@ -52,30 +42,15 @@ class PaymentWebhookControllerTest {
                 "SUCCESS"
         );
 
-        ResponseEntity<?> response = webhookController.handlePaygateWebhook(request);
+        when(paymentWebhookService.processPaygateWebhook(any(), any()))
+                .thenReturn(Map.of("orderId", 100L, "status", "CONFIRMED", "paymentStatus", "PAID"));
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(OrderStatus.CONFIRMED, order.getStatus());
-        assertEquals(PaymentStatus.PAID, order.getPaymentStatus());
+        ApiResponse<Map<String, Object>> response = webhookController.handlePaygateWebhook("signature-123", request);
 
-        verify(orderRepository).save(order);
-    }
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.getData().get("orderId")).isEqualTo(100L);
+        assertThat(response.getData().get("status")).isEqualTo("CONFIRMED");
 
-    @Test
-    void handlePaygateWebhook_OrderNotFound() {
-        when(orderRepository.findById(999L)).thenReturn(Optional.empty());
-
-        PaygateWebhookRequest request = new PaygateWebhookRequest(
-                "PAYMENT_COMPLETED",
-                "TXN_000000",
-                1L,
-                "ORD-999",
-                BigDecimal.valueOf(100.0),
-                "SUCCESS"
-        );
-
-        ResponseEntity<?> response = webhookController.handlePaygateWebhook(request);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        verify(paymentWebhookService).processPaygateWebhook(eq(request), eq("signature-123"));
     }
 }
