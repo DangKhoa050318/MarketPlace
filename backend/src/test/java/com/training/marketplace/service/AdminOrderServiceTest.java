@@ -118,7 +118,7 @@ class AdminOrderServiceTest {
     @DisplayName("updateOrderStatusByAdmin: valid transition updates status successfully")
     void updateOrderStatusByAdmin_validTransition_success() {
         UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.CONFIRMED, "Approved by admin");
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sampleOrder));
         when(orderRepository.save(any(Order.class))).thenReturn(sampleOrder);
         when(orderMapper.toResponse(sampleOrder)).thenReturn(sampleOrderResponse);
 
@@ -134,7 +134,7 @@ class AdminOrderServiceTest {
     @DisplayName("updateOrderStatusByAdmin: invalid transition throws BadRequestException")
     void updateOrderStatusByAdmin_invalidTransition_throwsException() {
         UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.DELIVERED, null);
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sampleOrder));
 
         assertThatThrownBy(() -> orderService.updateOrderStatusByAdmin(1L, request))
                 .isInstanceOf(BadRequestException.class)
@@ -145,7 +145,7 @@ class AdminOrderServiceTest {
     @DisplayName("updateOrderStatusByAdmin: order not found throws ResourceNotFoundException")
     void updateOrderStatusByAdmin_orderNotFound_throwsException() {
         UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.CONFIRMED, null);
-        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService.updateOrderStatusByAdmin(99L, request))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -156,7 +156,7 @@ class AdminOrderServiceTest {
     void updateOrderStatusByAdmin_cancel_releasesReservation() {
         Order order = reservedOrder(OrderStatus.PENDING);
         UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.CANCELLED, "Cancelled by admin");
-        when(orderRepository.findById(2L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenReturn(order);
         when(orderMapper.toResponse(order)).thenReturn(sampleOrderResponse);
 
@@ -171,12 +171,26 @@ class AdminOrderServiceTest {
     void updateOrderStatusByAdmin_cancelAlreadyCancelled_noDoubleRelease() {
         Order order = reservedOrder(OrderStatus.CANCELLED);
         UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.CANCELLED, null);
-        when(orderRepository.findById(2L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         orderService.updateOrderStatusByAdmin(2L, request);
 
         verify(inventoryFacade, never()).release(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateOrderStatusByAdmin: shipped order must be completed through delivery tracking")
+    void updateOrderStatusByAdmin_shippedToDelivered_requiresDeliveryTracking() {
+        Order order = reservedOrder(OrderStatus.SHIPPED);
+        UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.DELIVERED, null);
+        when(orderRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.updateOrderStatusByAdmin(2L, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("delivery tracking");
+
+        verify(orderRepository, never()).save(any(Order.class));
     }
 
     /** An order with a warehouse and two reserved variants (100 -> 2, 200 -> 3). */

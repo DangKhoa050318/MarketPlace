@@ -386,3 +386,27 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
   đã có; adapter thật còn chờ team chọn provider và bổ sung payment method/token vào checkout.
 - ✅ Verify: backend unit test **255/255 PASS**; Angular unit test **39/39 PASS**; Angular production build
   **SUCCESS** (2 CSS budget warnings); backend payment integration **2 SKIPPED** do Docker không khả dụng.
+
+### Delivery tracking — 2026-08-04
+
+- ✅ Thêm manual delivery tracking cho order `SHIPPED`: carrier, tracking code, ETA, state machine
+  `PENDING → IN_TRANSIT → DELIVERED/FAILED` và timeline event chi tiết.
+- ✅ Migration duy nhất `V20260804101500__create_delivery_tracking.sql` tạo `deliveries` và
+  `delivery_events`, gồm ownership FK, unique order/tracking, optimistic version, request-id
+  idempotency và timeline index.
+- ✅ Delivery là nguồn chân lý cho bước `SHIPPED → DELIVERED`; admin không còn chuyển order trực
+  tiếp. Delivery service khóa theo thứ tự `Order → Delivery` và cập nhật delivery/event/order trong
+  cùng transaction; inventory vẫn fulfill tại thời điểm order chuyển `SHIPPED`.
+- ✅ API customer ownership và back-office STAFF/MANAGER/ADMIN đã có; metadata chỉ sửa khi
+  `PENDING`, milestone request retry không tạo trùng.
+- ✅ Status command mang `expectedVersion`; command cũ bị từ chối bằng HTTP `409 Conflict` sau
+  khi khóa delivery. Query kiểm tra tracking dùng đúng biểu thức functional index
+  `LOWER(carrier), UPPER(tracking_code)`.
+- ✅ Angular có typed delivery service, customer timeline với loading/error/retry, và admin form
+  tạo/sửa delivery, ghi milestone, cập nhật trạng thái.
+- ✅ Verify: focused backend delivery/order/security tests **22/22 PASS**; toàn bộ backend unit test
+  **272/272 PASS**; toàn bộ Angular unit test **43/43 PASS**; Angular production build **SUCCESS**
+  (giữ nguyên 2 CSS budget warnings có sẵn).
+- ⚠️ `DeliveryTrackingIntegrationTest` đã thêm để kiểm tra concurrent create, normalized tracking
+  query và migration thật; môi trường hiện tại không có lệnh/Docker daemon nên chưa thể thực thi
+  Testcontainers.

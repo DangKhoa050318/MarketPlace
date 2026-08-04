@@ -73,6 +73,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/dashboard/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/analytics/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/orders/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers("/api/v1/admin/deliveries/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/reviews/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/users/**").hasRole("ADMIN")

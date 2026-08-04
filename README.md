@@ -18,7 +18,7 @@ Tồn kho là nguồn chân lý ở `stock_levels` theo `(variant_id, warehouse_
 ## Cấu trúc
 ```
 Marketplace/
-├── backend/    Spring Boot (base package com.training.marketplace), Flyway V1–V9
+├── backend/    Spring Boot (base package com.training.marketplace), Flyway timestamp migrations
 ├── frontend/   Angular 17
 ├── docs/       đặc tả (Merged Spec, MERGE-STATUS, requirements, feature specs)
 ├── AGENTS.md   quy ước code
