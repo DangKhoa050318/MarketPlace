@@ -35,7 +35,8 @@ import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.compo
     MatInputModule,
     MatProgressSpinnerModule,
     MatDialogModule,
-    MatTooltipModule
+    MatTooltipModule,
+    CheckoutDialogComponent
   ],
   template: `
     <div class="cart-container">
@@ -823,7 +824,7 @@ export class CartComponent implements OnInit {
     });
 
     const dialogRef = this.dialog.open(CheckoutDialogComponent, {
-      width: '500px',
+      width: '620px',
       data: { cart: this.cart, couponCode: this.appliedCode, discountAmount: this.discountAmount }
     });
 
@@ -838,9 +839,16 @@ export class CartComponent implements OnInit {
               totalAmount: res.data?.totalAmount,
               itemCount: res.data?.items?.length
             });
-            this.notification.success(`Order #${res.data?.id || ''} placed successfully! Confirmation email has been dispatched.`);
-            this.loadCart();
-            this.router.navigate(['/orders']);
+            const targetUrl = res.data?.paygatePayload?.paymentUrl;
+            if (targetUrl && (result.paymentMethod === 'CREDIT_CARD' || result.paymentMethod === 'PAYGATE_BNPL')) {
+              this.notification.info(`Redirecting to PayGate Checkout...`);
+              this.loadCart();
+              window.location.href = targetUrl;
+            } else {
+              this.notification.success(`Order #${res.data?.id || ''} placed successfully! Confirmation email has been dispatched.`);
+              this.loadCart();
+              this.router.navigate(['/orders']);
+            }
           },
           error: (err) => {
             this.actionLoading = false;

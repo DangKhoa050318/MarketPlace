@@ -4,6 +4,7 @@ import com.training.marketplace.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +28,9 @@ import java.util.UUID;
 public class FileUploadController {
 
     private static final String UPLOAD_DIR = "./uploads/images";
+
+    @Value("${marketplace.app.base-url:http://localhost:8080}")
+    private String baseUrl;
 
     @PostMapping(value = "/api/v1/uploads/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('CUSTOMER', 'STAFF', 'MANAGER', 'ADMIN')")
@@ -59,7 +63,7 @@ public class FileUploadController {
             Path filePath = uploadPath.resolve(filename);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-            String fileUrl = "http://localhost:8080/uploads/images/" + filename;
+            String fileUrl = baseUrl + "/uploads/images/" + filename;
             log.info("File uploaded successfully: {}", fileUrl);
 
             return ResponseEntity.ok(ApiResponse.success("Image uploaded successfully", Map.of("url", fileUrl)));

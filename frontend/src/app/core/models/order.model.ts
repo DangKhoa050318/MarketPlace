@@ -1,4 +1,25 @@
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+export type PaymentMethod = 'COD' | 'CREDIT_CARD' | 'PAYGATE_BNPL' | 'BANK_TRANSFER';
+export type PaymentStatus = 'UNPAID' | 'PENDING_PAYGATE' | 'PAID' | 'REFUNDED';
+
+export interface PaygatePayload {
+  orderId: number;
+  customerId: number;
+  merchantId: string;
+  totalAmount: number;
+  upfrontAmount: number;
+  financeAmount: number;
+  paymentChannel: string;
+  paymentUrl: string;
+  bankAccount?: {
+    bankName?: string;
+    accountNumber?: string;
+    accountHolder?: string;
+    amount?: number;
+  };
+  transferContent?: string;
+  qrPayload?: string;
+}
 
 export interface OrderItem {
   id: number;
@@ -23,6 +44,11 @@ export interface Order {
   shippingFee?: number;
   couponCode?: string;
   status: OrderStatus;
+  paymentMethod?: PaymentMethod;
+  paymentStatus?: PaymentStatus;
+  upfrontAmount?: number;
+  financeAmount?: number;
+  paygatePayload?: PaygatePayload;
   warehouseId?: number;
   note?: string;
   items: OrderItem[];
@@ -34,6 +60,10 @@ export interface CreateOrderRequest {
   shippingAddress: string;
   note?: string;
   couponCode?: string;
+  paymentMethod?: PaymentMethod;
+  upfrontAmount?: number;
+  financeAmount?: number;
+  bnplMonths?: number;
 }
 
 export interface UpdateOrderStatusRequest {

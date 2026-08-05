@@ -100,13 +100,25 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
               </td>
             </ng-container>
 
-            <!-- Status -->
+            <!-- Order Status -->
             <ng-container matColumnDef="status">
-              <th mat-header-cell *matHeaderCellDef>Status</th>
+              <th mat-header-cell *matHeaderCellDef>Order Status</th>
               <td mat-cell *matCellDef="let order">
                 <span class="badge-pill" [ngClass]="getStatusBadgeClass(order.status)">
                   {{ order.status }}
                 </span>
+              </td>
+            </ng-container>
+
+            <!-- Payment Method -->
+            <ng-container matColumnDef="paymentMethod">
+              <th mat-header-cell *matHeaderCellDef>Payment</th>
+              <td mat-cell *matCellDef="let order">
+                <span *ngIf="order.paymentMethod" class="badge-payment-chip">
+                  <span class="pay-method-text">{{ order.paymentMethod === 'COD' ? 'COD' : (order.paymentMethod === 'PAYGATE_BNPL' ? 'BNPL' : 'Paygate Card') }}</span>
+                  <span class="pay-dot dot-paid" *ngIf="order.paymentStatus === 'PAID'"></span>
+                </span>
+                <span *ngIf="!order.paymentMethod" class="text-muted">—</span>
               </td>
             </ng-container>
 
@@ -288,6 +300,42 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
       padding: 1px 5px;
       border-radius: 4px;
     }
+    .status-payment-col {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+    .badge-payment-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.68rem;
+      font-weight: 750;
+      background: #f8fafc;
+      color: #334155;
+      padding: 2px 8px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    }
+    .pay-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .pay-dot.dot-paid {
+      background-color: #10b981;
+      box-shadow: 0 0 4px rgba(16, 185, 129, 0.6);
+    }
+    .pay-dot.dot-unpaid {
+      background-color: #94a3b8;
+    }
     .more-items-badge {
       font-size: 0.75rem;
       font-weight: 650;
@@ -332,7 +380,7 @@ export class OrderListComponent implements OnInit {
   totalElements = 0;
   pageSize = 10;
   currentPage = 0;
-  displayedColumns = ['id', 'createdAt', 'itemsPreview', 'totalAmount', 'status', 'actions'];
+  displayedColumns = ['id', 'createdAt', 'itemsPreview', 'totalAmount', 'paymentMethod', 'status', 'actions'];
   reviewedOrderItemIds = new Set<number>();
 
   constructor(

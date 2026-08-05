@@ -13,6 +13,7 @@ public interface OrderMapper {
     @Mapping(target = "userId", source = "user.id")
     @Mapping(target = "username", source = "user.username")
     @Mapping(target = "userEmail", source = "user.email")
+    @Mapping(target = "paygatePayload", ignore = true)
     OrderResponse toResponse(Order order);
 
     OrderItemResponse toItemResponse(OrderItem orderItem);
