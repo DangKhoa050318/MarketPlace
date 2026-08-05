@@ -1,5 +1,5 @@
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
-export type PaymentMethod = 'COD' | 'CREDIT_CARD' | 'PAYGATE_BNPL';
+export type PaymentMethod = 'COD' | 'CREDIT_CARD' | 'PAYGATE_BNPL' | 'BANK_TRANSFER';
 export type PaymentStatus = 'UNPAID' | 'PENDING_PAYGATE' | 'PAID' | 'REFUNDED';
 
 export interface PaygatePayload {
@@ -11,6 +11,14 @@ export interface PaygatePayload {
   financeAmount: number;
   paymentChannel: string;
   paymentUrl: string;
+  bankAccount?: {
+    bankName?: string;
+    accountNumber?: string;
+    accountHolder?: string;
+    amount?: number;
+  };
+  transferContent?: string;
+  qrPayload?: string;
 }
 
 export interface OrderItem {

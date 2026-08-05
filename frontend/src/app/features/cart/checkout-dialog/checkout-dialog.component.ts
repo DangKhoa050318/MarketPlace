@@ -105,6 +105,20 @@ export interface CheckoutDialogData {
               </div>
               <span class="badge-promo">0% Interest</span>
             </div>
+
+            <!-- Option 4: Bank Transfer / QR VietQR -->
+            <div
+              class="payment-card"
+              [class.active]="selectedMethod === 'BANK_TRANSFER'"
+              (click)="selectMethod('BANK_TRANSFER')">
+              <div class="radio-indicator"></div>
+              <mat-icon class="method-icon bank-icon">qr_code_2</mat-icon>
+              <div class="method-details">
+                <span class="method-title">Bank Transfer / QR VietQR</span>
+                <span class="method-desc">Transfer directly via VietQR / Mobile Banking to PayGate master account.</span>
+              </div>
+              <span class="badge-promo">No Fee</span>
+            </div>
           </div>
         </div>
 
@@ -319,6 +333,7 @@ export interface CheckoutDialogData {
     .cod-icon { color: #16a34a; }
     .card-icon { color: #0284c7; }
     .bnpl-icon { color: #d97706; }
+    .bank-icon { color: #0284c7; }
 
     .method-details {
       display: flex;
@@ -337,7 +352,7 @@ export interface CheckoutDialogData {
       color: #64748b;
     }
 
-    .badge-recommended, .badge-promo {
+    .badge-recommended, .badge-promo, .badge-bank {
       font-size: 0.7rem;
       font-weight: 700;
       padding: 3px 8px;
@@ -346,6 +361,7 @@ export interface CheckoutDialogData {
     }
     .badge-recommended { background: #dcfce7; color: #15803d; }
     .badge-promo { background: #fef3c7; color: #b45309; }
+    .badge-bank { background: #e0f2fe; color: #0369a1; }
 
     .bnpl-details-box {
       margin-top: 10px;

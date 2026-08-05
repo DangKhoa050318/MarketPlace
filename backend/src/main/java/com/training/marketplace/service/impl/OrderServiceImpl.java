@@ -193,24 +193,30 @@ public class OrderServiceImpl implements OrderService {
         OrderResponse baseResponse = orderMapper.toResponse(savedOrder);
         PaygatePayloadResponse paygatePayload = null;
         if (paymentMethod != PaymentMethod.COD) {
+            String methodStr = paymentMethod == PaymentMethod.BANK_TRANSFER ? "BANK_TRANSFER" : "WALLET";
             var pgSession = paygateClientService.createCheckoutSession(
                     savedOrder.getId(),
                     savedOrder.getTotalAmount(),
-                    "Thanh toan don hang #" + savedOrder.getId() + " tren Marketplace"
+                    "Thanh toan don hang #" + savedOrder.getId() + " tren Marketplace",
+                    methodStr
             );
-            String targetPaymentUrl = (pgSession != null && pgSession.data() != null)
-                    ? pgSession.data().paymentUrl()
+            var sessionData = (pgSession != null) ? pgSession.data() : null;
+            String targetPaymentUrl = (sessionData != null && sessionData.paymentUrl() != null)
+                    ? sessionData.paymentUrl()
                     : "http://localhost:4201/checkout?orderId=" + savedOrder.getId();
 
             paygatePayload = new PaygatePayloadResponse(
                     savedOrder.getId(),
                     userId,
-                    "MC_API_KEY_MARKETPLACE_DEMO",
+                    "mock-merchant-api-key-123456",
                     savedOrder.getTotalAmount(),
                     savedOrder.getUpfrontAmount(),
                     savedOrder.getFinanceAmount(),
                     paymentMethod.name(),
-                    targetPaymentUrl
+                    targetPaymentUrl,
+                    sessionData != null ? sessionData.bankAccount() : null,
+                    sessionData != null ? sessionData.transferContent() : null,
+                    sessionData != null ? sessionData.qrPayload() : null
             );
         }
 

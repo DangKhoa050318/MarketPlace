@@ -35,7 +35,8 @@ import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.compo
     MatInputModule,
     MatProgressSpinnerModule,
     MatDialogModule,
-    MatTooltipModule
+    MatTooltipModule,
+    CheckoutDialogComponent
   ],
   template: `
     <div class="cart-container">
