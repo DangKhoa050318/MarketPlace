@@ -216,7 +216,7 @@ public class OrderServiceImpl implements OrderService {
             if (sessionData != null) {
                 savedOrder.setPaygateToken(sessionData.token());
                 savedOrder.setPaygateUrl(sessionData.paymentUrl());
-                savedOrder.setPaygateExpiresAt(sessionData.expiresAt());
+                savedOrder.setPaygateExpiresAt(parseExpiresAt(sessionData.expiresAt()));
                 orderRepository.save(savedOrder);
             }
 
@@ -310,7 +310,7 @@ public class OrderServiceImpl implements OrderService {
         if (sessionData != null) {
             order.setPaygateToken(sessionData.token());
             order.setPaygateUrl(sessionData.paymentUrl());
-            order.setPaygateExpiresAt(sessionData.expiresAt());
+            order.setPaygateExpiresAt(parseExpiresAt(sessionData.expiresAt()));
         }
 
         order.setPaymentStatus(PaymentStatus.PENDING_PAYGATE);
@@ -498,6 +498,17 @@ public class OrderServiceImpl implements OrderService {
         if (!isValid) {
             throw new BadRequestException(
                     String.format("Cannot transition order status from %s to %s", currentStatus, newStatus));
+        }
+    }
+
+    private LocalDateTime parseExpiresAt(String expiresAtStr) {
+        if (expiresAtStr == null || expiresAtStr.isBlank()) {
+            return LocalDateTime.now().plusMinutes(15);
+        }
+        try {
+            return LocalDateTime.parse(expiresAtStr);
+        } catch (Exception e) {
+            return LocalDateTime.now().plusMinutes(15);
         }
     }
 }
