@@ -1,4 +1,8 @@
 spring:
+  # Dev convenience: load the local, git-ignored backend/.env (properties format) so secrets like
+  # JWT_SECRET stay out of source and git. 'optional:' means prod/CI can supply real env vars instead.
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     url: jdbc:postgresql://localhost:5433/${DB_NAME:marketplace_db}
     username: ${DB_USER:postgres}
@@ -85,6 +89,9 @@ marketplace:
     api-key: ${PAYGATE_API_KEY:mock-merchant-api-key-123456}
     return-url: ${PAYGATE_RETURN_URL:http://localhost:4200/orders/callback}
     cancel-url: ${PAYGATE_CANCEL_URL:http://localhost:4200/cart}
+  review:
+    # Days after delivery during which a customer may still review a purchase (G5).
+    window-days: ${REVIEW_WINDOW_DAYS:90}
   features:
     review-qa: ${FEATURE_REVIEW_QA_ENABLED:true}
     promotions: ${FEATURE_PROMOTIONS_ENABLED:true}

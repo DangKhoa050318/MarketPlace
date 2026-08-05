@@ -1,23 +1,35 @@
 package com.training.marketplace.service;
 
+import com.training.marketplace.entity.AuditLog;
+import com.training.marketplace.repository.AuditLogRepository;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-/**
- * Minimal audit trail for privileged admin actions (cross-feature convention: "mọi thao tác quản
- * trị quan trọng phải có audit log"). Writes structured entries — actor, action, target, details —
- * to a dedicated {@code AUDIT} logger. Persisting to an audit table is a shared follow-up: it needs
- * a coordinated migration and a schema agreed across features, so it is intentionally out of scope
- * for FEATURE-STP-02.
- */
+/** Persists privileged actions and mirrors them to the structured AUDIT logger. */
 @Service
+@RequiredArgsConstructor
 public class AuditService {
 
     private static final Logger AUDIT = LoggerFactory.getLogger("AUDIT");
+    private final AuditLogRepository auditLogRepository;
 
     public void record(String actor, String action, String targetType, Object targetId, String details) {
+        String normalizedActor = actor == null || actor.isBlank() ? "system" : actor;
         AUDIT.info("audit action={} target={}#{} actor={} details=[{}]",
-                action, targetType, targetId, (actor == null || actor.isBlank()) ? "system" : actor, details);
+                action, targetType, targetId, normalizedActor, details);
+        try {
+            auditLogRepository.save(AuditLog.builder()
+                    .actor(normalizedActor)
+                    .action(action)
+                    .targetType(targetType)
+                    .targetId(targetId == null ? null : targetId.toString())
+                    .details(details)
+                    .build());
+        } catch (RuntimeException exception) {
+            AUDIT.error("audit_persistence_failed action={} target={}#{} actor={}",
+                    action, targetType, targetId, normalizedActor, exception);
+        }
     }
 }

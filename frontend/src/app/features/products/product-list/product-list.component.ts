@@ -24,12 +24,16 @@ import { CartService } from '../../../core/services/cart.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ProductService } from '../../../core/services/product.service';
+import { ReviewService } from '../../../core/services/review.service';
 import { AnalyticsService } from '../../../core/services/analytics.service';
 import { RecentlyViewedService } from '../../../core/services/recently-viewed.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import {
   RecommendationCarouselComponent
 } from '../../../shared/components/recommendation-carousel/recommendation-carousel.component';
+import {
+  StorefrontMerchandisingComponent
+} from '../../storefront/merchandising/storefront-merchandising.component';
 
 @Component({
   selector: 'app-product-list',
@@ -37,7 +41,7 @@ import {
   imports: [
     CommonModule, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatIconModule,
     MatPaginatorModule, MatProgressSpinnerModule, MatSelectModule, RecommendationCarouselComponent,
-    ScrollRevealDirective
+    ScrollRevealDirective, StorefrontMerchandisingComponent
   ],
   template: `
     <!-- Hero Banner Carousel -->
@@ -84,6 +88,8 @@ import {
         }
       </div>
     </section>
+
+    <app-storefront-merchandising appScrollReveal></app-storefront-merchandising>
 
     <app-recommendation-carousel appScrollReveal
       [title]="query.categoryId ? 'Bán chạy trong danh mục' : 'Sản phẩm bán chạy'"
@@ -322,7 +328,19 @@ import {
                   
                   <a class="product-name" [routerLink]="['/products', product.id]" [title]="product.name"
                      [innerHTML]="highlightMatch(product.name, appliedSearch)"></a>
-                  
+
+                  @if (product.reviewCount) {
+                    <a class="card-rating" [routerLink]="['/products', product.id]"
+                       [attr.aria-label]="product.averageRating + ' stars from ' + product.reviewCount + ' reviews'">
+                      <span class="card-stars">
+                        @for (s of [1, 2, 3, 4, 5]; track s) {
+                          <mat-icon [class.filled]="s <= (product.averageRating || 0)">{{ s <= (product.averageRating || 0) ? 'star' : 'star_border' }}</mat-icon>
+                        }
+                      </span>
+                      <small>{{ product.averageRating }} ({{ product.reviewCount }})</small>
+                    </a>
+                  }
+
                   <!-- Interactive Variant Selection Buttons like Detail Page -->
                   <div class="card-variant-section">
                     @if (product.variants && product.variants.length > 0) {
@@ -480,6 +498,10 @@ import {
     .image-box { position:relative; width:100%; aspect-ratio: 1 / 1; overflow: hidden; background: #f8fafc; }
     .image-link { position:relative; display:block; background:#f8fafc; width:100%; height:100%; overflow:hidden; }
     .image-link img { width:100%; height:100%; object-fit:cover; object-position:center; transition:transform 0.4s ease; }.product-card:hover img { transform:scale(1.04); }
+    .card-rating { display:flex; align-items:center; gap:6px; text-decoration:none; margin:4px 0 2px; }
+    .card-stars { display:inline-flex; color:#f59e0b; }
+    .card-stars mat-icon { font-size:15px; width:15px; height:15px; }
+    .card-rating small { color:#64748b; font-size:.74rem; font-weight:600; }
     .category-badge, .scarcity-badge {
       position: absolute; top: 12px; left: 12px; z-index: 2;
       background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(8px);
@@ -695,6 +717,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
 
   constructor(
     private productService: ProductService,
+    private reviewService: ReviewService,
     private categoryService: CategoryService,
     private cartService: CartService,
     private wishlistService: WishlistService,
@@ -851,8 +874,31 @@ export class ProductListComponent implements OnInit, OnDestroy {
           }
         });
         this.loadWishlistStatuses();
+        this.loadRatings();
       },
       error: () => this.errorMessage = 'Kết nối đến cửa hàng bị gián đoạn. Vui lòng thử lại.'
+    });
+  }
+
+  private loadRatings(): void {
+    const ids = this.products.map(p => p.id);
+    if (!ids.length) {
+      return;
+    }
+    this.reviewService.getProductRatings(ids).pipe(takeUntil(this.destroy$)).subscribe({
+      next: res => {
+        if (res.success && res.data) {
+          const map = new Map(res.data.map(r => [r.productId, r]));
+          this.products.forEach(p => {
+            const r = map.get(p.id);
+            if (r) {
+              p.averageRating = r.averageRating;
+              p.reviewCount = r.reviewCount;
+            }
+          });
+        }
+      },
+      error: () => undefined
     });
   }
 

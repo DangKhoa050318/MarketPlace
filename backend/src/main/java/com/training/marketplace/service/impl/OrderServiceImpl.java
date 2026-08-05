@@ -26,6 +26,7 @@ import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.AppliedCoupon;
 import com.training.marketplace.service.CartService;
 import com.training.marketplace.service.InventoryFacade;
+import com.training.marketplace.service.MerchandisingEventService;
 import com.training.marketplace.service.OrderService;
 import com.training.marketplace.service.PromotionService;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderEventPublisher orderEventPublisher;
     private final PromotionService promotionService;
     private final com.training.marketplace.service.PaygateClientService paygateClientService;
+    private final MerchandisingEventService merchandisingEventService;
 
     @Override
     @Transactional
@@ -165,6 +167,14 @@ public class OrderServiceImpl implements OrderService {
         if (appliedCoupon != null) {
             promotionService.recordRedemption(
                     appliedCoupon.promotionCodeId(), userId, savedOrder.getId(), discount);
+        }
+
+        // 3d. Best-effort last-click merchandising attribution (B-408). Runs in its own transaction
+        //     (REQUIRES_NEW) and must never break order creation, so failures are swallowed.
+        try {
+            merchandisingEventService.attributeOrder(savedOrder.getId(), userId, savedOrder.getCreatedAt());
+        } catch (Exception ex) {
+            log.warn("Merchandising attribution skipped for order {}: {}", savedOrder.getId(), ex.getMessage());
         }
 
         // 4. Clear cart.
@@ -302,6 +312,24 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
+    public OrderResponse confirmReceived(Long userId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+        if (!order.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You are not authorized to update this order");
+        }
+        if (order.getStatus() != OrderStatus.SHIPPED) {
+            throw new BadRequestException("Only a shipped order can be confirmed as received");
+        }
+        order.setStatus(OrderStatus.DELIVERED);
+        order.setDeliveredAt(java.time.LocalDateTime.now());
+        Order saved = orderRepository.save(order);
+        log.info("Customer confirmed receipt of order {}", orderId);
+        return orderMapper.toResponse(saved);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public DashboardStatsResponse getDashboardStats() {
         long totalOrders = orderRepository.count();
@@ -326,11 +354,16 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse updateOrderStatusByAdmin(Long orderId, UpdateOrderStatusRequest request) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
         OrderStatus previousStatus = order.getStatus();
         validateStatusTransition(previousStatus, request.status());
+
+        if (previousStatus == OrderStatus.SHIPPED && request.status() == OrderStatus.DELIVERED) {
+            throw new BadRequestException(
+                    "Complete the delivery tracking record to mark a shipped order as delivered");
+        }
 
         // When the order ships, convert the reservation into an actual stock decrement.
         if (request.status() == OrderStatus.SHIPPED && order.getWarehouseId() != null) {
@@ -348,6 +381,9 @@ public class OrderServiceImpl implements OrderService {
 
         log.info("Admin updating order {} status {} -> {}", orderId, previousStatus, request.status());
         order.setStatus(request.status());
+        if (request.status() == OrderStatus.DELIVERED && order.getDeliveredAt() == null) {
+            order.setDeliveredAt(java.time.LocalDateTime.now());
+        }
         if (request.note() != null && !request.note().isBlank()) {
             order.setNote(request.note());
         }

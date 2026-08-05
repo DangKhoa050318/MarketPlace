@@ -71,4 +71,14 @@ public class AnalyticsExportJob extends BaseEntity {
 
     @Column(name = "expires_at")
     private Instant expiresAt;
+
+    @Column(name = "attempt_count", nullable = false)
+    @Builder.Default
+    private int attemptCount = 0;
+
+    @Column(name = "next_attempt_at")
+    private Instant nextAttemptAt;
+
+    @Column(name = "started_at")
+    private Instant startedAt;
 }

@@ -22,19 +22,22 @@ import java.util.UUID;
 public class AnalyticsExportProcessor {
 
     private static final Duration DOWNLOAD_TTL = Duration.ofHours(24);
+    private static final int MAX_ATTEMPTS = 3;
 
     private final AnalyticsExportJobRepository analyticsExportJobRepository;
     private final AnalyticsDashboardService analyticsDashboardService;
 
     @Async
     public void process(UUID publicId) {
+        Instant startedAt = Instant.now();
+        if (analyticsExportJobRepository.claim(publicId, startedAt) == 0) {
+            return;
+        }
         AnalyticsExportJob job = analyticsExportJobRepository.findByPublicId(publicId).orElse(null);
         if (job == null) {
             return;
         }
         try {
-            job.setStatus(AnalyticsExportStatus.PROCESSING);
-            analyticsExportJobRepository.save(job);
             job.setCsvContent(generate(job));
             job.setFileName("analytics-" + job.getExportType().name().toLowerCase()
                     + "-" + job.getPublicId() + ".csv");
@@ -42,12 +45,25 @@ public class AnalyticsExportProcessor {
             job.setCompletedAt(Instant.now());
             job.setExpiresAt(job.getCompletedAt().plus(DOWNLOAD_TTL));
             job.setErrorMessage(null);
+            job.setNextAttemptAt(null);
+            job.setStartedAt(null);
         } catch (RuntimeException exception) {
-            job.setStatus(AnalyticsExportStatus.FAILED);
             job.setErrorMessage(truncate(exception.getMessage()));
             job.setCsvContent(null);
+            job.setStartedAt(null);
+            if (job.getAttemptCount() < MAX_ATTEMPTS) {
+                job.setStatus(AnalyticsExportStatus.PENDING);
+                job.setNextAttemptAt(Instant.now().plus(retryDelay(job.getAttemptCount())));
+            } else {
+                job.setStatus(AnalyticsExportStatus.FAILED);
+                job.setNextAttemptAt(null);
+            }
         }
         analyticsExportJobRepository.save(job);
+    }
+
+    private Duration retryDelay(int attemptCount) {
+        return Duration.ofMinutes(1L << Math.max(0, attemptCount - 1));
     }
 
     private String generate(AnalyticsExportJob job) {

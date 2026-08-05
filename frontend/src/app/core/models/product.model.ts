@@ -60,6 +60,8 @@ export interface StorefrontProduct {
   createdAt: string;
   variantNames?: string;
   variants?: StorefrontVariantItem[];
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 export interface ProductCatalogQuery {

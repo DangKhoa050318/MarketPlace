@@ -207,4 +207,41 @@ describe('DashboardComponent funnel visualization', () => {
     expect(args[5]).toBe('orders');
     expect(args[6]).toBe('desc');
   });
+
+  it('passes dashboard filters to overview, funnel, promotion and products', () => {
+    dashboardService.getAnalyticsOverview.calls.reset();
+    dashboardService.getProductPerformance.calls.reset();
+    fixture.componentInstance.filterCategoryId = 3;
+    fixture.componentInstance.filterProductId = 9;
+    fixture.componentInstance.filterCampaign = ' Summer ';
+    fixture.componentInstance.filterPlacement = 'HOME_BEST_SELLERS';
+    fixture.componentInstance.filterDeviceType = 'mobile';
+
+    fixture.componentInstance.loadAnalytics();
+
+    const filters = {
+      categoryId: 3,
+      productId: 9,
+      campaign: 'Summer',
+      placement: 'HOME_BEST_SELLERS',
+      deviceType: 'mobile'
+    };
+    expect(dashboardService.getAnalyticsOverview.calls.mostRecent().args[2]).toEqual(filters);
+    expect(dashboardService.getFunnelSummary.calls.mostRecent().args[2]).toEqual(filters);
+    expect(dashboardService.getPromotionPerformance.calls.mostRecent().args[2]).toEqual(filters);
+    expect(dashboardService.getProductPerformance.calls.mostRecent().args[7]).toEqual(filters);
+  });
+
+  it('shows product query failures instead of an empty state', () => {
+    dashboardService.getProductPerformance.and.returnValue(throwError(() => ({
+      error: { message: 'Product analytics unavailable' }
+    })));
+
+    fixture.componentInstance.loadProducts();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.productsError).toBe('Product analytics unavailable');
+    expect(fixture.nativeElement.textContent).toContain('Product analytics unavailable');
+    expect(fixture.nativeElement.textContent).not.toContain('No products match this filter.');
+  });
 });

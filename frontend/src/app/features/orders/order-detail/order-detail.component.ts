@@ -8,6 +8,10 @@ import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { OrderService, Order } from '../../../core/services/order.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { DeliveryService } from '../../../core/services/delivery.service';
+import { Delivery } from '../../../core/models/delivery.model';
+import { DeliveryTimelineComponent } from '../../../shared/components/delivery-timeline/delivery-timeline.component';
+import { catchError, finalize, of, switchMap, tap } from 'rxjs';
 
 @Component({
   selector: 'app-order-detail',
@@ -19,7 +23,8 @@ import { NotificationService } from '../../../core/services/notification.service
     MatButtonModule,
     MatIconModule,
     MatTableModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    DeliveryTimelineComponent
   ],
   template: `
     <div class="order-detail-container">
@@ -42,9 +47,16 @@ import { NotificationService } from '../../../core/services/notification.service
               <p class="order-date">Placed on {{ order.createdAt | date:'medium' }}</p>
             </div>
 
-            <span class="badge-pill" [ngClass]="getStatusBadgeClass(order.status)">
-              {{ order.status }}
-            </span>
+            <div class="status-actions">
+              <span class="badge-pill" [ngClass]="getStatusBadgeClass(order.status)">
+                {{ order.status }}
+              </span>
+              <button *ngIf="order.status === 'SHIPPED'" mat-flat-button color="primary" class="confirm-btn"
+                      (click)="confirmReceived()" [disabled]="confirming">
+                <mat-icon>check_circle</mat-icon>
+                {{ confirming ? 'Đang xác nhận...' : 'Đã nhận hàng' }}
+              </button>
+            </div>
           </div>
 
           <div class="info-grid">
@@ -83,6 +95,22 @@ import { NotificationService } from '../../../core/services/notification.service
               </div>
             </div>
           </div>
+        </div>
+
+        <div *ngIf="deliveryLoading" class="delivery-loading glass-panel" aria-live="polite">
+          <mat-spinner diameter="30"></mat-spinner>
+          <span>Loading delivery tracking...</span>
+        </div>
+
+        <app-delivery-timeline *ngIf="!deliveryLoading && delivery" [delivery]="delivery" />
+
+        <div *ngIf="!deliveryLoading && deliveryError" class="delivery-empty glass-panel" role="status">
+          <mat-icon>local_shipping</mat-icon>
+          <div>
+            <strong>Delivery tracking is not available yet</strong>
+            <p>{{ deliveryError }}</p>
+          </div>
+          <button mat-stroked-button type="button" (click)="retryDelivery()">Retry</button>
         </div>
 
         <!-- Items Table Card -->
@@ -311,16 +339,30 @@ import { NotificationService } from '../../../core/services/notification.service
     .subtotal-cell {
       font-weight: 800;
     }
+    .delivery-loading, .delivery-empty {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .delivery-empty > mat-icon { color: var(--accent-cyan); }
+    .delivery-empty div { flex: 1; }
+    .delivery-empty p { margin: 4px 0 0; color: var(--text-muted); }
   `]
 })
 export class OrderDetailComponent implements OnInit {
   order: Order | null = null;
+  delivery: Delivery | null = null;
   loading = true;
+  deliveryLoading = false;
+  deliveryError = '';
+  confirming = false;
   displayedColumns = ['productName', 'variantInfo', 'unitPrice', 'quantity', 'subtotal'];
 
   constructor(
     private route: ActivatedRoute,
     private orderService: OrderService,
+    private deliveryService: DeliveryService,
     private notification: NotificationService
   ) {}
 
@@ -333,16 +375,75 @@ export class OrderDetailComponent implements OnInit {
 
   loadOrderDetail(id: number): void {
     this.loading = true;
-    this.orderService.getUserOrderById(id).subscribe({
-      next: (res) => {
-        this.loading = false;
+    this.delivery = null;
+    this.deliveryError = '';
+    this.orderService.getUserOrderById(id).pipe(
+      tap((res) => {
         if (res.success && res.data) {
           this.order = res.data;
         }
+      }),
+      switchMap((res) => {
+        if (!res.data || (res.data.status !== 'SHIPPED' && res.data.status !== 'DELIVERED')) {
+          return of(null);
+        }
+        this.deliveryLoading = true;
+        return this.deliveryService.getCustomerDelivery(id).pipe(
+          catchError(() => {
+            this.deliveryError = 'The warehouse has not published tracking details for this order.';
+            return of(null);
+          }),
+          finalize(() => this.deliveryLoading = false)
+        );
+      }),
+      finalize(() => this.loading = false)
+    ).subscribe({
+      next: (deliveryResponse) => {
+        if (deliveryResponse?.success && deliveryResponse.data) {
+          this.delivery = deliveryResponse.data;
+        }
       },
       error: () => {
-        this.loading = false;
         this.notification.error('Failed to load order details');
+      }
+    });
+  }
+
+  retryDelivery(): void {
+    if (!this.order) {
+      return;
+    }
+    this.deliveryLoading = true;
+    this.deliveryError = '';
+    this.deliveryService.getCustomerDelivery(this.order.id).pipe(
+      finalize(() => this.deliveryLoading = false)
+    ).subscribe({
+      next: (response) => {
+        this.delivery = response.data ?? null;
+      },
+      error: () => {
+        this.deliveryError = 'The warehouse has not published tracking details for this order.';
+      }
+    });
+  }
+
+  confirmReceived(): void {
+    if (!this.order || this.confirming) {
+      return;
+    }
+    const orderId = this.order.id;
+    this.confirming = true;
+    this.orderService.confirmReceived(orderId).pipe(
+      finalize(() => this.confirming = false)
+    ).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.notification.success('Đã xác nhận nhận hàng. Bạn có thể đánh giá sản phẩm ngay bây giờ.');
+          this.loadOrderDetail(orderId);
+        }
+      },
+      error: (err) => {
+        this.notification.error(err?.error?.message || 'Không thể xác nhận nhận hàng.');
       }
     });
   }

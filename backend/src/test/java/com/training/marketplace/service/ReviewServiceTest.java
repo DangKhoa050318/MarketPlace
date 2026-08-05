@@ -24,11 +24,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -99,7 +101,7 @@ class ReviewServiceTest {
 
         when(productRepository.findById(20L)).thenReturn(Optional.of(sampleProduct));
         when(userRepository.findByUsername("customer1")).thenReturn(Optional.of(sampleUser));
-        when(orderItemRepository.findEligibleOrderItemsForReview(10L, 20L)).thenReturn(List.of(item));
+        when(orderItemRepository.findEligibleOrderItemsForReview(eq(10L), eq(20L), any())).thenReturn(List.of(item));
         when(reviewRepository.existsByUserIdAndOrderItemIdAndDeletedAtIsNull(10L, 50L)).thenReturn(false);
         when(reviewRepository.save(any(ProductReview.class))).thenReturn(sampleReview);
 
@@ -112,22 +114,18 @@ class ReviewServiceTest {
     }
 
     @Test
-    @DisplayName("REQ-STP-T-102: Verified purchase is derived from eligible order items")
-    void testCreateReview_NoEligibleOrder_CannotBecomeVerified() {
+    @DisplayName("REQ-STP-T-102: Should block review when user has no delivered purchase of the product")
+    void testCreateReview_NoDeliveredPurchase_Blocked() {
         CreateReviewRequest req = new CreateReviewRequest(
                 4, "Independent review", "No purchase is associated with this review.", null);
         when(productRepository.findById(20L)).thenReturn(Optional.of(sampleProduct));
         when(userRepository.findByUsername("customer1")).thenReturn(Optional.of(sampleUser));
-        when(orderItemRepository.findEligibleOrderItemsForReview(10L, 20L)).thenReturn(Collections.emptyList());
-        when(reviewRepository.save(any(ProductReview.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderItemRepository.findEligibleOrderItemsForReview(eq(10L), eq(20L), any())).thenReturn(Collections.emptyList());
 
-        ProductReviewResponse response = reviewService.createReview(20L, "customer1", req);
+        assertThatThrownBy(() -> reviewService.createReview(20L, "customer1", req))
+                .isInstanceOf(ForbiddenException.class);
 
-        ArgumentCaptor<ProductReview> reviewCaptor = ArgumentCaptor.forClass(ProductReview.class);
-        verify(reviewRepository).save(reviewCaptor.capture());
-        assertThat(reviewCaptor.getValue().getIsVerifiedPurchase()).isFalse();
-        assertThat(reviewCaptor.getValue().getOrderItem()).isNull();
-        assertThat(response.getIsVerifiedPurchase()).isFalse();
+        verify(reviewRepository, never()).save(any(ProductReview.class));
     }
 
     @Test
@@ -138,7 +136,7 @@ class ReviewServiceTest {
 
         when(productRepository.findById(20L)).thenReturn(Optional.of(sampleProduct));
         when(userRepository.findByUsername("customer1")).thenReturn(Optional.of(sampleUser));
-        when(orderItemRepository.findById(50L)).thenReturn(Optional.of(item));
+        when(orderItemRepository.findEligibleOrderItemsForReview(eq(10L), eq(20L), any())).thenReturn(List.of(item));
         when(reviewRepository.existsByUserIdAndOrderItemIdAndDeletedAtIsNull(10L, 50L)).thenReturn(true);
 
         assertThatThrownBy(() -> reviewService.createReview(20L, "customer1", req))
@@ -166,6 +164,21 @@ class ReviewServiceTest {
         assertThat(summary.getStarCounts().get(5)).isEqualTo(10L);
         assertThat(summary.getStarCounts().get(4)).isEqualTo(5L);
         assertThat(summary.getStarCounts().get(1)).isEqualTo(0L);
+    }
+
+    @Test
+    @DisplayName("Admin review list filters by star rating via specification")
+    @SuppressWarnings("unchecked")
+    void testGetReviewsForAdmin_FilterByRating() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(reviewRepository.findAll(any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of(sampleReview)));
+
+        PageResponse<ProductReviewResponse> result = reviewService.getReviewsForAdmin(5, null, null, pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).getRating()).isEqualTo(5);
+        assertThat(result.getTotalElements()).isEqualTo(1L);
     }
 
     @Test

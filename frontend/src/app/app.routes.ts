@@ -86,6 +86,46 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/promotions/promotion-form/promotion-form.component').then(m => m.PromotionFormComponent)
       },
       {
+        path: 'admin/campaigns',
+        loadComponent: () => import('./features/admin/merchandising/campaign-list/campaign-list.component').then(m => m.CampaignListComponent)
+      },
+      {
+        path: 'admin/campaigns/new',
+        loadComponent: () => import('./features/admin/merchandising/campaign-form/campaign-form.component').then(m => m.CampaignFormComponent)
+      },
+      {
+        path: 'admin/campaigns/:id/edit',
+        loadComponent: () => import('./features/admin/merchandising/campaign-form/campaign-form.component').then(m => m.CampaignFormComponent)
+      },
+      {
+        path: 'admin/collections',
+        loadComponent: () => import('./features/admin/merchandising/collection-list/collection-list.component').then(m => m.CollectionListComponent)
+      },
+      {
+        path: 'admin/collections/new',
+        loadComponent: () => import('./features/admin/merchandising/collection-form/collection-form.component').then(m => m.CollectionFormComponent)
+      },
+      {
+        path: 'admin/collections/:id/edit',
+        loadComponent: () => import('./features/admin/merchandising/collection-form/collection-form.component').then(m => m.CollectionFormComponent)
+      },
+      {
+        path: 'admin/banners',
+        loadComponent: () => import('./features/admin/merchandising/banner-list/banner-list.component').then(m => m.BannerListComponent)
+      },
+      {
+        path: 'admin/banners/new',
+        loadComponent: () => import('./features/admin/merchandising/banner-form/banner-form.component').then(m => m.BannerFormComponent)
+      },
+      {
+        path: 'admin/banners/:id/edit',
+        loadComponent: () => import('./features/admin/merchandising/banner-form/banner-form.component').then(m => m.BannerFormComponent)
+      },
+      {
+        path: 'admin/merchandising/effectiveness',
+        loadComponent: () => import('./features/admin/merchandising/effectiveness/merchandising-effectiveness.component').then(m => m.MerchandisingEffectivenessComponent)
+      },
+      {
         path: 'admin/users',
         loadComponent: () => import('./features/users/user-list/user-list.component').then(m => m.UserListComponent)
       },
@@ -100,6 +140,10 @@ export const routes: Routes = [
       {
         path: 'admin/moderation',
         loadComponent: () => import('./features/admin/moderation/moderation-queue/moderation-queue.component').then(m => m.ModerationQueueComponent)
+      },
+      {
+        path: 'admin/reviews',
+        loadComponent: () => import('./features/admin/reviews/admin-review-list/admin-review-list.component').then(m => m.AdminReviewListComponent)
       },
 
       // Stock & Warehouse Features (Merged from StockPulse)

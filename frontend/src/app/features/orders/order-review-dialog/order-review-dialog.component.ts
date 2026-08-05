@@ -103,13 +103,17 @@ interface ItemReviewState {
 
               <!-- Form Inputs -->
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Review Title</mat-label>
-                <input matInput [(ngModel)]="state.title" placeholder="e.g., Excellent quality, super fast delivery...">
+                <mat-label>Review Title (optional)</mat-label>
+                <input matInput [(ngModel)]="state.title" maxlength="100"
+                       placeholder="e.g., Excellent quality, super fast delivery...">
+                <mat-hint align="end">{{ state.title.length }}/100</mat-hint>
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Detailed Review</mat-label>
-                <textarea matInput [(ngModel)]="state.content" rows="3" placeholder="Share your overall experience using this product..."></textarea>
+                <mat-label>Detailed Review (optional)</mat-label>
+                <textarea matInput [(ngModel)]="state.content" maxlength="1000"
+                          rows="3" placeholder="Share your overall experience using this product..."></textarea>
+                <mat-hint align="end">{{ state.content.length }}/1000</mat-hint>
               </mat-form-field>
 
               <!-- Image File Upload Section -->
@@ -147,7 +151,7 @@ interface ItemReviewState {
 
               <div class="form-actions">
                 <button mat-raised-button color="primary" class="btn-submit"
-                        [disabled]="state.submitting || state.uploadingImage || state.rating === 0 || !state.content.trim()"
+                        [disabled]="state.submitting || state.uploadingImage || state.rating === 0"
                         (click)="submitItemReview(state)">
                   <mat-spinner *ngIf="state.submitting" diameter="18"></mat-spinner>
                   <mat-icon *ngIf="!state.submitting">send</mat-icon>
@@ -469,7 +473,7 @@ export class OrderReviewDialogComponent implements OnInit {
     this.reviewService.create(productId, {
       rating: state.rating,
       title: state.title.trim() || undefined,
-      content: state.content.trim(),
+      content: state.content.trim() || undefined,
       imageUrl: state.imageUrl.trim() || undefined,
       orderItemId: state.item.id
     }).subscribe({

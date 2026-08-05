@@ -40,4 +40,8 @@ export class OrderService {
       status: 'SUCCESS'
     });
   }
+
+  confirmReceived(id: number): Observable<ApiResponse<Order>> {
+    return this.http.put<ApiResponse<Order>>(`${this.apiUrl}/${id}/confirm-received`, {});
+  }
 }

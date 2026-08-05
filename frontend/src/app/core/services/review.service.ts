@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api-response.model';
 import { PageResponse } from '../models/page-response.model';
 import {
+  ProductRatingSummary,
   ProductReview,
   RatingSummary,
   ReviewEligibility,
@@ -40,10 +41,40 @@ export class ReviewService {
     );
   }
 
+  getProductRatings(ids: number[]): Observable<ApiResponse<ProductRatingSummary[]>> {
+    const params = new HttpParams().set('ids', ids.join(','));
+    return this.http.get<ApiResponse<ProductRatingSummary[]>>(
+      `${this.apiUrl}/products/ratings`, { params }
+    );
+  }
+
   getEligibility(productId: number): Observable<ApiResponse<ReviewEligibility>> {
     return this.http.get<ApiResponse<ReviewEligibility>>(
       `${this.apiUrl}/products/${productId}/reviews/eligibility`
     );
+  }
+
+  getAdminReviews(page = 0, size = 10, rating?: number, status?: string, productId?: number):
+    Observable<ApiResponse<PageResponse<ProductReview>>> {
+    let params = new HttpParams().set('page', page).set('size', size);
+    if (rating) {
+      params = params.set('rating', rating);
+    }
+    if (status) {
+      params = params.set('status', status);
+    }
+    if (productId) {
+      params = params.set('productId', productId);
+    }
+    return this.http.get<ApiResponse<PageResponse<ProductReview>>>(`${this.apiUrl}/admin/reviews`, { params });
+  }
+
+  adminUpdateStatus(reviewId: number, status: string): Observable<ApiResponse<ProductReview>> {
+    return this.http.put<ApiResponse<ProductReview>>(`${this.apiUrl}/admin/reviews/${reviewId}/status`, { status });
+  }
+
+  adminReply(reviewId: number, reply: string): Observable<ApiResponse<ProductReview>> {
+    return this.http.put<ApiResponse<ProductReview>>(`${this.apiUrl}/admin/reviews/${reviewId}/reply`, { reply });
   }
 
   create(productId: number, payload: ReviewPayload): Observable<ApiResponse<ProductReview>> {

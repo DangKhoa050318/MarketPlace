@@ -19,6 +19,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,9 +36,11 @@ class AnalyticsExportProcessorTest {
                 .publicId(UUID.randomUUID())
                 .exportType(AnalyticsExportType.OVERVIEW)
                 .status(AnalyticsExportStatus.PENDING)
+                .attemptCount(1)
                 .from(Instant.parse("2026-07-01T00:00:00Z"))
                 .to(Instant.parse("2026-07-31T00:00:00Z"))
                 .build();
+        when(analyticsExportJobRepository.claim(any(), any())).thenReturn(1);
         when(analyticsExportJobRepository.findByPublicId(job.getPublicId()))
                 .thenReturn(Optional.of(job));
         when(analyticsDashboardService.overview(any()))
@@ -60,5 +63,44 @@ class AnalyticsExportProcessorTest {
                 .contains("100,20,10,5")
                 .doesNotContain("userId", "sessionId", "email", "phone", "address");
         assertThat(job.getExpiresAt()).isAfter(job.getCompletedAt());
+        verify(analyticsExportJobRepository).save(job);
+    }
+
+    @Test
+    void process_schedulesRetryWhenGenerationFails() {
+        AnalyticsExportJob job = failedJob(1);
+        when(analyticsExportJobRepository.claim(any(), any())).thenReturn(1);
+        when(analyticsExportJobRepository.findByPublicId(job.getPublicId())).thenReturn(Optional.of(job));
+        when(analyticsDashboardService.overview(any())).thenThrow(new IllegalStateException("database unavailable"));
+
+        analyticsExportProcessor.process(job.getPublicId());
+
+        assertThat(job.getStatus()).isEqualTo(AnalyticsExportStatus.PENDING);
+        assertThat(job.getNextAttemptAt()).isAfter(Instant.now());
+        assertThat(job.getErrorMessage()).contains("database unavailable");
+    }
+
+    @Test
+    void process_marksJobFailedAfterMaximumAttempts() {
+        AnalyticsExportJob job = failedJob(3);
+        when(analyticsExportJobRepository.claim(any(), any())).thenReturn(1);
+        when(analyticsExportJobRepository.findByPublicId(job.getPublicId())).thenReturn(Optional.of(job));
+        when(analyticsDashboardService.overview(any())).thenThrow(new IllegalStateException("database unavailable"));
+
+        analyticsExportProcessor.process(job.getPublicId());
+
+        assertThat(job.getStatus()).isEqualTo(AnalyticsExportStatus.FAILED);
+        assertThat(job.getNextAttemptAt()).isNull();
+    }
+
+    private AnalyticsExportJob failedJob(int attemptCount) {
+        return AnalyticsExportJob.builder()
+                .publicId(UUID.randomUUID())
+                .exportType(AnalyticsExportType.OVERVIEW)
+                .status(AnalyticsExportStatus.PROCESSING)
+                .attemptCount(attemptCount)
+                .from(Instant.parse("2026-07-01T00:00:00Z"))
+                .to(Instant.parse("2026-07-31T00:00:00Z"))
+                .build();
     }
 }

@@ -18,6 +18,9 @@ import { MatMenuModule } from '@angular/material/menu';
 import { AdminOrderService } from '../../../../core/services/admin-order.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Order, OrderStatus } from '../../../../core/models/order.model';
+import { DeliveryService } from '../../../../core/services/delivery.service';
+import { Delivery, DeliveryEventType, DeliveryStatus } from '../../../../core/models/delivery.model';
+import { DeliveryTimelineComponent } from '../../../../shared/components/delivery-timeline/delivery-timeline.component';
 
 @Component({
   selector: 'app-admin-order-list',
@@ -37,7 +40,8 @@ import { Order, OrderStatus } from '../../../../core/models/order.model';
     MatFormFieldModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
-    MatMenuModule
+    MatMenuModule,
+    DeliveryTimelineComponent
   ],
   template: `
     <div class="admin-orders-container">
@@ -134,7 +138,7 @@ import { Order, OrderStatus } from '../../../../core/models/order.model';
                     color="primary"
                     class="quick-status-btn"
                     [matMenuTriggerFor]="statusMenu"
-                    [disabled]="order.status === 'DELIVERED' || order.status === 'CANCELLED'">
+                    [disabled]="getNextAllowedStatuses(order.status).length === 0">
                     <span>Change Status</span>
                     <mat-icon>arrow_drop_down</mat-icon>
                   </button>
@@ -154,6 +158,15 @@ import { Order, OrderStatus } from '../../../../core/models/order.model';
                   <!-- Open Modal for Details & Note -->
                   <button mat-icon-button class="edit-note-btn" (click)="openUpdateModal(order)" matTooltip="Add Note / Custom Details">
                     <mat-icon>edit_note</mat-icon>
+                  </button>
+
+                  <button
+                    *ngIf="order.status === 'SHIPPED' || order.status === 'DELIVERED'"
+                    mat-icon-button
+                    class="delivery-btn"
+                    (click)="openDeliveryModal(order)"
+                    matTooltip="Manage delivery tracking">
+                    <mat-icon>local_shipping</mat-icon>
                   </button>
                 </div>
               </td>
@@ -219,6 +232,104 @@ import { Order, OrderStatus } from '../../../../core/models/order.model';
               </div>
             </form>
           </div>
+        </div>
+      </div>
+
+      <!-- Delivery Management Modal -->
+      <div *ngIf="deliveryOrder" class="update-modal-backdrop">
+        <div class="update-card delivery-modal surface-card">
+          <div class="modal-header">
+            <div>
+              <h3>Delivery for Order #{{ deliveryOrder.id }}</h3>
+              <small>{{ deliveryOrder.shippingAddress }}</small>
+            </div>
+            <button mat-icon-button type="button" (click)="closeDeliveryModal()">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <div *ngIf="deliveryLoading" class="delivery-modal-loading">
+            <mat-spinner diameter="36"></mat-spinner>
+          </div>
+
+          <ng-container *ngIf="!deliveryLoading">
+            <app-delivery-timeline *ngIf="delivery" [delivery]="delivery" />
+
+            <form
+              *ngIf="(!delivery && deliveryOrder.status === 'SHIPPED') || delivery?.status === 'PENDING'"
+              [formGroup]="deliveryForm"
+              (ngSubmit)="saveDeliveryDetails()"
+              class="delivery-form">
+              <h4>{{ delivery ? 'Edit pending delivery' : 'Create delivery tracking' }}</h4>
+
+              <div class="form-grid">
+                <mat-form-field appearance="outline">
+                  <mat-label>Carrier</mat-label>
+                  <input matInput formControlName="carrier" maxlength="100" placeholder="e.g. GHN">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Tracking code</mat-label>
+                  <input matInput formControlName="trackingCode" maxlength="100">
+                </mat-form-field>
+              </div>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Estimated delivery</mat-label>
+                <input matInput type="date" formControlName="estimatedDelivery" [min]="minEstimatedDelivery">
+              </mat-form-field>
+
+              <div class="modal-actions">
+                <button mat-raised-button class="btn-solid-primary" type="submit"
+                        [disabled]="deliveryForm.invalid || deliverySaving">
+                  <mat-spinner *ngIf="deliverySaving" diameter="20"></mat-spinner>
+                  <span *ngIf="!deliverySaving">{{ delivery ? 'Save details' : 'Create delivery' }}</span>
+                </button>
+              </div>
+            </form>
+
+            <section *ngIf="delivery && delivery.status !== 'DELIVERED'" class="delivery-status-panel">
+              <h4>Record delivery progress</h4>
+
+              <div class="milestone-actions">
+                <button *ngIf="delivery.status === 'PENDING'" mat-stroked-button type="button"
+                        (click)="recordMilestone('READY_FOR_PICKUP')" [disabled]="deliverySaving">
+                  Ready for pickup
+                </button>
+                <button *ngIf="delivery.status === 'IN_TRANSIT'" mat-stroked-button type="button"
+                        (click)="recordMilestone('OUT_FOR_DELIVERY')" [disabled]="deliverySaving">
+                  Out for delivery
+                </button>
+              </div>
+
+              <form [formGroup]="deliveryStatusForm" (ngSubmit)="saveDeliveryStatus()">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Next delivery status</mat-label>
+                  <mat-select formControlName="status">
+                    <mat-option *ngFor="let status of getNextDeliveryStatuses(delivery.status)" [value]="status">
+                      {{ status.replace('_', ' ') }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Milestone note (optional)</mat-label>
+                  <textarea matInput rows="2" maxlength="1000" formControlName="note"></textarea>
+                </mat-form-field>
+
+                <div class="modal-actions">
+                  <button mat-raised-button class="btn-solid-primary" type="submit"
+                          [disabled]="deliveryStatusForm.invalid || deliverySaving">
+                    Update status
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <div *ngIf="!delivery && deliveryOrder.status === 'DELIVERED'" class="legacy-delivery-empty">
+              This order was delivered before tracking details were recorded.
+            </div>
+          </ng-container>
         </div>
       </div>
     </div>
@@ -352,6 +463,7 @@ import { Order, OrderStatus } from '../../../../core/models/order.model';
     .edit-note-btn {
       color: #4f46e5;
     }
+    .delivery-btn { color: #0284c7; }
 
     .no-status-item {
       padding: 8px 16px;
@@ -425,6 +537,15 @@ import { Order, OrderStatus } from '../../../../core/models/order.model';
       gap: 12px;
       margin-top: 16px;
     }
+    .delivery-modal { width: 760px; max-height: 90vh; overflow-y: auto; }
+    .delivery-modal-loading { display: flex; justify-content: center; padding: 48px; }
+    .delivery-form, .delivery-status-panel { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border-subtle); }
+    .delivery-form h4, .delivery-status-panel h4 { margin: 0 0 14px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .full-width { width: 100%; }
+    .milestone-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+    .legacy-delivery-empty { padding: 28px; text-align: center; color: var(--text-muted); }
+    @media (max-width: 680px) { .form-grid { grid-template-columns: 1fr; } }
   `]
 })
 export class AdminOrderListComponent implements OnInit {
@@ -440,11 +561,19 @@ export class AdminOrderListComponent implements OnInit {
 
   selectedOrder: Order | null = null;
   updateForm: FormGroup;
+  deliveryOrder: Order | null = null;
+  delivery: Delivery | null = null;
+  deliveryLoading = false;
+  deliverySaving = false;
+  readonly minEstimatedDelivery = this.localDateString(new Date());
+  deliveryForm: FormGroup;
+  deliveryStatusForm: FormGroup;
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   constructor(
     private adminOrderService: AdminOrderService,
+    private deliveryService: DeliveryService,
     private notificationService: NotificationService,
     private fb: FormBuilder,
     private route: ActivatedRoute,
@@ -453,6 +582,15 @@ export class AdminOrderListComponent implements OnInit {
     this.updateForm = this.fb.group({
       status: ['', Validators.required],
       note: ['']
+    });
+    this.deliveryForm = this.fb.group({
+      carrier: ['', [Validators.required, Validators.maxLength(100)]],
+      trackingCode: ['', [Validators.required, Validators.maxLength(100)]],
+      estimatedDelivery: ['', Validators.required]
+    });
+    this.deliveryStatusForm = this.fb.group({
+      status: ['', Validators.required],
+      note: ['', Validators.maxLength(1000)]
     });
   }
 
@@ -519,7 +657,7 @@ export class AdminOrderListComponent implements OnInit {
       case 'PENDING': return ['CONFIRMED', 'CANCELLED'];
       case 'CONFIRMED': return ['PROCESSING', 'CANCELLED'];
       case 'PROCESSING': return ['SHIPPED', 'CANCELLED'];
-      case 'SHIPPED': return ['DELIVERED'];
+      case 'SHIPPED': return [];
       default: return [];
     }
   }
@@ -576,5 +714,147 @@ export class AdminOrderListComponent implements OnInit {
           this.notificationService.error(err.error?.message || 'Failed to update order status');
         }
       });
+  }
+
+  openDeliveryModal(order: Order): void {
+    this.deliveryOrder = order;
+    this.delivery = null;
+    this.deliveryForm.reset();
+    this.deliveryStatusForm.reset();
+    this.deliveryLoading = true;
+    this.deliveryService.getAdminDelivery(order.id).subscribe({
+      next: (response) => {
+        this.deliveryLoading = false;
+        if (response.data) {
+          this.applyDelivery(response.data);
+        }
+      },
+      error: (error) => {
+        this.deliveryLoading = false;
+        if (error.status !== 404) {
+          this.notificationService.error(error.error?.message || 'Failed to load delivery tracking');
+        }
+      }
+    });
+  }
+
+  closeDeliveryModal(): void {
+    this.deliveryOrder = null;
+    this.delivery = null;
+    this.deliveryForm.reset();
+    this.deliveryStatusForm.reset();
+  }
+
+  saveDeliveryDetails(): void {
+    if (this.deliveryForm.invalid || !this.deliveryOrder) {
+      return;
+    }
+    this.deliverySaving = true;
+    const request = {
+      carrier: String(this.deliveryForm.value.carrier).trim(),
+      trackingCode: String(this.deliveryForm.value.trackingCode).trim(),
+      estimatedDelivery: String(this.deliveryForm.value.estimatedDelivery)
+    };
+    const isUpdate = Boolean(this.delivery);
+    const operation = this.delivery
+      ? this.deliveryService.update(this.delivery.id, request)
+      : this.deliveryService.create(this.deliveryOrder.id, request);
+
+    operation.subscribe({
+      next: (response) => {
+        this.deliverySaving = false;
+        if (response.data) {
+          this.applyDelivery(response.data);
+          this.notificationService.success(isUpdate ? 'Delivery details saved' : 'Delivery created');
+        }
+      },
+      error: (error) => {
+        this.deliverySaving = false;
+        this.notificationService.error(error.error?.message || 'Failed to save delivery');
+      }
+    });
+  }
+
+  saveDeliveryStatus(): void {
+    if (!this.delivery || this.deliveryStatusForm.invalid) {
+      return;
+    }
+    this.deliverySaving = true;
+    const status = this.deliveryStatusForm.value.status as DeliveryStatus;
+    const eventType = status === 'IN_TRANSIT' && this.delivery.status === 'PENDING'
+      ? 'PICKED_UP' as DeliveryEventType
+      : undefined;
+    this.deliveryService.updateStatus(this.delivery.id, {
+      expectedVersion: this.delivery.version,
+      status,
+      eventType,
+      note: this.deliveryStatusForm.value.note || undefined
+    }).subscribe({
+      next: (response) => {
+        this.deliverySaving = false;
+        if (response.data) {
+          this.applyDelivery(response.data);
+          this.notificationService.success(`Delivery updated to ${status}`);
+          if (status === 'DELIVERED') {
+            this.loadOrders();
+          }
+        }
+      },
+      error: (error) => {
+        this.deliverySaving = false;
+        this.notificationService.error(error.error?.message || 'Failed to update delivery status');
+      }
+    });
+  }
+
+  recordMilestone(eventType: DeliveryEventType): void {
+    if (!this.delivery) {
+      return;
+    }
+    this.deliverySaving = true;
+    this.deliveryService.addEvent(this.delivery.id, {
+      requestId: crypto.randomUUID(),
+      eventType
+    }).subscribe({
+      next: (response) => {
+        this.deliverySaving = false;
+        if (response.data) {
+          this.applyDelivery(response.data);
+          this.notificationService.success('Delivery milestone recorded');
+        }
+      },
+      error: (error) => {
+        this.deliverySaving = false;
+        this.notificationService.error(error.error?.message || 'Failed to record milestone');
+      }
+    });
+  }
+
+  getNextDeliveryStatuses(status: DeliveryStatus): DeliveryStatus[] {
+    switch (status) {
+      case 'PENDING': return ['IN_TRANSIT', 'FAILED'];
+      case 'IN_TRANSIT': return ['DELIVERED', 'FAILED'];
+      case 'FAILED': return ['IN_TRANSIT'];
+      case 'DELIVERED': return [];
+    }
+  }
+
+  private applyDelivery(delivery: Delivery): void {
+    this.delivery = delivery;
+    this.deliveryForm.patchValue({
+      carrier: delivery.carrier,
+      trackingCode: delivery.trackingCode,
+      estimatedDelivery: delivery.estimatedDelivery
+    });
+    const nextStatuses = this.getNextDeliveryStatuses(delivery.status);
+    this.deliveryStatusForm.reset({
+      status: nextStatuses[0] || '',
+      note: ''
+    });
+  }
+
+  private localDateString(date: Date): string {
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+    return local.toISOString().slice(0, 10);
   }
 }
