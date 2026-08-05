@@ -38,6 +38,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     long countByStatus(OrderStatus status);
 
+    long countByUserId(Long userId);
+
     @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status != com.training.marketplace.enums.OrderStatus.CANCELLED")
     java.math.BigDecimal calculateTotalRevenue();
 }

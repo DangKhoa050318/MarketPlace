@@ -51,7 +51,7 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
               <span class="badge-pill" [ngClass]="getStatusBadgeClass(order.status)">
                 {{ order.status }}
               </span>
-              <button *ngIf="order.status === 'SHIPPED'" mat-flat-button color="primary" class="confirm-btn"
+              <button *ngIf="canConfirmReceived()" mat-flat-button color="primary" class="confirm-btn"
                       (click)="confirmReceived()" [disabled]="confirming">
                 <mat-icon>check_circle</mat-icon>
                 {{ confirming ? 'Đang xác nhận...' : 'Đã nhận hàng' }}
@@ -446,6 +446,17 @@ export class OrderDetailComponent implements OnInit {
         this.notification.error(err?.error?.message || 'Không thể xác nhận nhận hàng.');
       }
     });
+  }
+
+  canConfirmReceived(): boolean {
+    if (this.order?.status !== 'SHIPPED') {
+      return false;
+    }
+    if (this.deliveryLoading) {
+      return false;
+    }
+    // No tracking record → allow (order shipped without delivery). With a record → only once in transit.
+    return !this.delivery || this.delivery.status === 'IN_TRANSIT';
   }
 
   getStatusBadgeClass(status: string): string {

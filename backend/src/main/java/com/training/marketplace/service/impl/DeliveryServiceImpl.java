@@ -173,6 +173,30 @@ public class DeliveryServiceImpl implements DeliveryService {
         return toResponse(delivery);
     }
 
+    @Override
+    @Transactional
+    public void completeForCustomerConfirmation(Long orderId, Long actorUserId) {
+        Delivery existing = deliveryRepository.findByOrderId(orderId).orElse(null);
+        if (existing == null) {
+            // Order shipped without a tracking record — allow the plain order confirmation.
+            return;
+        }
+        Delivery delivery = deliveryRepository.findByIdForUpdate(existing.getId()).orElse(existing);
+        if (delivery.getStatus() == DeliveryStatus.DELIVERED) {
+            return; // Already delivered — idempotent.
+        }
+        if (delivery.getStatus() != DeliveryStatus.IN_TRANSIT) {
+            throw new BadRequestException(
+                    "Chưa thể xác nhận đã nhận hàng: đơn vận chuyển chưa được lấy hàng / đang giao.");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        delivery.setStatus(DeliveryStatus.DELIVERED);
+        delivery.setDeliveredAt(now);
+        deliveryRepository.saveAndFlush(delivery);
+        appendEvent(delivery, actorUserId, UUID.randomUUID(),
+                DeliveryEventType.DELIVERED, "Khách xác nhận đã nhận hàng");
+    }
+
     private Order lockOrder(Long orderId) {
         return orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));

@@ -49,6 +49,7 @@ class OrderServiceTest {
     @Mock private OrderMapper orderMapper;
     @Mock private OrderEventPublisher orderEventPublisher;
     @Mock private PromotionService promotionService;
+    @Mock private DeliveryService deliveryService;
 
     @InjectMocks private OrderServiceImpl orderService;
 

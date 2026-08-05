@@ -22,6 +22,8 @@ public interface OrderService {
 
     PageResponse<OrderResponse> getAdminOrders(OrderStatus status, Pageable pageable);
 
+    long countOrdersByUser(Long userId);
+
     OrderResponse updateOrderStatusByAdmin(Long orderId, UpdateOrderStatusRequest request);
 
     DashboardStatsResponse getDashboardStats();
