@@ -25,6 +25,7 @@ import com.training.marketplace.repository.ProductRepository;
 import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.AppliedCoupon;
 import com.training.marketplace.service.CartService;
+import com.training.marketplace.service.DeliveryService;
 import com.training.marketplace.service.InventoryFacade;
 import com.training.marketplace.service.MerchandisingEventService;
 import com.training.marketplace.service.OrderService;
@@ -62,6 +63,7 @@ public class OrderServiceImpl implements OrderService {
     private final PromotionService promotionService;
     private final com.training.marketplace.service.PaygateClientService paygateClientService;
     private final MerchandisingEventService merchandisingEventService;
+    private final DeliveryService deliveryService;
 
     @Override
     @Transactional
@@ -312,7 +314,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse confirmReceived(Long userId, Long orderId) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
         if (!order.getUser().getId().equals(userId)) {
             throw new BadRequestException("You are not authorized to update this order");
@@ -320,8 +322,11 @@ public class OrderServiceImpl implements OrderService {
         if (order.getStatus() != OrderStatus.SHIPPED) {
             throw new BadRequestException("Only a shipped order can be confirmed as received");
         }
+        // Keep the delivery-tracking record in sync: close the delivery to DELIVERED (or reject if it
+        // hasn't been picked up yet). No-op when the order has no delivery record.
+        deliveryService.completeForCustomerConfirmation(orderId, userId);
         order.setStatus(OrderStatus.DELIVERED);
-        order.setDeliveredAt(java.time.LocalDateTime.now());
+        order.setDeliveredAt(LocalDateTime.now());
         Order saved = orderRepository.save(order);
         log.info("Customer confirmed receipt of order {}", orderId);
         return orderMapper.toResponse(saved);
