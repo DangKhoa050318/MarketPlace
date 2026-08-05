@@ -1,11 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { OrderService, Order } from '../../../core/services/order.service';
@@ -20,11 +24,15 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
   imports: [
     CommonModule,
     RouterLink,
+    FormsModule,
     MatTableModule,
     MatPaginatorModule,
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
     MatProgressSpinnerModule,
     MatDialogModule,
     OrderReviewDialogComponent
@@ -38,6 +46,45 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
           </h1>
           <p class="page-subtitle">Track your placed orders, delivery status, and payment receipts</p>
         </div>
+      </div>
+
+      <!-- Filter Controls Bar -->
+      <div class="glass-panel filter-bar">
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Search Orders & Products</mat-label>
+          <input matInput [(ngModel)]="searchQuery" (keyup.enter)="applyFilters()" placeholder="Order ID or product name...">
+          <button *ngIf="searchQuery" matSuffix mat-icon-button (click)="searchQuery=''; applyFilters()">
+            <mat-icon>close</mat-icon>
+          </button>
+          <mat-icon matSuffix *ngIf="!searchQuery">search</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-select">
+          <mat-label>Order Status</mat-label>
+          <mat-select [(ngModel)]="selectedStatus" (selectionChange)="applyFilters()">
+            <mat-option value="">All</mat-option>
+            <mat-option value="PENDING">Pending</mat-option>
+            <mat-option value="CONFIRMED">Confirmed</mat-option>
+            <mat-option value="PROCESSING">Processing</mat-option>
+            <mat-option value="SHIPPED">Shipped</mat-option>
+            <mat-option value="DELIVERED">Delivered</mat-option>
+            <mat-option value="CANCELLED">Cancelled</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-select">
+          <mat-label>Payment Status</mat-label>
+          <mat-select [(ngModel)]="selectedPaymentStatus" (selectionChange)="applyFilters()">
+            <mat-option value="">All</mat-option>
+            <mat-option value="UNPAID">Unpaid</mat-option>
+            <mat-option value="PENDING_PAYGATE">Pending PayGate</mat-option>
+            <mat-option value="PAID">Paid</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <button mat-stroked-button class="btn-clear-filter" (click)="resetFilters()" *ngIf="hasActiveFilters()">
+          <mat-icon>filter_alt_off</mat-icon> Reset Filters
+        </button>
       </div>
 
       <div *ngIf="loading" class="loading-container">
@@ -116,7 +163,6 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
               <td mat-cell *matCellDef="let order">
                 <span *ngIf="order.paymentMethod" class="badge-payment-chip">
                   <span class="pay-method-text">{{ order.paymentMethod === 'COD' ? 'COD' : (order.paymentMethod === 'PAYGATE_BNPL' ? 'BNPL' : 'Paygate Card') }}</span>
-                  <span class="pay-dot dot-paid" *ngIf="order.paymentStatus === 'PAID'"></span>
                 </span>
                 <span *ngIf="!order.paymentMethod" class="text-muted">—</span>
               </td>
@@ -127,16 +173,24 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
               <th mat-header-cell *matHeaderCellDef>Actions</th>
               <td mat-cell *matCellDef="let order">
                 <div class="action-buttons">
-                  <a mat-icon-button color="primary" [routerLink]="['/orders', order.id]" title="View Order Details">
-                    <mat-icon>visibility</mat-icon>
-                  </a>
-                  <button 
-                    *ngIf="order.status === 'PENDING' || order.status === 'CONFIRMED'" 
-                    mat-icon-button 
-                    color="warn" 
-                    (click)="onCancelOrder(order)" 
-                    title="Cancel Order">
-                    <mat-icon>cancel</mat-icon>
+                  <button
+                    *ngIf="isPaymentEligibleForRetry(order)"
+                    mat-raised-button
+                    class="btn-pay-again"
+                    (click)="onRetryPayment(order)"
+                    [disabled]="retryingOrderId === order.id"
+                    title="Tiếp tục thanh toán qua PayGate">
+                    <mat-icon>payment</mat-icon>
+                    <span>{{ retryingOrderId === order.id ? 'Đang chuyển...' : 'Tiếp tục thanh toán' }}</span>
+                  </button>
+                  <button
+                    *ngIf="order.status === 'SHIPPED'"
+                    mat-raised-button
+                    class="btn-confirm-received"
+                    (click)="onConfirmReceived(order)"
+                    title="Xác nhận đã nhận hàng">
+                    <mat-icon>check_circle</mat-icon>
+                    <span>Đã nhận hàng</span>
                   </button>
                   <button
                     *ngIf="hasUnreviewedItems(order)"
@@ -144,7 +198,19 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
                     class="btn-review-order"
                     (click)="openOrderReviewModal(order)"
                     title="Review Purchased Items">
-                    <mat-icon>rate_review</mat-icon> <span>Review</span>
+                    <mat-icon>rate_review</mat-icon>
+                    <span>Đánh giá</span>
+                  </button>
+                  <a mat-icon-button color="primary" [routerLink]="['/orders', order.id]" title="View Order Details">
+                    <mat-icon>visibility</mat-icon>
+                  </a>
+                  <button 
+                    *ngIf="isCancelEligible(order)" 
+                    mat-icon-button 
+                    color="warn" 
+                    (click)="onCancelOrder(order)" 
+                    title="Cancel Order">
+                    <mat-icon>cancel</mat-icon>
                   </button>
                 </div>
               </td>
@@ -157,8 +223,10 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
           <mat-paginator
             [length]="totalElements"
             [pageSize]="pageSize"
+            [pageIndex]="currentPage"
             [pageSizeOptions]="[5, 10, 20]"
             (page)="onPageChange($event)"
+            showFirstLastButtons
             class="glass-paginator">
           </mat-paginator>
         </div>
@@ -261,22 +329,27 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
     .items-preview-stack {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
       padding: 6px 0;
+      width: 100%;
+      min-width: 320px;
     }
     .variant-item-pill {
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       font-size: 0.83rem;
       background: #f8fafc;
-      border: 1px solid var(--border-subtle);
-      padding: 3px 8px;
-      border-radius: 6px;
-      width: fit-content;
-      max-width: 340px;
+      border: 1px solid var(--border-subtle, #e2e8f0);
+      padding: 5px 10px;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 380px;
+      box-sizing: border-box;
     }
     .item-product-name {
+      flex: 1;
+      min-width: 0;
       font-weight: 650;
       color: #0f172a;
       white-space: nowrap;
@@ -284,21 +357,25 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
       text-overflow: ellipsis;
     }
     .item-variant-chip {
+      flex-shrink: 0;
       font-size: 0.72rem;
       font-weight: 700;
       background: #eef2ff;
       color: #4f46e5;
-      padding: 1px 6px;
+      padding: 2px 7px;
       border-radius: 4px;
       border: 1px solid rgba(99, 102, 241, 0.2);
+      white-space: nowrap;
     }
     .item-qty {
+      flex-shrink: 0;
       font-size: 0.75rem;
       font-weight: 800;
       color: #0284c7;
       background: #e0f2fe;
-      padding: 1px 5px;
+      padding: 2px 6px;
       border-radius: 4px;
+      white-space: nowrap;
     }
     .status-payment-col {
       display: flex;
@@ -345,32 +422,111 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
     .action-buttons {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       vertical-align: middle;
+      white-space: nowrap;
+    }
+    .btn-pay-again {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+      color: #ffffff !important;
+      font-size: 0.78rem !important;
+      font-weight: 700 !important;
+      height: 34px !important;
+      padding: 0 12px !important;
+      border-radius: 8px !important;
+      box-shadow: 0 3px 10px rgba(2, 132, 199, 0.35) !important;
+      white-space: nowrap !important;
+    }
+    .btn-pay-again ::ng-deep .mdc-button__label,
+    .btn-pay-again .mdc-button__label {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 5px !important;
+      white-space: nowrap !important;
+      line-height: 1 !important;
+    }
+    .btn-pay-again mat-icon {
+      font-size: 17px !important;
+      width: 17px !important;
+      height: 17px !important;
+      margin: 0 !important;
+    }
+    .btn-confirm-received {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+      color: #ffffff !important;
+      font-size: 0.78rem !important;
+      font-weight: 700 !important;
+      height: 34px !important;
+      padding: 0 12px !important;
+      border-radius: 8px !important;
+      box-shadow: 0 3px 10px rgba(16, 185, 129, 0.35) !important;
+      white-space: nowrap !important;
+    }
+    .btn-confirm-received ::ng-deep .mdc-button__label,
+    .btn-confirm-received .mdc-button__label {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 5px !important;
+      white-space: nowrap !important;
+      line-height: 1 !important;
+    }
+    .btn-confirm-received mat-icon {
+      font-size: 17px !important;
+      width: 17px !important;
+      height: 17px !important;
+      margin: 0 !important;
     }
     .btn-review-order {
       color: #0284c7 !important;
       border-color: rgba(2, 132, 199, 0.4) !important;
-      font-size: 0.8rem !important;
+      font-size: 0.78rem !important;
       font-weight: 700 !important;
-      height: 32px !important;
-      line-height: 30px !important;
+      height: 34px !important;
       padding: 0 10px !important;
+      border-radius: 8px !important;
+      white-space: nowrap !important;
+    }
+    .btn-review-order ::ng-deep .mdc-button__label,
+    .btn-review-order .mdc-button__label {
       display: inline-flex !important;
       align-items: center !important;
       gap: 4px !important;
-      vertical-align: middle;
-      border-radius: 8px !important;
+      white-space: nowrap !important;
+      line-height: 1 !important;
     }
     .btn-review-order mat-icon {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
-      margin: 0;
+      font-size: 16px !important;
+      width: 16px !important;
+      height: 16px !important;
+      margin: 0 !important;
     }
     .glass-paginator {
       background: transparent !important;
       color: var(--text-main);
+    }
+
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    }
+    .search-field {
+      flex: 1 1 280px;
+    }
+    .filter-select {
+      flex: 0 1 200px;
+    }
+    .btn-clear-filter {
+      height: 48px !important;
+      margin-bottom: 22px;
+      border-color: rgba(255, 255, 255, 0.2) !important;
+      color: var(--text-main) !important;
     }
   `]
 })
@@ -430,9 +586,36 @@ export class OrderListComponent implements OnInit {
     });
   }
 
+  searchQuery = '';
+  selectedStatus = '';
+  selectedPaymentStatus = '';
+
+  hasActiveFilters(): boolean {
+    return !!(this.searchQuery.trim() || this.selectedStatus || this.selectedPaymentStatus);
+  }
+
+  applyFilters(): void {
+    this.currentPage = 0;
+    this.loadOrders();
+  }
+
+  resetFilters(): void {
+    this.searchQuery = '';
+    this.selectedStatus = '';
+    this.selectedPaymentStatus = '';
+    this.currentPage = 0;
+    this.loadOrders();
+  }
+
   loadOrders(): void {
     this.loading = true;
-    this.orderService.getUserOrders(this.currentPage, this.pageSize).subscribe({
+    this.orderService.getUserOrders(
+      this.currentPage,
+      this.pageSize,
+      this.selectedStatus || undefined,
+      this.selectedPaymentStatus || undefined,
+      this.searchQuery || undefined
+    ).subscribe({
       next: (res) => {
         this.loading = false;
         if (res.success && res.data) {
@@ -472,6 +655,63 @@ export class OrderListComponent implements OnInit {
             this.notification.error(err.error?.message || 'Failed to cancel order');
           }
         });
+      }
+    });
+  }
+
+  retryingOrderId: number | null = null;
+
+  isPaymentEligibleForRetry(order: Order): boolean {
+    return order.paymentStatus !== 'PAID' &&
+           order.status !== 'CANCELLED' &&
+           order.status !== 'DELIVERED' &&
+           order.paymentMethod !== 'COD';
+  }
+
+  isCancelEligible(order: Order): boolean {
+    return (order.status === 'PENDING' || order.status === 'CONFIRMED') &&
+           order.paymentStatus !== 'PAID';
+  }
+
+  onConfirmReceived(order: Order): void {
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Xác nhận đã nhận hàng',
+        message: `Bạn xác nhận đã nhận được đơn hàng #${order.id}?`
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed: boolean) => {
+      if (confirmed) {
+        this.orderService.confirmReceived(order.id).subscribe({
+          next: () => {
+            this.notification.success(`Đã xác nhận nhận thành công đơn hàng #${order.id}`);
+            this.loadOrders();
+          },
+          error: (err) => {
+            this.notification.error(err.error?.message || 'Không thể cập nhật trạng thái đơn hàng');
+          }
+        });
+      }
+    });
+  }
+
+  onRetryPayment(order: Order): void {
+    this.retryingOrderId = order.id;
+    this.orderService.retryPayment(order.id).subscribe({
+      next: (res) => {
+        this.retryingOrderId = null;
+        const targetUrl = res.data?.paymentUrl;
+        if (targetUrl) {
+          this.notification.info('Đang chuyển hướng sang cổng thanh toán PayGate...');
+          window.location.href = targetUrl;
+        } else {
+          this.notification.error('Không thể khởi tạo phiên thanh toán mới. Vui lòng thử lại sau.');
+        }
+      },
+      error: (err) => {
+        this.retryingOrderId = null;
+        this.notification.error(err.error?.message || 'Không thể kết nối đến hệ thống thanh toán.');
       }
     });
   }

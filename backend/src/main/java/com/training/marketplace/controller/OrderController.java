@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -48,12 +49,15 @@ public class OrderController {
     }
 
     @GetMapping
-    @Operation(summary = "Get order history for current authenticated user")
+    @Operation(summary = "Get order history for current authenticated user with optional filtering")
     public ApiResponse<PageResponse<OrderResponse>> getUserOrders(
             Authentication authentication,
+            @RequestParam(required = false) com.training.marketplace.enums.OrderStatus status,
+            @RequestParam(required = false) com.training.marketplace.enums.PaymentStatus paymentStatus,
+            @RequestParam(required = false) String search,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Long userId = getUserId(authentication);
-        return ApiResponse.success(orderService.getUserOrders(userId, pageable));
+        return ApiResponse.success(orderService.getUserOrders(userId, status, paymentStatus, search, pageable));
     }
 
     @GetMapping("/{id}")
@@ -63,6 +67,16 @@ public class OrderController {
             @PathVariable Long id) {
         Long userId = getUserId(authentication);
         return ApiResponse.success(orderService.getUserOrderById(userId, id));
+    }
+
+    @PostMapping("/{id}/retry-payment")
+    @Operation(summary = "Re-create PayGate checkout session to resume/retry payment for an uncompleted order")
+    public ApiResponse<com.training.marketplace.dto.response.PaygatePayloadResponse> retryPayment(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long userId = getUserId(authentication);
+        com.training.marketplace.dto.response.PaygatePayloadResponse response = orderService.retryOrderPayment(userId, id);
+        return ApiResponse.success("Payment session created", response);
     }
 
     @PutMapping("/{id}/cancel")

@@ -36,6 +36,24 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @EntityGraph(attributePaths = {"user", "items"})
     Page<Order> findByUserId(Long userId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"user", "items"})
+    @Query(
+        value = "SELECT DISTINCT o FROM Order o LEFT JOIN o.items i WHERE o.user.id = :userId " +
+                "AND (:status IS NULL OR o.status = :status) " +
+                "AND (:paymentStatus IS NULL OR o.paymentStatus = :paymentStatus) " +
+                "AND (:search IS NULL OR LOWER(i.productName) LIKE :search OR CAST(o.id AS string) LIKE :search)",
+        countQuery = "SELECT COUNT(DISTINCT o) FROM Order o LEFT JOIN o.items i WHERE o.user.id = :userId " +
+                     "AND (:status IS NULL OR o.status = :status) " +
+                     "AND (:paymentStatus IS NULL OR o.paymentStatus = :paymentStatus) " +
+                     "AND (:search IS NULL OR LOWER(i.productName) LIKE :search OR CAST(o.id AS string) LIKE :search)"
+    )
+    Page<Order> findFilteredOrders(
+            @Param("userId") Long userId,
+            @Param("status") OrderStatus status,
+            @Param("paymentStatus") com.training.marketplace.enums.PaymentStatus paymentStatus,
+            @Param("search") String search,
+            Pageable pageable);
+
     long countByStatus(OrderStatus status);
 
     long countByUserId(Long userId);

@@ -3,9 +3,9 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PageResponse } from '../models/api-response.model';
-import { Order, OrderItem, CreateOrderRequest } from '../models/order.model';
+import { Order, OrderItem, CreateOrderRequest, PaygatePayload } from '../models/order.model';
 
-export { Order, OrderItem, CreateOrderRequest };
+export { Order, OrderItem, CreateOrderRequest, PaygatePayload };
 
 @Injectable({ providedIn: 'root' })
 export class OrderService {
@@ -17,10 +17,25 @@ export class OrderService {
     return this.http.post<ApiResponse<Order>>(this.apiUrl, request);
   }
 
-  getUserOrders(page = 0, size = 10): Observable<ApiResponse<PageResponse<Order>>> {
-    const params = new HttpParams()
+  retryPayment(id: number): Observable<ApiResponse<PaygatePayload>> {
+    return this.http.post<ApiResponse<PaygatePayload>>(`${this.apiUrl}/${id}/retry-payment`, {});
+  }
+
+  getUserOrders(page = 0, size = 10, status?: string, paymentStatus?: string, search?: string): Observable<ApiResponse<PageResponse<Order>>> {
+    let params = new HttpParams()
       .set('page', page.toString())
       .set('size', size.toString());
+
+    if (status) {
+      params = params.set('status', status);
+    }
+    if (paymentStatus) {
+      params = params.set('paymentStatus', paymentStatus);
+    }
+    if (search && search.trim()) {
+      params = params.set('search', search.trim());
+    }
+
     return this.http.get<ApiResponse<PageResponse<Order>>>(this.apiUrl, { params });
   }
 
@@ -38,6 +53,14 @@ export class OrderService {
       orderId,
       transactionRef: transactionRef || 'TXN-DIRECT-CALLBACK',
       status: 'SUCCESS'
+    });
+  }
+
+  cancelPaygatePayment(orderId: string): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/payments/paygate-webhook`, {
+      event: 'PAYMENT_CANCELLED',
+      orderId,
+      status: 'CANCELLED'
     });
   }
 
