@@ -230,17 +230,26 @@ export class PaymentCallbackComponent implements OnInit {
     private orderService: OrderService
   ) {}
 
+  private getFirstString(val: any): string | null {
+    if (!val) return null;
+    if (Array.isArray(val)) {
+      return val.length > 0 ? String(val[0]) : null;
+    }
+    return String(val);
+  }
+
   get isSuccess(): boolean {
-    if (!this.status) return false;
-    const s = this.status.toUpperCase();
+    const raw = this.getFirstString(this.status);
+    if (!raw) return false;
+    const s = raw.toUpperCase();
     return s === 'SUCCESS' || s === 'PROCESSING' || s === 'COMPLETED' || s === 'PAID';
   }
 
   ngOnInit(): void {
     this.route.queryParams.subscribe(params => {
-      this.status = params['status'] || 'SUCCESS';
-      this.orderId = params['orderId'] || null;
-      this.transactionRef = params['transactionRef'] || null;
+      this.status = this.getFirstString(params['status']) || 'SUCCESS';
+      this.orderId = this.getFirstString(params['orderId']);
+      this.transactionRef = this.getFirstString(params['transactionRef']);
 
       if (this.isSuccess && this.orderId) {
         this.orderService.confirmPaygatePayment(this.orderId, this.transactionRef || undefined).subscribe({
@@ -256,8 +265,9 @@ export class PaymentCallbackComponent implements OnInit {
     });
   }
 
-  cleanOrderId(rawId: string | null): string {
-    if (!rawId) return '';
-    return rawId.replace(/^ORD-/, '');
+  cleanOrderId(rawId: any): string {
+    const str = this.getFirstString(rawId);
+    if (!str) return '';
+    return str.replace(/^ORD-/, '');
   }
 }
