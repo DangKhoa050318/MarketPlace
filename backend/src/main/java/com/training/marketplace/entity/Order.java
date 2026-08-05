@@ -97,6 +97,15 @@ public class Order {
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
+    @Column(name = "paygate_token", length = 100)
+    private String paygateToken;
+
+    @Column(name = "paygate_url", length = 500)
+    private String paygateUrl;
+
+    @Column(name = "paygate_expires_at")
+    private LocalDateTime paygateExpiresAt;
+
     /** When the order reached DELIVERED (customer confirmed or admin marked). Drives the review window. */
     @Column(name = "delivered_at")
     private LocalDateTime deliveredAt;

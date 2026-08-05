@@ -213,6 +213,13 @@ public class OrderServiceImpl implements OrderService {
             var sessionData = (pgSession != null) ? pgSession.data() : null;
             String targetPaymentUrl = (sessionData != null) ? sessionData.paymentUrl() : null;
 
+            if (sessionData != null) {
+                savedOrder.setPaygateToken(sessionData.token());
+                savedOrder.setPaygateUrl(sessionData.paymentUrl());
+                savedOrder.setPaygateExpiresAt(sessionData.expiresAt());
+                orderRepository.save(savedOrder);
+            }
+
             paygatePayload = new PaygatePayloadResponse(
                     savedOrder.getId(),
                     userId,
@@ -271,6 +278,23 @@ public class OrderServiceImpl implements OrderService {
         }
 
         PaymentMethod paymentMethod = order.getPaymentMethod() != null ? order.getPaymentMethod() : PaymentMethod.CREDIT_CARD;
+
+        // Check if an active PayGate session exists on the order and is still valid (< 15 minutes)
+        if (order.getPaygateExpiresAt() != null && LocalDateTime.now().isBefore(order.getPaygateExpiresAt()) && order.getPaygateUrl() != null) {
+            log.info("Reusing active PayGate session for order {}: expiresAt={}", order.getId(), order.getPaygateExpiresAt());
+            return new PaygatePayloadResponse(
+                    order.getId(),
+                    userId,
+                    "mock-merchant-api-key-123456",
+                    order.getTotalAmount(),
+                    order.getUpfrontAmount(),
+                    order.getFinanceAmount(),
+                    paymentMethod.name(),
+                    order.getPaygateUrl(),
+                    null, null, null
+            );
+        }
+
         String methodStr = paymentMethod == PaymentMethod.BANK_TRANSFER ? "BANK_TRANSFER" : "WALLET";
 
         var pgSession = paygateClientService.createCheckoutSession(
@@ -282,6 +306,12 @@ public class OrderServiceImpl implements OrderService {
 
         var sessionData = (pgSession != null) ? pgSession.data() : null;
         String targetPaymentUrl = (sessionData != null) ? sessionData.paymentUrl() : null;
+
+        if (sessionData != null) {
+            order.setPaygateToken(sessionData.token());
+            order.setPaygateUrl(sessionData.paymentUrl());
+            order.setPaygateExpiresAt(sessionData.expiresAt());
+        }
 
         order.setPaymentStatus(PaymentStatus.PENDING_PAYGATE);
         orderRepository.save(order);
