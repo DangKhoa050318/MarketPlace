@@ -56,6 +56,14 @@ export class OrderService {
     });
   }
 
+  cancelPaygatePayment(orderId: string): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/payments/paygate-webhook`, {
+      event: 'PAYMENT_CANCELLED',
+      orderId,
+      status: 'CANCELLED'
+    });
+  }
+
   confirmReceived(id: number): Observable<ApiResponse<Order>> {
     return this.http.put<ApiResponse<Order>>(`${this.apiUrl}/${id}/confirm-received`, {});
   }

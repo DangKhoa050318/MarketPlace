@@ -206,6 +206,11 @@ export class PaymentCallbackComponent implements OnInit {
           next: (res) => console.log('Payment status confirmed via callback:', res),
           error: (err) => console.warn('Could not auto-confirm payment status via callback:', err)
         });
+      } else if (!this.isSuccess && this.orderId) {
+        this.orderService.cancelPaygatePayment(this.orderId).subscribe({
+          next: (res) => console.log('Payment cancellation processed via callback:', res),
+          error: (err) => console.warn('Could not auto-cancel payment via callback:', err)
+        });
       }
     });
   }
