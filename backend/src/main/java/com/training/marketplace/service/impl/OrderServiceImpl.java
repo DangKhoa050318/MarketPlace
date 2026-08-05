@@ -252,9 +252,66 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
+    public PaygatePayloadResponse retryOrderPayment(Long userId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+
+        if (!order.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You are not authorized to pay for this order");
+        }
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new BadRequestException("Cannot pay for a cancelled order");
+        }
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new BadRequestException("Order is already paid");
+        }
+        if (order.getPaymentMethod() == PaymentMethod.COD) {
+            throw new BadRequestException("COD orders do not require online payment");
+        }
+
+        PaymentMethod paymentMethod = order.getPaymentMethod() != null ? order.getPaymentMethod() : PaymentMethod.CREDIT_CARD;
+        String methodStr = paymentMethod == PaymentMethod.BANK_TRANSFER ? "BANK_TRANSFER" : "WALLET";
+
+        var pgSession = paygateClientService.createCheckoutSession(
+                order.getId(),
+                order.getTotalAmount(),
+                "Thanh toan lai don hang #" + order.getId() + " tren Marketplace",
+                methodStr
+        );
+
+        var sessionData = (pgSession != null) ? pgSession.data() : null;
+        String targetPaymentUrl = (sessionData != null) ? sessionData.paymentUrl() : null;
+
+        order.setPaymentStatus(PaymentStatus.PENDING_PAYGATE);
+        orderRepository.save(order);
+
+        return new PaygatePayloadResponse(
+                order.getId(),
+                userId,
+                "mock-merchant-api-key-123456",
+                order.getTotalAmount(),
+                order.getUpfrontAmount(),
+                order.getFinanceAmount(),
+                paymentMethod.name(),
+                targetPaymentUrl,
+                sessionData != null ? sessionData.bankAccount() : null,
+                sessionData != null ? sessionData.transferContent() : null,
+                sessionData != null ? sessionData.qrPayload() : null
+        );
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PageResponse<OrderResponse> getUserOrders(Long userId, Pageable pageable) {
-        Page<Order> page = orderRepository.findByUserId(userId, pageable);
+        return getUserOrders(userId, null, null, null, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<OrderResponse> getUserOrders(Long userId, OrderStatus status, com.training.marketplace.enums.PaymentStatus paymentStatus, String search, Pageable pageable) {
+        String cleanSearch = (search != null && !search.trim().isEmpty()) ? "%" + search.trim().toLowerCase() + "%" : null;
+        Page<Order> page = orderRepository.findFilteredOrders(userId, status, paymentStatus, cleanSearch, pageable);
         page.getContent().forEach(this::ensureOrderItemProductIds);
         return PageResponse.from(page, orderMapper::toResponse);
     }
