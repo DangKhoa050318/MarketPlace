@@ -81,11 +81,17 @@ logging:
     org.hibernate.SQL: DEBUG
     com.training.marketplace: DEBUG
 
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:4201}
+
 marketplace:
+  app:
+    base-url: ${APP_BASE_URL:http://localhost:8080}
   payment:
     provider: ${PAYMENT_PROVIDER:disabled}
   paygate:
     api-url: ${PAYGATE_API_URL:http://localhost:8081}
+    checkout-url: ${PAYGATE_CHECKOUT_URL:http://localhost:4201/checkout}
     api-key: ${PAYGATE_API_KEY:mock-merchant-api-key-123456}
     return-url: ${PAYGATE_RETURN_URL:http://localhost:4200/orders/callback}
     cancel-url: ${PAYGATE_CANCEL_URL:http://localhost:4200/cart}

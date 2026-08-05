@@ -7,6 +7,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { environment } from '../../../../environments/environment';
 
 export interface BankTransferDialogData {
   orderId: number;
@@ -632,7 +633,7 @@ export class BankTransferDialogComponent {
       transferContent: this.transferContentStr
     };
 
-    this.http.post('http://localhost:8081/api/v1/bank-transfers/receive', body).subscribe({
+    this.http.post(`${environment.paygateApiUrl}/api/v1/bank-transfers/receive`, body).subscribe({
       next: () => {
         this.simulating = false;
         this.snackBar.open('⚡ Đã gửi Webhook thanh toán thành công từ PayGate!', 'Đóng', { duration: 3000 });

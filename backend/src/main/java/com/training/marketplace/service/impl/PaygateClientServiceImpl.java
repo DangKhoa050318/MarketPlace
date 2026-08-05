@@ -26,6 +26,9 @@ public class PaygateClientServiceImpl implements PaygateClientService {
     @Value("${marketplace.paygate.api-url:http://localhost:8081}")
     private String apiUrl;
 
+    @Value("${marketplace.paygate.checkout-url:http://localhost:4201/checkout}")
+    private String checkoutUrl;
+
     @Value("${marketplace.paygate.api-key:mock-merchant-api-key-123456}")
     private String apiKey;
 
@@ -88,7 +91,7 @@ public class PaygateClientServiceImpl implements PaygateClientService {
 
         // Fallback for offline local dev mode
         String mockToken = "CHK_MOCK_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
-        String fallbackPaymentUrl = "http://localhost:4201/checkout?token=" + mockToken;
+        String fallbackPaymentUrl = checkoutUrl + "?token=" + mockToken;
 
         PaygateCreateCheckoutResponse.BankAccountData mockBankAccount = null;
         String transferContent = null;

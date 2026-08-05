@@ -9,6 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { Cart } from '../../../core/models/cart.model';
 import { PaymentMethod } from '../../../core/models/order.model';
+import { environment } from '../../../../environments/environment';
 
 export interface CheckoutDialogData {
   cart: Cart;
@@ -577,8 +578,8 @@ export class CheckoutDialogComponent {
         bnplMonths: this.selectedBnplMonths,
         monthlyPayment: this.monthlyPayment(),
         description: `Tra gop PayGate BNPL (${this.selectedBnplMonths} thang) cho don hang Marketplace`,
-        returnUrl: 'http://localhost:4200/orders/callback',
-        cancelUrl: 'http://localhost:4200/cart'
+        returnUrl: `${environment.appBaseUrl}/orders/callback`,
+        cancelUrl: `${environment.appBaseUrl}/cart`
       }, null, 2);
     } else if (this.selectedMethod === 'CREDIT_CARD') {
       return JSON.stringify({
@@ -588,8 +589,8 @@ export class CheckoutDialogComponent {
         paymentType: 'FULL_PAYMENT',
         amount: this.payableTotal(),
         description: 'Thanh toan 100% qua PayGate E-Wallet / Card Gateway',
-        returnUrl: 'http://localhost:4200/orders/callback',
-        cancelUrl: 'http://localhost:4200/cart'
+        returnUrl: `${environment.appBaseUrl}/orders/callback`,
+        cancelUrl: `${environment.appBaseUrl}/cart`
       }, null, 2);
     } else {
       return JSON.stringify({

@@ -211,9 +211,7 @@ public class OrderServiceImpl implements OrderService {
                     methodStr
             );
             var sessionData = (pgSession != null) ? pgSession.data() : null;
-            String targetPaymentUrl = (sessionData != null && sessionData.paymentUrl() != null)
-                    ? sessionData.paymentUrl()
-                    : "http://localhost:4201/checkout?orderId=" + savedOrder.getId();
+            String targetPaymentUrl = (sessionData != null) ? sessionData.paymentUrl() : null;
 
             paygatePayload = new PaygatePayloadResponse(
                     savedOrder.getId(),
