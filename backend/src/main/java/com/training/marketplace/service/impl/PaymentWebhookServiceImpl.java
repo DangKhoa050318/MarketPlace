@@ -57,9 +57,9 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
-        // 3. Idempotency Check: If order is already PAID, return early without duplicate stock operations
-        if (order.getPaymentStatus() == PaymentStatus.PAID && order.getStatus() == OrderStatus.CONFIRMED) {
-            log.info("Webhook received for already PAID order #{}. Returning idempotent result.", orderId);
+        // 3. Idempotency Check: If order is already in a terminal state (CONFIRMED or CANCELLED), return early without duplicate stock operations
+        if (order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.CANCELLED) {
+            log.info("Webhook received for order #{} which is already in terminal state {}. Returning idempotent result.", orderId, order.getStatus());
             return Map.of(
                     "orderId", order.getId(),
                     "status", order.getStatus().name(),

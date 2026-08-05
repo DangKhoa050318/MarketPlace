@@ -156,4 +156,36 @@ class PaymentWebhookServiceTest {
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Invalid webhook signature");
     }
+
+    @Test
+    void processPaygateWebhook_AlreadyCancelled_ReturnsIdempotentNoDuplicateRelease() {
+        // given
+        Long orderId = 102L;
+        Order order = new Order();
+        order.setId(orderId);
+        order.setWarehouseId(1L);
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setPaymentStatus(PaymentStatus.UNPAID);
+
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+        PaygateWebhookRequest request = new PaygateWebhookRequest(
+                "PAYMENT_CANCELLED",
+                "TXN_998877",
+                1L,
+                "ORD-102",
+                new BigDecimal("150000.00"),
+                "CANCELLED"
+        );
+
+        // when
+        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(request, null);
+
+        // then
+        assertThat(result.get("idempotent")).isEqualTo(true);
+        assertThat(result.get("status")).isEqualTo("CANCELLED");
+
+        verify(orderRepository, never()).save(any());
+        verify(inventoryFacade, never()).release(any(), any());
+    }
 }
