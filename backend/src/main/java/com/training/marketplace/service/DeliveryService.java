@@ -19,4 +19,11 @@ public interface DeliveryService {
     DeliveryResponse updateStatus(Long deliveryId, Long actorUserId, UpdateDeliveryStatusRequest request);
 
     DeliveryResponse addEvent(Long deliveryId, Long actorUserId, AddDeliveryEventRequest request);
+
+    /**
+     * Close the delivery when the customer confirms receipt (keeps delivery + order in sync).
+     * No-op if the order has no delivery record; throws if the parcel has not been picked up yet
+     * (delivery still PENDING); idempotent if already DELIVERED.
+     */
+    void completeForCustomerConfirmation(Long orderId, Long actorUserId);
 }

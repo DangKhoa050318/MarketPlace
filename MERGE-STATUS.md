@@ -480,3 +480,13 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
 - ✅ Verify: backend unit **270/270 PASS**; Angular unit **46/46 PASS**; `npm run build` **SUCCESS** (2 CSS budget warnings cũ).
 - ⏳ Còn lại (Docker/Playwright-gated — khớp quyết định CI hiện chỉ chạy unit test): **T-402/T-403** integration (CRUD/publish + reorder-in-1-transaction), **T-406** E2E; và PO chốt **D-1/D-5**.
 - ▶️ **Sẵn sàng mở PR nhánh → `dev`.**
+
+### confirm-received (F03/G3) đồng bộ với Delivery tracking (F02) — 2026-08-04
+
+> Có **2 đường** đưa order tới `DELIVERED`: nút "Đã nhận hàng" của khách (F03/G3) và delivery→DELIVERED (F02).
+> Chúng chưa đồng bộ → khách xác nhận sớm làm bản ghi Delivery **mồ côi/kẹt** (order DELIVERED nhưng delivery vẫn IN_TRANSIT, và admin không cập nhật delivery được nữa do chốt "chỉ đổi khi order SHIPPED"). Đã sửa (① + ②).
+> ⚠️ Đụng `DeliveryService`/`DeliveryServiceImpl` (feature của Giảng) — **cần Giảng + Vinh review** khi PR.
+
+- **① Sync:** `OrderServiceImpl.confirmReceived` gọi `DeliveryService.completeForCustomerConfirmation(orderId, userId)` → nếu order có Delivery thì **đóng luôn delivery = DELIVERED** (+ event "Khách xác nhận đã nhận hàng") trong **cùng transaction**; lock theo thứ tự `Order → Delivery` (order dùng `findByIdForUpdate`). Order + delivery luôn nhất quán.
+- **② Gate:** chỉ cho xác nhận khi delivery đã **`IN_TRANSIT`** (đã lấy hàng). Delivery `PENDING` → BE ném lỗi rõ ràng, FE `canConfirmReceived()` ẩn nút; **không có** delivery record → vẫn cho (fallback đơn SHIPPED không tạo tracking); đã `DELIVERED` → idempotent.
+- ✅ Verify: backend unit **293/293 PASS**; `npm run build` **SUCCESS**.

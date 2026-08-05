@@ -47,6 +47,12 @@ public class AdminOrderController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @GetMapping("/count")
+    @Operation(summary = "Count orders placed by a customer", description = "Total number of orders for a userId (reviewer trust signal)")
+    public ResponseEntity<ApiResponse<Long>> countOrdersByUser(@RequestParam Long userId) {
+        return ResponseEntity.ok(ApiResponse.success(orderService.countOrdersByUser(userId)));
+    }
+
     @PutMapping("/{id}/status")
     @Operation(summary = "Update customer order status by Admin", description = "Update order status following validated state transition rules")
     @ApiResponses(value = {
