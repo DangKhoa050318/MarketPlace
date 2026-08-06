@@ -2,10 +2,15 @@ package com.training.marketplace.controller;
 
 import com.training.marketplace.common.ApiResponse;
 import com.training.marketplace.common.PageResponse;
+import com.training.marketplace.dto.request.AdminReturnDecisionRequest;
+import com.training.marketplace.dto.request.PartialRefundRequest;
+import com.training.marketplace.dto.request.ReturnQcRequest;
 import com.training.marketplace.dto.request.UpdateOrderStatusRequest;
 import com.training.marketplace.dto.response.OrderResponse;
+import com.training.marketplace.dto.response.ReturnRequestResponse;
 import com.training.marketplace.enums.OrderStatus;
 import com.training.marketplace.service.OrderService;
+import com.training.marketplace.service.ReturnRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminOrderController {
 
     private final OrderService orderService;
+    private final ReturnRequestService returnRequestService;
 
     @GetMapping
     @Operation(summary = "Get paginated orders list for Admin", description = "Retrieve all customer orders with optional status filtering")
@@ -67,5 +74,38 @@ public class AdminOrderController {
             @Valid @RequestBody UpdateOrderStatusRequest request) {
         OrderResponse response = orderService.updateOrderStatusByAdmin(id, request);
         return ResponseEntity.ok(ApiResponse.success("Order status updated successfully", response));
+    }
+
+    @GetMapping("/return-requests")
+    @Operation(summary = "Get open return requests")
+    public ResponseEntity<ApiResponse<java.util.List<ReturnRequestResponse>>> getReturnRequests() {
+        return ResponseEntity.ok(ApiResponse.success(returnRequestService.getOpenRequests()));
+    }
+
+    @PutMapping("/return-requests/{id}/decision")
+    @Operation(summary = "Approve or reject a customer return request")
+    public ResponseEntity<ApiResponse<ReturnRequestResponse>> decideReturn(
+            @PathVariable Long id,
+            @RequestBody AdminReturnDecisionRequest request) {
+        ReturnRequestResponse response = returnRequestService.decide(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Return request decision saved", response));
+    }
+
+    @PutMapping("/return-requests/{id}/qc")
+    @Operation(summary = "Record return QC result and refund when QC passes")
+    public ResponseEntity<ApiResponse<ReturnRequestResponse>> recordReturnQc(
+            @PathVariable Long id,
+            @RequestBody ReturnQcRequest request) {
+        ReturnRequestResponse response = returnRequestService.recordQc(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Return QC recorded", response));
+    }
+
+    @PostMapping("/{id}/refunds/partial")
+    @Operation(summary = "Create a partial refund for an order item")
+    public ResponseEntity<ApiResponse<ReturnRequestResponse>> partialRefund(
+            @PathVariable Long id,
+            @RequestBody PartialRefundRequest request) {
+        ReturnRequestResponse response = returnRequestService.partialRefund(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Partial refund requested", response));
     }
 }

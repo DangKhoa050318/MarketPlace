@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api-response.model';
 import { PageResponse } from '../models/page-response.model';
-import { Order, OrderStatus, UpdateOrderStatusRequest } from '../models/order.model';
+import { Order, OrderStatus, ReturnRequest, UpdateOrderStatusRequest } from '../models/order.model';
 
 @Injectable({
   providedIn: 'root'
@@ -40,5 +40,32 @@ export class AdminOrderService {
   countOrdersByUser(userId: number): Observable<ApiResponse<number>> {
     const params = new HttpParams().set('userId', userId.toString());
     return this.http.get<ApiResponse<number>>(`${this.apiUrl}/count`, { params });
+  }
+
+  getReturnRequests(): Observable<ApiResponse<ReturnRequest[]>> {
+    return this.http.get<ApiResponse<ReturnRequest[]>>(`${this.apiUrl}/return-requests`);
+  }
+
+  decideReturnRequest(id: number, approved: boolean, refundWithoutReturn: boolean, note?: string): Observable<ApiResponse<ReturnRequest>> {
+    return this.http.put<ApiResponse<ReturnRequest>>(`${this.apiUrl}/return-requests/${id}/decision`, {
+      approved,
+      refundWithoutReturn,
+      note
+    });
+  }
+
+  recordReturnQc(id: number, passed: boolean, note?: string): Observable<ApiResponse<ReturnRequest>> {
+    return this.http.put<ApiResponse<ReturnRequest>>(`${this.apiUrl}/return-requests/${id}/qc`, {
+      passed,
+      note
+    });
+  }
+
+  partialRefund(orderId: number, orderItemId: number, quantity: number, reason?: string): Observable<ApiResponse<ReturnRequest>> {
+    return this.http.post<ApiResponse<ReturnRequest>>(`${this.apiUrl}/${orderId}/refunds/partial`, {
+      orderItemId,
+      quantity,
+      reason
+    });
   }
 }

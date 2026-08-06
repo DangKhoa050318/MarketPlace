@@ -10,11 +10,13 @@ import com.training.marketplace.dto.response.OrderResponse;
 import com.training.marketplace.entity.Order;
 import com.training.marketplace.entity.OrderItem;
 import com.training.marketplace.entity.ProductVariant;
+import com.training.marketplace.entity.RefundRequest;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.dto.response.PaygatePayloadResponse;
 import com.training.marketplace.enums.OrderStatus;
 import com.training.marketplace.enums.PaymentMethod;
 import com.training.marketplace.enums.PaymentStatus;
+import com.training.marketplace.enums.RefundRequestStatus;
 import com.training.marketplace.enums.Role;
 import com.training.marketplace.event.OrderCreatedEvent;
 import com.training.marketplace.exception.BadRequestException;
@@ -23,6 +25,7 @@ import com.training.marketplace.mapper.OrderMapper;
 import com.training.marketplace.publisher.OrderEventPublisher;
 import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.repository.ProductRepository;
+import com.training.marketplace.repository.RefundRequestRepository;
 import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.AppliedCoupon;
 import com.training.marketplace.service.CartService;
@@ -67,6 +70,7 @@ public class OrderServiceImpl implements OrderService {
     private final com.training.marketplace.service.PaygateClientService paygateClientService;
     private final MerchandisingEventService merchandisingEventService;
     private final DeliveryService deliveryService;
+    private final RefundRequestRepository refundRequestRepository;
 
     @Override
     @Transactional
@@ -296,6 +300,7 @@ public class OrderServiceImpl implements OrderService {
                 baseResponse.paymentStatus(),
                 baseResponse.upfrontAmount(),
                 baseResponse.financeAmount(),
+                baseResponse.paygateTransactionRef(),
                 paygatePayload,
                 baseResponse.note(),
                 baseResponse.items(),
@@ -423,8 +428,23 @@ public class OrderServiceImpl implements OrderService {
         if (!order.getUser().getId().equals(userId)) {
             throw new BadRequestException("You are not authorized to cancel this order");
         }
-        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED) {
-            throw new BadRequestException("Cannot cancel order in status " + order.getStatus());
+
+        if (order.getStatus() == OrderStatus.SHIPPED) {
+            throw new BadRequestException("Order is already being delivered. Please create a return request instead.");
+        }
+        if (order.getStatus() == OrderStatus.DELIVERED) {
+            throw new BadRequestException("Delivered orders cannot be cancelled directly. Please contact support for returns.");
+        }
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            return orderMapper.toResponse(order);
+        }
+
+        boolean paidOnline = order.getPaymentStatus() == PaymentStatus.PAID
+                && order.getPaymentMethod() != PaymentMethod.COD;
+        if (paidOnline) {
+            requestPaygateRefund(order, "Customer cancelled before shipment");
+        } else if (order.getPaymentStatus() == PaymentStatus.PENDING_PAYGATE) {
+            order.setPaymentStatus(PaymentStatus.UNPAID);
         }
 
         order.setStatus(OrderStatus.CANCELLED);
@@ -438,7 +458,7 @@ public class OrderServiceImpl implements OrderService {
         promotionService.refundIfPresent(order.getPromotionCodeId(), order.getId());
 
         Order savedOrder = orderRepository.save(order);
-        log.info("User cancelled order {}: reservation released", orderId);
+        log.info("User cancelled order {}: paymentStatus={}, reservation released", orderId, savedOrder.getPaymentStatus());
         return orderMapper.toResponse(savedOrder);
     }
 
@@ -513,13 +533,20 @@ public class OrderServiceImpl implements OrderService {
         // when they reach PAID, so re-fulfilling here would decrement on-hand twice (phantom stock).
         if (request.status() == OrderStatus.SHIPPED
                 && order.getWarehouseId() != null
-                && order.getPaymentStatus() != PaymentStatus.PAID) {
+                && order.getTotalAmount().compareTo(BigDecimal.ZERO) > 0) {
             inventoryFacade.fulfill(order.getWarehouseId(), quantitiesByVariant(order));
         }
 
         // When an admin cancels, restore stock and refund any coupon (mirrors cancelUserOrder).
         // Guard against a CANCELLED -> CANCELLED no-op double release.
         if (request.status() == OrderStatus.CANCELLED && previousStatus != OrderStatus.CANCELLED) {
+            boolean paidOnline = order.getPaymentStatus() == PaymentStatus.PAID
+                    && order.getPaymentMethod() != PaymentMethod.COD;
+            if (paidOnline) {
+                requestPaygateRefund(order, "Admin cancelled before shipment");
+            } else if (order.getPaymentStatus() == PaymentStatus.PENDING_PAYGATE) {
+                order.setPaymentStatus(PaymentStatus.UNPAID);
+            }
             if (order.getWarehouseId() != null) {
                 if (previousStatus == OrderStatus.SHIPPED) {
                     // Failed / refused delivery ("bom hàng"): the stock was already decremented at ship,
@@ -546,6 +573,53 @@ public class OrderServiceImpl implements OrderService {
             order.setNote(request.note());
         }
         return orderMapper.toResponse(orderRepository.save(order));
+    }
+
+    private void requestPaygateRefund(Order order, String reason) {
+        String idempotencyKey = "PAYGATE_REFUND:ORDER:" + order.getId() + ":FULL";
+        RefundRequest refundRequest = refundRequestRepository.findByIdempotencyKey(idempotencyKey)
+                .orElseGet(() -> refundRequestRepository.save(RefundRequest.builder()
+                        .order(order)
+                        .idempotencyKey(idempotencyKey)
+                        .transactionRef(order.getPaygateTransactionRef())
+                        .amount(order.getTotalAmount())
+                        .reason(reason)
+                        .status(RefundRequestStatus.PENDING)
+                        .build()));
+
+        if (refundRequest.getStatus() == RefundRequestStatus.SUCCEEDED) {
+            order.setPaymentStatus(PaymentStatus.REFUNDED);
+            return;
+        }
+
+        if (order.getPaygateTransactionRef() == null || order.getPaygateTransactionRef().isBlank()) {
+            refundRequest.setStatus(RefundRequestStatus.FAILED);
+            refundRequest.setFailureReason("PayGate transaction reference is missing");
+            refundRequestRepository.save(refundRequest);
+            order.setPaymentStatus(PaymentStatus.REFUND_PENDING);
+            log.warn("Order {} refund pending because PayGate transaction reference is missing", order.getId());
+            return;
+        }
+        try {
+            paygateClientService.refund(
+                    order.getPaygateTransactionRef(),
+                    order.getId(),
+                    order.getTotalAmount(),
+                    reason,
+                    idempotencyKey);
+            refundRequest.setTransactionRef(order.getPaygateTransactionRef());
+            refundRequest.setStatus(RefundRequestStatus.SUCCEEDED);
+            refundRequest.setFailureReason(null);
+            refundRequestRepository.save(refundRequest);
+            order.setPaymentStatus(PaymentStatus.REFUNDED);
+        } catch (Exception ex) {
+            refundRequest.setTransactionRef(order.getPaygateTransactionRef());
+            refundRequest.setStatus(RefundRequestStatus.FAILED);
+            refundRequest.setFailureReason(ex.getMessage());
+            refundRequestRepository.save(refundRequest);
+            order.setPaymentStatus(PaymentStatus.REFUND_PENDING);
+            log.warn("Order {} refund pending because PayGate refund call failed: {}", order.getId(), ex.getMessage());
+        }
     }
 
     /** Aggregate an order's line items into {@code variantId -> total quantity} for inventory calls. */

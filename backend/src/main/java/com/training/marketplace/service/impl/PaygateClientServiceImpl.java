@@ -1,6 +1,7 @@
 package com.training.marketplace.service.impl;
 
 import com.training.marketplace.dto.request.PaygateCreateCheckoutRequest;
+import com.training.marketplace.dto.request.PaygateRefundRequest;
 import com.training.marketplace.dto.response.PaygateCreateCheckoutResponse;
 import com.training.marketplace.service.PaygateClientService;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -126,5 +128,45 @@ public class PaygateClientServiceImpl implements PaygateClientService {
                         null
                 )
         );
+    }
+
+    @Override
+    public void refund(String transactionRef, Long orderId, BigDecimal amount, String reason, String idempotencyKey) {
+        if (transactionRef == null || transactionRef.isBlank()) {
+            throw new IllegalArgumentException("PayGate transaction reference is required for refund");
+        }
+        if (orderId == null) {
+            throw new IllegalArgumentException("Marketplace order ID is required for PayGate refund");
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Refund amount must be greater than zero");
+        }
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("PayGate merchant API key is not configured; cannot request PayGate refund");
+        }
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException("Idempotency key is required for PayGate refund");
+        }
+
+        String endpoint = apiUrl + "/api/v1/refunds";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-Merchant-Api-Key", apiKey);
+        headers.set("Idempotency-Key", idempotencyKey);
+
+        PaygateRefundRequest request = new PaygateRefundRequest(
+                apiKey,
+                transactionRef,
+                "ORD-" + orderId,
+                currencyConversionService.convertUsdToVnd(amount),
+                reason
+        );
+
+        log.info("Requesting PayGate merchant refund for transactionRef={}, orderId={}, amount={}, idempotencyKey={}",
+                transactionRef, request.orderId(), request.amount(), idempotencyKey);
+        ResponseEntity<String> response = restTemplate.postForEntity(endpoint, new HttpEntity<>(request, headers), String.class);
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new IllegalStateException("PayGate refund failed with status " + response.getStatusCode().value());
+        }
     }
 }

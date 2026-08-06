@@ -72,6 +72,9 @@ public class Order {
     @Builder.Default
     private BigDecimal financeAmount = BigDecimal.ZERO;
 
+    @Column(name = "paygate_transaction_ref", length = 100)
+    private String paygateTransactionRef;
+
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount;
 

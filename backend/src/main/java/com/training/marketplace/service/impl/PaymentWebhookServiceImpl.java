@@ -52,10 +52,18 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
             throw new BadRequestException("Invalid payload: orderId and transactionRef are null");
         }
 
+        if (payload.transactionRef() != null && payload.transactionRef().startsWith("TXN-REFUND-")) {
+            log.info("Ignoring PayGate refund webhook transactionRef={} because Marketplace already marks refunds during cancellation",
+                    payload.transactionRef());
+            return Map.of(
+                    "transactionRef", payload.transactionRef(),
+                    "ignored", true,
+                    "reason", "refund-notification"
+            );
+        }
+
         // 1. Signature / Authorization Verification (Security Check).
         // PayGate authenticates each webhook by sending the shared merchant secret in X-Paygate-Signature.
-        // We reject a missing signature when enforcement is on, and compare exactly + in constant time so a
-        // value that merely *contains* the secret (old bug) or a response-timing side-channel cannot pass.
         verifySignature(signature);
 
         // 2. Parse Order ID
@@ -84,20 +92,17 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
             );
         }
 
-        // 4. Process Status & Perform Stock Fulfillment / Release via InventoryFacade
+        // 4. Process Status. Stock is only fulfilled when the order moves to SHIPPED.
         boolean isSuccess = "PAYMENT_COMPLETED".equalsIgnoreCase(payload.event()) ||
-                            "SUCCESS".equalsIgnoreCase(payload.status());
+                            "SUCCESS".equalsIgnoreCase(payload.status()) ||
+                            "COMPLETED".equalsIgnoreCase(payload.status());
 
         if (isSuccess) {
             order.setStatus(OrderStatus.CONFIRMED);
             order.setPaymentStatus(PaymentStatus.PAID);
+            order.setPaygateTransactionRef(payload.transactionRef());
             orderRepository.save(order);
-
-            // Authoritative stock fulfillment in InventoryFacade
-            if (order.getWarehouseId() != null && order.getItems() != null && !order.getItems().isEmpty()) {
-                inventoryFacade.fulfill(order.getWarehouseId(), quantitiesByVariant(order));
-            }
-            log.info("Successfully processed PayGate Webhook: Order #{} updated to CONFIRMED and PAID, stock fulfilled.", orderId);
+            log.info("Successfully processed PayGate Webhook: Order #{} updated to CONFIRMED and PAID.", orderId);
         } else if ("FAILED".equalsIgnoreCase(payload.status())
                 || "CANCELLED".equalsIgnoreCase(payload.status())
                 || "PAYMENT_CANCELLED".equalsIgnoreCase(payload.event())

@@ -1,16 +1,20 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { OrderService, Order } from '../../../core/services/order.service';
+import { ReviewService } from '../../../core/services/review.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { DeliveryService } from '../../../core/services/delivery.service';
 import { Delivery } from '../../../core/models/delivery.model';
 import { DeliveryTimelineComponent } from '../../../shared/components/delivery-timeline/delivery-timeline.component';
+import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { catchError, finalize, of, switchMap, tap } from 'rxjs';
 
 @Component({
@@ -18,12 +22,14 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     RouterLink,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
     MatTableModule,
     MatProgressSpinnerModule,
+    MatDialogModule,
     DeliveryTimelineComponent
   ],
   template: `
@@ -51,6 +57,16 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
               <span class="badge-pill" [ngClass]="getStatusBadgeClass(order.status)">
                 {{ order.status }}
               </span>
+              <button *ngIf="canCancelOrder()" mat-stroked-button color="warn" class="confirm-btn"
+                      (click)="cancelOrder()" [disabled]="cancelling">
+                <mat-icon>cancel</mat-icon>
+                {{ cancelling ? 'Cancelling...' : cancelButtonLabel() }}
+              </button>
+              <button *ngIf="canRequestReturn()" mat-stroked-button color="accent" class="confirm-btn"
+                      (click)="openReturnRequestForm()" [disabled]="requestingReturn">
+                <mat-icon>assignment_return</mat-icon>
+                Return request
+              </button>
               <button *ngIf="canConfirmReceived()" mat-flat-button color="primary" class="confirm-btn"
                       (click)="confirmReceived()" [disabled]="confirming">
                 <mat-icon>check_circle</mat-icon>
@@ -58,6 +74,61 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
               </button>
             </div>
           </div>
+
+          <form *ngIf="showReturnRequestForm" class="return-request-form" (ngSubmit)="createReturnRequest()">
+            <label for="return-request-item">Item to return</label>
+            <select
+              id="return-request-item"
+              name="returnRequestItem"
+              [(ngModel)]="returnOrderItemId"
+              (ngModelChange)="useMaxReturnQuantity()">
+              <option [ngValue]="null">Entire order</option>
+              <option *ngFor="let item of refundableItems()" [ngValue]="item.id">
+                {{ item.productName }} - refundable quantity {{ refundableQuantity(item) }}
+              </option>
+            </select>
+
+            <div class="return-quantity-summary">
+              <strong>Return quantity</strong>
+              <span>{{ returnQuantityLabel() }}</span>
+            </div>
+
+            <label for="return-request-reason">Return request reason</label>
+            <textarea
+              id="return-request-reason"
+              name="returnRequestReason"
+              [(ngModel)]="returnReason"
+              rows="4"
+              maxlength="1000"
+              placeholder="Describe why you want to return this order. Include product condition, packaging condition, wrong item details, missing parts, or any delivery issue."></textarea>
+
+            <div class="evidence-upload">
+              <div>
+                <strong>Evidence images</strong>
+                <p>Upload clear photos of the defective item, wrong product, missing parts, damaged package, or delivery issue.</p>
+              </div>
+              <input #returnEvidenceInput type="file" accept="image/*" multiple hidden (change)="uploadReturnEvidence($event)">
+              <button mat-stroked-button type="button" (click)="returnEvidenceInput.click()" [disabled]="uploadingReturnEvidence || returnEvidenceImageUrls.length >= 5">
+                <mat-icon>add_photo_alternate</mat-icon>
+                {{ uploadingReturnEvidence ? 'Uploading images...' : 'Upload evidence images' }}
+              </button>
+              <div class="evidence-grid" *ngIf="returnEvidenceImageUrls.length">
+                <div class="evidence-thumb" *ngFor="let imageUrl of returnEvidenceImageUrls">
+                  <img [src]="imageUrl" alt="Return evidence image">
+                  <button mat-icon-button type="button" (click)="removeReturnEvidence(imageUrl)" aria-label="Remove evidence image">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="return-request-actions">
+              <button mat-button type="button" (click)="closeReturnRequestForm()" [disabled]="requestingReturn">Cancel</button>
+              <button mat-raised-button color="primary" type="submit" [disabled]="!returnReason.trim() || requestingReturn">
+                {{ requestingReturn ? 'Submitting return request...' : 'Submit return request' }}
+              </button>
+            </div>
+          </form>
 
           <div class="info-grid">
             <div class="info-item">
@@ -348,6 +419,106 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
     .delivery-empty > mat-icon { color: var(--accent-cyan); }
     .delivery-empty div { flex: 1; }
     .delivery-empty p { margin: 4px 0 0; color: var(--text-muted); }
+    .return-request-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .return-request-form label {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: #334155;
+    }
+    .return-request-form textarea {
+      width: 100%;
+      min-height: 104px;
+      resize: vertical;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px;
+      font: inherit;
+      box-sizing: border-box;
+    }
+    .return-request-form select,
+    .return-request-form input {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px;
+      font: inherit;
+      box-sizing: border-box;
+      background: #ffffff;
+    }
+    .return-quantity-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 12px;
+      border: 1px solid #dbe4ee;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #334155;
+    }
+    .return-quantity-summary strong {
+      font-size: 0.84rem;
+    }
+    .return-quantity-summary span {
+      font-weight: 800;
+      color: #0f172a;
+      text-align: right;
+    }
+    .return-request-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .evidence-upload {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+      border: 1px dashed #94a3b8;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+    .evidence-upload p {
+      margin: 4px 0 0;
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+      gap: 10px;
+    }
+    .evidence-thumb {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #cbd5e1;
+      background: #f1f5f9;
+    }
+    .evidence-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .evidence-thumb button {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 26px;
+      height: 26px;
+      background: rgba(15, 23, 42, 0.72);
+      color: #ffffff;
+    }
   `]
 })
 export class OrderDetailComponent implements OnInit {
@@ -357,13 +528,23 @@ export class OrderDetailComponent implements OnInit {
   deliveryLoading = false;
   deliveryError = '';
   confirming = false;
+  cancelling = false;
+  requestingReturn = false;
+  showReturnRequestForm = false;
+  returnOrderItemId: number | null = null;
+  returnQuantity = 1;
+  returnReason = '';
+  returnEvidenceImageUrls: string[] = [];
+  uploadingReturnEvidence = false;
   displayedColumns = ['productName', 'variantInfo', 'unitPrice', 'quantity', 'subtotal'];
 
   constructor(
     private route: ActivatedRoute,
     private orderService: OrderService,
+    private reviewService: ReviewService,
     private deliveryService: DeliveryService,
-    private notification: NotificationService
+    private notification: NotificationService,
+    private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -446,6 +627,175 @@ export class OrderDetailComponent implements OnInit {
         this.notification.error(err?.error?.message || 'Không thể xác nhận nhận hàng.');
       }
     });
+  }
+
+  cancelOrder(): void {
+    if (!this.order || this.cancelling) {
+      return;
+    }
+    const paidOnline = this.order.paymentStatus === 'PAID' && this.order.paymentMethod !== 'COD';
+    const message = paidOnline
+      ? `Order #${this.order.id} has been paid. Cancelling now will request a PayGate refund.`
+      : `Cancel Order #${this.order.id}?`;
+    const orderId = this.order.id;
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: paidOnline ? 'Cancel Order and Request PayGate Refund' : 'Cancel Order',
+        message
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed: boolean) => {
+      if (!confirmed) {
+        return;
+      }
+      this.cancelling = true;
+      this.orderService.cancelOrder(orderId).pipe(
+        finalize(() => this.cancelling = false)
+      ).subscribe({
+        next: () => {
+          this.notification.success(paidOnline ? 'Order cancelled and refund requested' : 'Order cancelled');
+          this.loadOrderDetail(orderId);
+        },
+        error: (err) => {
+          this.notification.error(err?.error?.message || 'Failed to cancel order');
+        }
+      });
+    });
+  }
+
+  openReturnRequestForm(): void {
+    this.showReturnRequestForm = true;
+    this.returnOrderItemId = null;
+    this.returnQuantity = 1;
+    this.returnReason = '';
+    this.returnEvidenceImageUrls = [];
+  }
+
+  closeReturnRequestForm(): void {
+    this.showReturnRequestForm = false;
+    this.returnOrderItemId = null;
+    this.returnQuantity = 1;
+    this.returnReason = '';
+    this.returnEvidenceImageUrls = [];
+  }
+
+  createReturnRequest(): void {
+    if (!this.order || this.requestingReturn) {
+      return;
+    }
+    const reason = this.returnReason.trim();
+    if (!reason) {
+      this.notification.error('Return request reason is required');
+      return;
+    }
+    const item = this.returnOrderItemId
+      ? this.refundableItems().find(candidate => candidate.id === this.returnOrderItemId)
+      : undefined;
+    const quantity = item ? this.refundableQuantity(item) : undefined;
+    if (item && (!quantity || quantity <= 0 || quantity > this.refundableQuantity(item))) {
+      this.notification.error(`Return quantity must be between 1 and ${this.refundableQuantity(item)}`);
+      return;
+    }
+    const orderId = this.order.id;
+    this.requestingReturn = true;
+    this.orderService.createReturnRequest(orderId, {
+      orderItemId: item?.id,
+      quantity,
+      reason,
+      evidenceImageUrls: this.returnEvidenceImageUrls
+    }).pipe(
+      finalize(() => this.requestingReturn = false)
+    ).subscribe({
+      next: () => {
+        this.notification.success('Return request created');
+        this.closeReturnRequestForm();
+        this.loadOrderDetail(orderId);
+      },
+      error: (err) => {
+        this.notification.error(err?.error?.message || 'Failed to create return request');
+      }
+    });
+  }
+
+  canCancelOrder(): boolean {
+    return !!this.order && ['PENDING', 'CONFIRMED', 'PROCESSING'].includes(this.order.status);
+  }
+
+  canRequestReturn(): boolean {
+    return this.order?.status === 'SHIPPED' || this.order?.status === 'DELIVERED';
+  }
+
+  refundableItems(): Order['items'] {
+    return (this.order?.items || []).filter(item => this.refundableQuantity(item) > 0);
+  }
+
+  refundableQuantity(item: Order['items'][number]): number {
+    return item.quantity - (item.refundedQuantity || 0);
+  }
+
+  useMaxReturnQuantity(): void {
+    const item = this.returnOrderItemId
+      ? this.refundableItems().find(candidate => candidate.id === this.returnOrderItemId)
+      : undefined;
+    this.returnQuantity = item ? this.refundableQuantity(item) : 1;
+  }
+
+  returnQuantityLabel(): string {
+    const item = this.returnOrderItemId
+      ? this.refundableItems().find(candidate => candidate.id === this.returnOrderItemId)
+      : undefined;
+    if (item) {
+      return `All ${this.refundableQuantity(item)} item(s)`;
+    }
+    const total = this.refundableItems().reduce((sum, current) => sum + this.refundableQuantity(current), 0);
+    return `Entire order (${total} item(s))`;
+  }
+
+  uploadReturnEvidence(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []).slice(0, 5 - this.returnEvidenceImageUrls.length);
+    input.value = '';
+    if (files.length === 0) {
+      return;
+    }
+    this.uploadingReturnEvidence = true;
+    let completed = 0;
+    const finishOne = () => {
+      completed += 1;
+      if (completed === files.length) {
+        this.uploadingReturnEvidence = false;
+      }
+    };
+    files.forEach(file => {
+      this.reviewService.uploadImage(file).pipe(
+        finalize(finishOne)
+      ).subscribe({
+        next: (response) => {
+          if (response.success && response.data?.url) {
+            this.returnEvidenceImageUrls = [...this.returnEvidenceImageUrls, response.data.url].slice(0, 5);
+            this.notification.success('Evidence image uploaded');
+          }
+        },
+        error: (err) => {
+          this.notification.error(err?.error?.message || 'Failed to upload evidence image');
+        }
+      });
+    });
+  }
+
+  removeReturnEvidence(imageUrl: string): void {
+    this.returnEvidenceImageUrls = this.returnEvidenceImageUrls.filter(url => url !== imageUrl);
+  }
+
+  cancelButtonLabel(): string {
+    if (this.order?.paymentStatus === 'PAID' && this.order.paymentMethod !== 'COD') {
+      return 'Cancel & refund';
+    }
+    if (this.order?.paymentStatus === 'REFUND_PENDING') {
+      return 'Refund pending';
+    }
+    return 'Cancel order';
   }
 
   canConfirmReceived(): boolean {

@@ -3,33 +3,24 @@ package com.training.marketplace.service;
 import java.util.Map;
 
 /**
- * The one seam between the ordering module and the inventory module. Ordering never touches
- * stock_levels directly — it goes through here. Keeping this as an interface means a future
- * split into a separate inventory microservice only changes the implementation (in-process →
- * message/REST), not the callers.
+ * Boundary between ordering and inventory. Ordering never touches stock levels directly.
  */
 public interface InventoryFacade {
 
     /** Warehouse used to fulfil storefront orders (MVP: first active warehouse). */
     Long defaultWarehouseId();
 
-    /**
-     * Reserve stock for {@code variantId -> quantity} at a warehouse. Locks the affected
-     * stock_levels rows (in variantId order) and throws {@code BadRequestException} if any
-     * variant has insufficient available quantity. This is the authoritative no-oversell point.
-     */
     void reserve(Long warehouseId, Map<Long, Integer> quantityByVariant);
 
-    /** Release a previous reservation (e.g. on order cancel). */
+    /** Release a previous reservation (for example on order cancel). */
     void release(Long warehouseId, Map<Long, Integer> quantityByVariant);
 
-    /** Convert a reservation into an actual decrement (e.g. on shipment). */
+    /** Convert a reservation into an actual decrement, usually when the order ships. */
     void fulfill(Long warehouseId, Map<Long, Integer> quantityByVariant);
 
-    /**
-     * Add stock back on-hand after a fulfilled order is returned (failed / refused delivery — "bom hàng").
-     * Inverse of {@link #fulfill}'s on-hand decrement: increases {@code quantity}; reservations are
-     * untouched (they were already cleared at fulfil).
-     */
+    /** Add stock back on-hand after a fulfilled order is returned or refused. */
     void returnStock(Long warehouseId, Map<Long, Integer> quantityByVariant);
+
+    /** Add accepted returned goods back to on-hand stock after QC passes. */
+    void restockReturn(Long warehouseId, Map<Long, Integer> quantityByVariant);
 }
