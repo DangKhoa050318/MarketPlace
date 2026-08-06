@@ -1,0 +1,46 @@
+<div class="chatbot-container">
+  
+  <!-- Chat Window -->
+  <div class="chat-window" *ngIf="isOpen" @windowAnimation>
+    <div class="chat-header">
+      <div class="header-info">
+        <mat-icon>smart_toy</mat-icon>
+        <span>MarketPlace AI</span>
+      </div>
+      <button mat-icon-button (click)="toggleChat()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="chat-messages" #scrollContainer>
+      <div *ngFor="let msg of messages" 
+           class="message-wrapper" 
+           [ngClass]="msg.role === 'user' ? 'user-message' : 'bot-message'">
+        <div class="message-bubble" [innerHTML]="formatMessage(msg.content)"></div>
+      </div>
+      
+      <div class="message-wrapper bot-message" *ngIf="isLoading">
+        <div class="message-bubble loading-bubble">
+          <mat-spinner diameter="20"></mat-spinner>
+          <span>Đang trả lời...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <input type="text" 
+             placeholder="Nhập câu hỏi của bạn..." 
+             [(ngModel)]="userInput" 
+             (keyup.enter)="sendMessage()"
+             [disabled]="isLoading" />
+      <button mat-icon-button color="primary" (click)="sendMessage()" [disabled]="!userInput.trim() || isLoading">
+        <mat-icon>send</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- Floating Action Button -->
+  <button mat-fab color="accent" class="chat-fab" (click)="toggleChat()">
+    <mat-icon>{{ isOpen ? 'close' : 'chat' }}</mat-icon>
+  </button>
+</div>
