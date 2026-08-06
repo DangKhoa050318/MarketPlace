@@ -98,16 +98,21 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
                 inventoryFacade.fulfill(order.getWarehouseId(), quantitiesByVariant(order));
             }
             log.info("Successfully processed PayGate Webhook: Order #{} updated to CONFIRMED and PAID, stock fulfilled.", orderId);
-        } else if ("FAILED".equalsIgnoreCase(payload.status()) || "CANCELLED".equalsIgnoreCase(payload.status())) {
+        } else if ("FAILED".equalsIgnoreCase(payload.status())
+                || "CANCELLED".equalsIgnoreCase(payload.status())
+                || "PAYMENT_CANCELLED".equalsIgnoreCase(payload.event())
+                || "PAYMENT_FAILED".equalsIgnoreCase(payload.event())) {
             order.setStatus(OrderStatus.CANCELLED);
             order.setPaymentStatus(PaymentStatus.UNPAID);
             orderRepository.save(order);
 
-            // Release reserved stock if payment fails
+            // Release reserved stock when payment fails OR the user cancels checkout. Cancellation
+            // may arrive via the status field (FAILED/CANCELLED) or the event field
+            // (PAYMENT_CANCELLED/PAYMENT_FAILED) — cover both so a cancel-checkout webhook is not missed.
             if (order.getWarehouseId() != null && order.getItems() != null && !order.getItems().isEmpty()) {
                 inventoryFacade.release(order.getWarehouseId(), quantitiesByVariant(order));
             }
-            log.info("PayGate Webhook reported failure: Order #{} updated to CANCELLED and FAILED, stock released.", orderId);
+            log.info("PayGate Webhook reported failure/cancellation: Order #{} updated to CANCELLED and UNPAID, stock released.", orderId);
         }
 
         return Map.of(

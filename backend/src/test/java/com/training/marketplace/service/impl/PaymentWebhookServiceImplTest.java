@@ -106,4 +106,23 @@ class PaymentWebhookServiceImplTest {
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(result).containsEntry("idempotent", true);
     }
+
+    @Test
+    void cancelledSignalledByEventOnly_stillReleasesStock() {
+        // User-cancels-checkout flow: cancellation arrives via the event field (PAYMENT_CANCELLED)
+        // while status is not a cancel value. The merged branch detects it from `event` too, so the
+        // reservation is released. A status-only condition would miss this and leave stock stuck.
+        Order order = orderWith(4L, OrderStatus.PROCESSING, PaymentStatus.UNPAID);
+        given(orderRepository.findByIdForUpdate(4L)).willReturn(Optional.of(order));
+
+        PaygateWebhookRequest eventOnly = new PaygateWebhookRequest(
+                "PAYMENT_CANCELLED", "TX-4", 1L, "4", new BigDecimal("100.00"), "PENDING");
+
+        service.processPaygateWebhook(eventOnly, null);
+
+        verify(inventoryFacade, times(1)).release(eq(1L), anyMap());
+        verify(inventoryFacade, never()).fulfill(eq(1L), anyMap());
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
+    }
 }
