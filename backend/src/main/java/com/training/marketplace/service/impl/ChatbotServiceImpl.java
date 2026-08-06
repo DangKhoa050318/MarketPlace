@@ -77,7 +77,7 @@ public class ChatbotServiceImpl implements ChatbotService {
 
         return coupons.stream()
                 .map(c -> String.format("- Mã: %s (Giảm: %s, Loại: %s) Hết hạn: %s", 
-                        c.getCode(), c.getDiscountValue(), c.getDiscountType(), c.getEndsAt()))
+                        c.getCode(), c.getDiscountValue(), c.getDiscountType(), c.getExpiresAt()))
                 .collect(Collectors.joining("\n"));
     }
 }
