@@ -221,7 +221,7 @@ class PaymentWebhookServiceTest {
         order.setStatus(OrderStatus.CANCELLED);
         order.setPaymentStatus(PaymentStatus.UNPAID);
 
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
 
         PaygateWebhookRequest request = new PaygateWebhookRequest(
                 "PAYMENT_CANCELLED",
