@@ -12,6 +12,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { finalize } from 'rxjs';
 import { OrderService, Order } from '../../../core/services/order.service';
 import { ReviewService } from '../../../core/services/review.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -1043,21 +1044,24 @@ export class OrderListComponent implements OnInit {
     }
     this.uploadingReturnEvidence = true;
     let completed = 0;
+    const finishOne = () => {
+      completed += 1;
+      if (completed === files.length) {
+        this.uploadingReturnEvidence = false;
+      }
+    };
     files.forEach(file => {
-      this.reviewService.uploadImage(file).subscribe({
+      this.reviewService.uploadImage(file).pipe(
+        finalize(finishOne)
+      ).subscribe({
         next: (response) => {
           if (response.success && response.data?.url) {
             this.returnEvidenceImageUrls = [...this.returnEvidenceImageUrls, response.data.url].slice(0, 5);
+            this.notification.success('Evidence image uploaded');
           }
         },
         error: (err) => {
           this.notification.error(err?.error?.message || 'Failed to upload evidence image');
-        },
-        complete: () => {
-          completed += 1;
-          if (completed === files.length) {
-            this.uploadingReturnEvidence = false;
-          }
         }
       });
     });

@@ -208,7 +208,7 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> orderService.createOrder(1L, request))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Gia da thay doi");
+                .hasMessageContaining("Giá đã thay đổi");
 
         verify(inventoryFacade, never()).reserve(any(), anyMap());
         verify(orderRepository, never()).save(any(Order.class));

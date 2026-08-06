@@ -184,7 +184,7 @@ class PaymentWebhookServiceTest {
 
     @Test
     void processPaygateWebhook_ValidSignature_WhenEnforced_Processes() {
-        // Enforcement on + the exact shared secret -> the webhook is authenticated and runs normally.
+        // Enforcement on + the exact shared secret -> the webhook is authenticated and marks payment paid.
         ReflectionTestUtils.setField(paymentWebhookService, "requireSignature", true);
         Long orderId = 200L;
         Order order = new Order();
@@ -205,7 +205,9 @@ class PaymentWebhookServiceTest {
                 request, "mock-merchant-api-key-123456");
 
         assertThat(result.get("status")).isEqualTo("CONFIRMED");
-        verify(inventoryFacade).fulfill(eq(1L), eq(Map.of(7L, 1)));
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(order.getPaygateTransactionRef()).isEqualTo("TXN_1");
+        verify(inventoryFacade, never()).fulfill(eq(1L), eq(Map.of(7L, 1)));
     }
 
     @Test

@@ -29,7 +29,7 @@ import static org.mockito.Mockito.verify;
 /**
  * Webhook replay idempotency — phantom-stock guard. PayGate retries the same webhook on network
  * errors, so a CANCELLED/FAILED replay must release reserved stock at most once, and a SUCCESS
- * replay must fulfill at most once. Uses real Order/OrderItem so the status transition set by the
+ * replay must mark the order paid without touching stock. Uses real Order/OrderItem so the status transition set by the
  * first call is visible to the replays (that transition is exactly what the idempotency guard reads).
  */
 @ExtendWith(MockitoExtension.class)
@@ -79,18 +79,19 @@ class PaymentWebhookServiceImplTest {
     }
 
     @Test
-    void successWebhookReplayedThreeTimes_fulfillsStockExactlyOnce() {
+    void successWebhookReplayedThreeTimes_marksPaidWithoutFulfillingStock() {
         Order order = orderWith(2L, OrderStatus.PENDING, PaymentStatus.UNPAID);
         given(orderRepository.findByIdForUpdate(2L)).willReturn(Optional.of(order));
 
-        service.processPaygateWebhook(success("2"), null); // first: confirms + fulfills
+        service.processPaygateWebhook(success("2"), null); // first: confirms + marks paid
         service.processPaygateWebhook(success("2"), null); // retry -> idempotent no-op
         service.processPaygateWebhook(success("2"), null); // retry -> idempotent no-op
 
-        verify(inventoryFacade, times(1)).fulfill(eq(1L), anyMap());
+        verify(inventoryFacade, never()).fulfill(eq(1L), anyMap());
         verify(inventoryFacade, never()).release(eq(1L), anyMap());
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(order.getPaygateTransactionRef()).isEqualTo("TX-2");
     }
 
     @Test

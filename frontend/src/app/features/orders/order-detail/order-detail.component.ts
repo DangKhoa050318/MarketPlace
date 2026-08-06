@@ -761,21 +761,24 @@ export class OrderDetailComponent implements OnInit {
     }
     this.uploadingReturnEvidence = true;
     let completed = 0;
+    const finishOne = () => {
+      completed += 1;
+      if (completed === files.length) {
+        this.uploadingReturnEvidence = false;
+      }
+    };
     files.forEach(file => {
-      this.reviewService.uploadImage(file).subscribe({
+      this.reviewService.uploadImage(file).pipe(
+        finalize(finishOne)
+      ).subscribe({
         next: (response) => {
           if (response.success && response.data?.url) {
             this.returnEvidenceImageUrls = [...this.returnEvidenceImageUrls, response.data.url].slice(0, 5);
+            this.notification.success('Evidence image uploaded');
           }
         },
         error: (err) => {
           this.notification.error(err?.error?.message || 'Failed to upload evidence image');
-        },
-        complete: () => {
-          completed += 1;
-          if (completed === files.length) {
-            this.uploadingReturnEvidence = false;
-          }
         }
       });
     });
