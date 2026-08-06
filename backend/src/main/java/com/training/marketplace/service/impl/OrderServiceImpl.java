@@ -70,11 +70,8 @@ public class OrderServiceImpl implements OrderService {
     private final com.training.marketplace.service.PaygateClientService paygateClientService;
     private final MerchandisingEventService merchandisingEventService;
     private final DeliveryService deliveryService;
-<<<<<<< HEAD
     private final RefundRequestRepository refundRequestRepository;
-=======
     private final OrderExpiryJob orderExpiryJob;
->>>>>>> 165e507 (feat(order): auto-cancellation worker, VietQR confirm/cancel payment APIs, and PayGate callback cancel URL)
 
     @Override
     @Transactional

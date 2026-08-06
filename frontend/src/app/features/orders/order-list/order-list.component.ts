@@ -12,11 +12,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-<<<<<<< HEAD
 import { finalize } from 'rxjs';
-=======
 import { MatTooltipModule } from '@angular/material/tooltip';
->>>>>>> 0a0a607 (feat(vietqr): VietQR generator dialog, English UI, dynamic timer countdown, and compact action buttons)
 import { OrderService, Order } from '../../../core/services/order.service';
 import { ReviewService } from '../../../core/services/review.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -42,6 +39,7 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
     MatProgressSpinnerModule,
     MatDialogModule,
     MatTooltipModule,
+    ConfirmDialogComponent,
     OrderReviewDialogComponent,
     VietQrDialogComponent
   ],
@@ -225,7 +223,7 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
                     <mat-icon>rate_review</mat-icon>
                   </button>
                   <button 
-                    *ngIf="isCancelEligible(order)" 
+                    *ngIf="canCancelOrder(order)" 
                     mat-icon-button 
                     class="icon-btn-action btn-cancel"
                     (click)="onCancelOrder(order)" 

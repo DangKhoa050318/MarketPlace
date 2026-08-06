@@ -38,6 +38,6 @@ public record OrderResponse(
     ) {
         this(id, userId, username, userEmail, shippingAddress, totalAmount, discountAmount, shippingFee,
              couponCode, status, PaymentMethod.COD, PaymentStatus.UNPAID, totalAmount != null ? totalAmount : BigDecimal.ZERO,
-             BigDecimal.ZERO, null, null, note, items, createdAt, updatedAt);
+             BigDecimal.ZERO, null, null, null, note, items, createdAt, updatedAt);
     }
 }

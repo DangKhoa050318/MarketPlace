@@ -14,11 +14,8 @@ import { NotificationService } from '../../../core/services/notification.service
 import { DeliveryService } from '../../../core/services/delivery.service';
 import { Delivery } from '../../../core/models/delivery.model';
 import { DeliveryTimelineComponent } from '../../../shared/components/delivery-timeline/delivery-timeline.component';
-<<<<<<< HEAD
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
-=======
 import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/vietqr-dialog.component';
->>>>>>> 0a0a607 (feat(vietqr): VietQR generator dialog, English UI, dynamic timer countdown, and compact action buttons)
 import { catchError, finalize, of, switchMap, tap } from 'rxjs';
 
 @Component({
@@ -34,12 +31,9 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
     MatTableModule,
     MatProgressSpinnerModule,
     MatDialogModule,
-<<<<<<< HEAD
-    DeliveryTimelineComponent
-=======
     DeliveryTimelineComponent,
+    ConfirmDialogComponent,
     VietQrDialogComponent
->>>>>>> 0a0a607 (feat(vietqr): VietQR generator dialog, English UI, dynamic timer countdown, and compact action buttons)
   ],
   template: `
     <div class="order-detail-container">
