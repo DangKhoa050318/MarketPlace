@@ -92,6 +92,24 @@ public class OrderController {
         return ApiResponse.success("Order cancelled successfully", orderService.cancelUserOrder(userId, id));
     }
 
+    @PostMapping("/{id}/confirm-vietqr")
+    @Operation(summary = "User manual confirmation of VietQR bank transfer payment")
+    public ApiResponse<OrderResponse> confirmVietQrPayment(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long userId = getUserId(authentication);
+        return ApiResponse.success("Payment confirmed successfully", orderService.confirmVietQrPayment(userId, id));
+    }
+
+    @PostMapping("/{id}/cancel-vietqr")
+    @Operation(summary = "User manual cancellation of VietQR bank transfer payment")
+    public ApiResponse<OrderResponse> cancelVietQrPayment(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long userId = getUserId(authentication);
+        return ApiResponse.success("Payment cancelled successfully", orderService.cancelVietQrPayment(userId, id));
+    }
+
     @PutMapping("/{id}/confirm-received")
     @Operation(summary = "Confirm an order was received (SHIPPED -> DELIVERED) by current user")
     public ApiResponse<OrderResponse> confirmReceived(

@@ -70,7 +70,11 @@ public class OrderServiceImpl implements OrderService {
     private final com.training.marketplace.service.PaygateClientService paygateClientService;
     private final MerchandisingEventService merchandisingEventService;
     private final DeliveryService deliveryService;
+<<<<<<< HEAD
     private final RefundRequestRepository refundRequestRepository;
+=======
+    private final OrderExpiryJob orderExpiryJob;
+>>>>>>> 165e507 (feat(order): auto-cancellation worker, VietQR confirm/cancel payment APIs, and PayGate callback cancel URL)
 
     @Override
     @Transactional
@@ -302,6 +306,7 @@ public class OrderServiceImpl implements OrderService {
                 baseResponse.financeAmount(),
                 baseResponse.paygateTransactionRef(),
                 paygatePayload,
+                savedOrder.getPaygateExpiresAt(),
                 baseResponse.note(),
                 baseResponse.items(),
                 baseResponse.createdAt(),
@@ -383,22 +388,22 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public PageResponse<OrderResponse> getUserOrders(Long userId, Pageable pageable) {
         return getUserOrders(userId, null, null, null, pageable);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public PageResponse<OrderResponse> getUserOrders(Long userId, OrderStatus status, com.training.marketplace.enums.PaymentStatus paymentStatus, String search, Pageable pageable) {
         String cleanSearch = (search != null && !search.trim().isEmpty()) ? "%" + search.trim().toLowerCase() + "%" : null;
         Page<Order> page = orderRepository.findFilteredOrders(userId, status, paymentStatus, cleanSearch, pageable);
         page.getContent().forEach(this::ensureOrderItemProductIds);
-        return PageResponse.from(page, orderMapper::toResponse);
+        return PageResponse.from(page, this::enrichOrderResponse);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public OrderResponse getUserOrderById(Long userId, Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
@@ -406,7 +411,42 @@ public class OrderServiceImpl implements OrderService {
             throw new BadRequestException("You are not authorized to view this order");
         }
         ensureOrderItemProductIds(order);
-        return orderMapper.toResponse(order);
+        return enrichOrderResponse(order);
+    }
+
+    private OrderResponse enrichOrderResponse(Order order) {
+        if (order.getStatus() == OrderStatus.PENDING
+                && order.getPaygateExpiresAt() != null
+                && LocalDateTime.now().isAfter(order.getPaygateExpiresAt())) {
+            orderExpiryJob.cancelExpiredOrder(order);
+        }
+
+        OrderResponse resp = orderMapper.toResponse(order);
+
+        PaygatePayloadResponse payload = resp.paygatePayload();
+        if (payload == null && order.getPaygateUrl() != null && order.getPaymentStatus() == PaymentStatus.PENDING_PAYGATE) {
+            String channel = order.getPaymentMethod() != null ? order.getPaymentMethod().name() : "BANK_TRANSFER";
+            payload = new PaygatePayloadResponse(
+                    order.getId(),
+                    order.getUser().getId(),
+                    "mock-merchant-api-key-123456",
+                    order.getTotalAmount(),
+                    order.getUpfrontAmount(),
+                    order.getFinanceAmount(),
+                    channel,
+                    order.getPaygateUrl(),
+                    new com.training.marketplace.dto.response.PaygateCreateCheckoutResponse.BankAccountData("MBBank - Ngân hàng TMCP Quân Đội", "8888999988", "PAYGATE GATEWAY SYSTEM", order.getTotalAmount()),
+                    "ORD-" + order.getId(),
+                    null
+            );
+        }
+
+        return new OrderResponse(
+                resp.id(), resp.userId(), resp.username(), resp.userEmail(), resp.shippingAddress(),
+                resp.totalAmount(), resp.discountAmount(), resp.shippingFee(), resp.couponCode(),
+                resp.status(), resp.paymentMethod(), resp.paymentStatus(), resp.upfrontAmount(),
+                resp.financeAmount(), resp.paygateTransactionRef(), payload, order.getPaygateExpiresAt(), resp.note(), resp.items(), resp.createdAt(), resp.updatedAt()
+        );
     }
 
     private void ensureOrderItemProductIds(Order order) {
@@ -460,6 +500,75 @@ public class OrderServiceImpl implements OrderService {
         Order savedOrder = orderRepository.save(order);
         log.info("User cancelled order {}: paymentStatus={}, reservation released", orderId, savedOrder.getPaymentStatus());
         return orderMapper.toResponse(savedOrder);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse cancelVietQrPayment(Long userId, Long orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+
+        if (!order.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You are not authorized to cancel this order");
+        }
+
+        // Idempotency check: if order is already CANCELLED, return current state
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            log.info("Order #{} is already cancelled. Idempotent skip.", orderId);
+            return enrichOrderResponse(order);
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BadRequestException("Cannot cancel payment for order in status " + order.getStatus());
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setPaymentStatus(PaymentStatus.UNPAID);
+
+        // Release the reservation held while the order was PENDING.
+        if (order.getWarehouseId() != null) {
+            inventoryFacade.release(order.getWarehouseId(), quantitiesByVariant(order));
+        }
+
+        // Refund the coupon redemption held for this order (frees a usage slot; idempotent).
+        promotionService.refundIfPresent(order.getPromotionCodeId(), order.getId());
+
+        Order savedOrder = orderRepository.save(order);
+        log.info("User cancelled VietQR payment for order {}: reservation released, coupon refunded", orderId);
+        return enrichOrderResponse(savedOrder);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse confirmVietQrPayment(Long userId, Long orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+
+        if (!order.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You are not authorized to perform payment for this order");
+        }
+
+        // Idempotency check: if order is already PAID or CONFIRMED, return current state without double fulfillment
+        if (order.getPaymentStatus() == PaymentStatus.PAID || order.getStatus() == OrderStatus.CONFIRMED) {
+            log.info("Order #{} is already confirmed and paid. Idempotent skip.", orderId);
+            return enrichOrderResponse(order);
+        }
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new BadRequestException("Order is cancelled and cannot be paid");
+        }
+
+        order.setStatus(OrderStatus.CONFIRMED);
+        order.setPaymentStatus(PaymentStatus.PAID);
+        Order savedOrder = orderRepository.save(order);
+
+        // Fulfill stock (convert reservation to actual stock decrement)
+        if (savedOrder.getWarehouseId() != null && savedOrder.getItems() != null && !savedOrder.getItems().isEmpty()) {
+            inventoryFacade.fulfill(savedOrder.getWarehouseId(), quantitiesByVariant(savedOrder));
+        }
+
+        log.info("User confirmed VietQR transfer for Order #{}: updated to CONFIRMED & PAID, stock fulfilled.", orderId);
+        return enrichOrderResponse(savedOrder);
     }
 
     @Override

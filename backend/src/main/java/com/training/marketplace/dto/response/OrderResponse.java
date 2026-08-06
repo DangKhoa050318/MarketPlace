@@ -24,6 +24,7 @@ public record OrderResponse(
         BigDecimal financeAmount,
         String paygateTransactionRef,
         PaygatePayloadResponse paygatePayload,
+        LocalDateTime paygateExpiresAt,
         String note,
         List<OrderItemResponse> items,
         LocalDateTime createdAt,

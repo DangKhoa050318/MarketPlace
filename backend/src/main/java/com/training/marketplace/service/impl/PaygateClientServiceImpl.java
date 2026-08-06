@@ -37,7 +37,7 @@ public class PaygateClientServiceImpl implements PaygateClientService {
     @Value("${marketplace.paygate.return-url:http://localhost:4200/orders/callback}")
     private String returnUrl;
 
-    @Value("${marketplace.paygate.cancel-url:http://localhost:4200/cart}")
+    @Value("${marketplace.paygate.cancel-url:http://localhost:4200/orders/callback}")
     private String cancelUrl;
 
     public PaygateClientServiceImpl(CurrencyConversionService currencyConversionService) {
@@ -104,9 +104,9 @@ public class PaygateClientServiceImpl implements PaygateClientService {
 
         if ("BANK_TRANSFER".equalsIgnoreCase(paymentMethodStr)) {
             mockBankAccount = new PaygateCreateCheckoutResponse.BankAccountData(
-                    "Ngân hàng chủ PayGate (VietinBank)",
-                    "PAYGATE-0001-9999",
-                    "PayGate JSC",
+                    "MBBank - Ngân hàng TMCP Quân Đội",
+                    "8888999988",
+                    "PAYGATE GATEWAY SYSTEM",
                     vndAmount
             );
             transferContent = "PAYGATE MOCK_MERCHANT " + orderIdStr;

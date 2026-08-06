@@ -24,6 +24,10 @@ public interface OrderService {
 
     OrderResponse cancelUserOrder(Long userId, Long orderId);
 
+    OrderResponse cancelVietQrPayment(Long userId, Long orderId);
+
+    OrderResponse confirmVietQrPayment(Long userId, Long orderId);
+
     OrderResponse confirmReceived(Long userId, Long orderId);
 
     PageResponse<OrderResponse> getAdminOrders(OrderStatus status, Pageable pageable);
