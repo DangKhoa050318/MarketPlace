@@ -490,3 +490,14 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
 - **① Sync:** `OrderServiceImpl.confirmReceived` gọi `DeliveryService.completeForCustomerConfirmation(orderId, userId)` → nếu order có Delivery thì **đóng luôn delivery = DELIVERED** (+ event "Khách xác nhận đã nhận hàng") trong **cùng transaction**; lock theo thứ tự `Order → Delivery` (order dùng `findByIdForUpdate`). Order + delivery luôn nhất quán.
 - **② Gate:** chỉ cho xác nhận khi delivery đã **`IN_TRANSIT`** (đã lấy hàng). Delivery `PENDING` → BE ném lỗi rõ ràng, FE `canConfirmReceived()` ẩn nút; **không có** delivery record → vẫn cho (fallback đơn SHIPPED không tạo tracking); đã `DELIVERED` → idempotent.
 - ✅ Verify: backend unit **293/293 PASS**; `npm run build` **SUCCESS**.
+
+### webhook security hardening (F00 — Khoa) — 2026-08-06
+
+> Vá + siết `PaymentWebhookServiceImpl` (nhánh `fix/webhook-security-hardening`). **Đụng code webhook đã merge của Hoàng** (PR #46 `fix/webhook-phantom-stock`) — bản này **giữ** phần nhận diện hủy của Hoàng và **bổ sung** các lớp bảo mật + concurrency.
+> ⚠️ Chạm code đã merge của Hoàng → **cần Hoàng + Vinh review** khi PR.
+
+- **Chữ ký:** thiếu chữ ký → **403** (mặc định `require-signature=true`); so khớp exact + constant-time (`MessageDigest.isEqual`) → đóng lỗ `.contains()` bypass + timing side-channel. Cấu hình `marketplace.paygate.webhook.require-signature` (env `PAYGATE_WEBHOOK_REQUIRE_SIGNATURE`).
+- **Idempotency + concurrency:** đọc đơn bằng `findByIdForUpdate` (SELECT..FOR UPDATE) → check + nhả/trừ kho **atomic**, chặn double-release khi PayGate retry đồng thời (phantom stock). Guard `paymentStatus==PAID || status==CANCELLED` (bền khi đơn tiến sang SHIPPED, không hụt như `status==CONFIRMED`).
+- **Fail-fast prod:** `WebhookSignatureConfigGuard` từ chối khởi động app nếu profile `prod` mà `require-signature=false` → không thể lên air với webhook không xác thực.
+- **Gộp của Hoàng:** nhận diện hủy qua `event` (`PAYMENT_CANCELLED`/`PAYMENT_FAILED`), không chỉ `status`.
+- ✅ Verify: backend unit **309/309 PASS**.

@@ -95,6 +95,11 @@ marketplace:
     api-key: ${PAYGATE_API_KEY:mock-merchant-api-key-123456}
     return-url: ${PAYGATE_RETURN_URL:http://localhost:4200/orders/callback}
     cancel-url: ${PAYGATE_CANCEL_URL:http://localhost:4200/cart}
+    webhook:
+      # The webhook endpoint is public (permitAll); this shared-secret signature is its only auth.
+      # Keep true in real environments. Set false only if the PayGate build here does not yet send
+      # the X-Paygate-Signature header, otherwise every webhook is rejected with 403.
+      require-signature: ${PAYGATE_WEBHOOK_REQUIRE_SIGNATURE:true}
   review:
     # Days after delivery during which a customer may still review a purchase (G5).
     window-days: ${REVIEW_WINDOW_DAYS:90}
