@@ -5,6 +5,7 @@ import com.training.marketplace.dto.response.CartItemResponse;
 import com.training.marketplace.dto.response.CartResponse;
 import com.training.marketplace.dto.response.OrderResponse;
 import com.training.marketplace.entity.Order;
+import com.training.marketplace.entity.ProductVariant;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.enums.OrderStatus;
 import com.training.marketplace.enums.PaymentMethod;
@@ -15,6 +16,7 @@ import com.training.marketplace.mapper.OrderMapper;
 import com.training.marketplace.publisher.OrderEventPublisher;
 import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.repository.ProductRepository;
+import com.training.marketplace.repository.ProductVariantRepository;
 import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.impl.OrderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -47,6 +50,7 @@ class OrderServiceTest {
 
     @Mock private OrderRepository orderRepository;
     @Mock private ProductRepository productRepository;
+    @Mock private ProductVariantRepository variantRepository;
     @Mock private UserRepository userRepository;
     @Mock private CartService cartService;
     @Mock private InventoryFacade inventoryFacade;
@@ -98,6 +102,7 @@ class OrderServiceTest {
         when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
         when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
         when(orderMapper.toResponse(testOrder)).thenReturn(testOrderResponse);
+        stubCurrentVariantPrice();
 
         OrderResponse response = orderService.createOrder(1L, request);
 
@@ -127,6 +132,7 @@ class OrderServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(cartService.getCart(1L)).thenReturn(cartResponse);
         when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
+        stubCurrentVariantPrice();
         doThrow(new BadRequestException("Insufficient stock for variant 10"))
                 .when(inventoryFacade).reserve(eq(1L), anyMap());
 
@@ -147,6 +153,7 @@ class OrderServiceTest {
         when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
         when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
         when(orderMapper.toResponse(testOrder)).thenReturn(testOrderResponse);
+        stubCurrentVariantPrice();
 
         orderService.createOrder(1L, request);
 
@@ -173,6 +180,7 @@ class OrderServiceTest {
                 .thenReturn(new AppliedCoupon(500L, "FREE100", new BigDecimal("200.00")));
         when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
         when(orderMapper.toResponse(testOrder)).thenReturn(testOrderResponse);
+        stubCurrentVariantPrice();
 
         orderService.createOrder(1L, request);
 
@@ -184,5 +192,37 @@ class OrderServiceTest {
         assertThat(saved.getTotalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         verify(inventoryFacade).fulfill(eq(1L), anyMap());   // stock committed now, no webhook will
         verifyNoInteractions(paygateClientService);          // PayGate bypassed for a 0đ order
+    }
+
+    @Test
+    @DisplayName("createOrder: blocks checkout and asks to review cart when a variant's price changed")
+    void createOrder_priceChanged_blocksAndAsksToReviewCart() {
+        // Cart snapshot shows $100 (captured at add-to-cart), but admin has since raised it to $120.
+        CreateOrderRequest request = new CreateOrderRequest("123 Main St", null, null);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(cartService.getCart(1L)).thenReturn(cartResponse);       // snapshot unitPrice = 100.00
+        when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
+        ProductVariant repriced = ProductVariant.builder()
+                .productId(100L).sku("LAP-1").variantName("Silver / 16GB")
+                .price(new BigDecimal("120.00")).build();
+        repriced.setId(10L);
+        when(variantRepository.findAllById(any())).thenReturn(List.of(repriced));
+
+        assertThatThrownBy(() -> orderService.createOrder(1L, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Giá đã thay đổi");
+
+        // Rejected before touching stock or persisting the order.
+        verify(inventoryFacade, never()).reserve(any(), anyMap());
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    /** Stub the DB re-price lookup: variant 10 currently sells for $100.00 (matches the cart snapshot). */
+    private void stubCurrentVariantPrice() {
+        ProductVariant variant = ProductVariant.builder()
+                .productId(100L).sku("LAP-1").variantName("Silver / 16GB")
+                .price(BigDecimal.valueOf(100.00)).build();
+        variant.setId(10L);
+        when(variantRepository.findAllById(any())).thenReturn(List.of(variant));
     }
 }
