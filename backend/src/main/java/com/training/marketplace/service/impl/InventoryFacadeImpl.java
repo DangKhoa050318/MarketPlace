@@ -82,6 +82,19 @@ public class InventoryFacadeImpl implements InventoryFacade {
         stockLevelRepository.saveAll(rows.values());
     }
 
+    @Override
+    @Transactional
+    public void returnStock(Long warehouseId, Map<Long, Integer> quantityByVariant) {
+        Map<Long, StockLevel> rows = lock(warehouseId, quantityByVariant);
+        for (Map.Entry<Long, Integer> e : quantityByVariant.entrySet()) {
+            StockLevel sl = require(rows, warehouseId, e.getKey());
+            // A returned order was already fulfilled, so its stock left as an on-hand decrement (reserved
+            // is 0). Add the quantity back on-hand; do not touch reservedQuantity.
+            sl.setQuantity(sl.getQuantity() + e.getValue());
+        }
+        stockLevelRepository.saveAll(rows.values());
+    }
+
     /** Locks the stock_levels rows for the given variants (ascending variantId → deadlock-free). */
     private Map<Long, StockLevel> lock(Long warehouseId, Map<Long, Integer> quantityByVariant) {
         List<Long> variantIds = new ArrayList<>(quantityByVariant.keySet());
