@@ -193,6 +193,23 @@ class AdminOrderServiceTest {
         verify(orderRepository, never()).save(any(Order.class));
     }
 
+    @Test
+    @DisplayName("updateOrderStatusByAdmin: cancelling a SHIPPED order (failed delivery) returns stock on-hand")
+    void updateOrderStatusByAdmin_cancelShipped_returnsStock() {
+        Order order = reservedOrder(OrderStatus.SHIPPED);
+        UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.CANCELLED, "Failed delivery / boomed");
+        when(orderRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenReturn(order);
+        when(orderMapper.toResponse(order)).thenReturn(sampleOrderResponse);
+
+        orderService.updateOrderStatusByAdmin(2L, request);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        // Shipped stock was already decremented at ship → add it back on-hand, not a reservation release.
+        verify(inventoryFacade).returnStock(eq(5L), eq(Map.of(100L, 2, 200L, 3)));
+        verify(inventoryFacade, never()).release(any(), any());
+    }
+
     /** An order with a warehouse and two reserved variants (100 -> 2, 200 -> 3). */
     private Order reservedOrder(OrderStatus status) {
         Order order = Order.builder()

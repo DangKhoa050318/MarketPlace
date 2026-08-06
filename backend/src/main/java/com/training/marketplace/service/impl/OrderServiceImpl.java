@@ -485,11 +485,17 @@ public class OrderServiceImpl implements OrderService {
             inventoryFacade.fulfill(order.getWarehouseId(), quantitiesByVariant(order));
         }
 
-        // When an admin cancels, release the reservation and refund any coupon (mirrors
-        // cancelUserOrder). Guard against a CANCELLED -> CANCELLED no-op double release.
+        // When an admin cancels, restore stock and refund any coupon (mirrors cancelUserOrder).
+        // Guard against a CANCELLED -> CANCELLED no-op double release.
         if (request.status() == OrderStatus.CANCELLED && previousStatus != OrderStatus.CANCELLED) {
             if (order.getWarehouseId() != null) {
-                inventoryFacade.release(order.getWarehouseId(), quantitiesByVariant(order));
+                if (previousStatus == OrderStatus.SHIPPED) {
+                    // Failed / refused delivery ("bom hàng"): the stock was already decremented at ship,
+                    // so add it back on-hand instead of releasing a reservation that no longer exists.
+                    inventoryFacade.returnStock(order.getWarehouseId(), quantitiesByVariant(order));
+                } else {
+                    inventoryFacade.release(order.getWarehouseId(), quantitiesByVariant(order));
+                }
             }
             promotionService.refundIfPresent(order.getPromotionCodeId(), order.getId());
         }
@@ -522,7 +528,7 @@ public class OrderServiceImpl implements OrderService {
             case PENDING -> newStatus == OrderStatus.CONFIRMED || newStatus == OrderStatus.CANCELLED;
             case CONFIRMED -> newStatus == OrderStatus.PROCESSING || newStatus == OrderStatus.CANCELLED;
             case PROCESSING -> newStatus == OrderStatus.SHIPPED || newStatus == OrderStatus.CANCELLED;
-            case SHIPPED -> newStatus == OrderStatus.DELIVERED;
+            case SHIPPED -> newStatus == OrderStatus.DELIVERED || newStatus == OrderStatus.CANCELLED;
             case DELIVERED, CANCELLED -> false;
         };
         if (!isValid) {

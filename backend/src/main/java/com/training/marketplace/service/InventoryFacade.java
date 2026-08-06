@@ -25,4 +25,11 @@ public interface InventoryFacade {
 
     /** Convert a reservation into an actual decrement (e.g. on shipment). */
     void fulfill(Long warehouseId, Map<Long, Integer> quantityByVariant);
+
+    /**
+     * Add stock back on-hand after a fulfilled order is returned (failed / refused delivery — "bom hàng").
+     * Inverse of {@link #fulfill}'s on-hand decrement: increases {@code quantity}; reservations are
+     * untouched (they were already cleared at fulfil).
+     */
+    void returnStock(Long warehouseId, Map<Long, Integer> quantityByVariant);
 }
