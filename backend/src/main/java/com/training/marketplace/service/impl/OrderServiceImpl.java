@@ -9,6 +9,7 @@ import com.training.marketplace.dto.response.DashboardStatsResponse;
 import com.training.marketplace.dto.response.OrderResponse;
 import com.training.marketplace.entity.Order;
 import com.training.marketplace.entity.OrderItem;
+import com.training.marketplace.entity.ProductVariant;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.dto.response.PaygatePayloadResponse;
 import com.training.marketplace.enums.OrderStatus;
@@ -40,6 +41,8 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,10 +87,34 @@ public class OrderServiceImpl implements OrderService {
             quantityByVariant.merge(item.variantId(), item.quantity(), Integer::sum);
         }
 
-        // 2. Reserve stock (locks stock_levels rows, validates no oversell). Authoritative point.
+        // 2. Re-fetch authoritative prices from the DB and reject the checkout if any variant's current
+        //    price differs from the cart (Redis) snapshot — the customer must review the new price before
+        //    confirming instead of being charged a silently-changed amount.
+        Map<Long, ProductVariant> variantById = new HashMap<>();
+        for (ProductVariant v : variantRepository.findAllById(quantityByVariant.keySet())) {
+            variantById.put(v.getId(), v);
+        }
+        List<String> priceChanges = new ArrayList<>();
+        for (CartItemResponse item : cart.items()) {
+            ProductVariant variant = variantById.get(item.variantId());
+            if (variant == null) {
+                throw new BadRequestException(
+                        "Sản phẩm '" + item.productName() + "' không còn khả dụng, vui lòng xem lại giỏ hàng.");
+            }
+            BigDecimal currentPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
+            if (item.unitPrice() == null || currentPrice.compareTo(item.unitPrice()) != 0) {
+                priceChanges.add(String.format("%s (%s → %s)", item.productName(), item.unitPrice(), currentPrice));
+            }
+        }
+        if (!priceChanges.isEmpty()) {
+            throw new BadRequestException(
+                    "Giá đã thay đổi, vui lòng xem lại giỏ hàng: " + String.join(", ", priceChanges));
+        }
+
+        // 3. Reserve stock (locks stock_levels rows, validates no oversell). Authoritative point.
         inventoryFacade.reserve(warehouseId, quantityByVariant);
 
-        // 3. Build order + items from cart snapshots.
+        // 4. Build order + items using the (now-validated) current DB prices.
         BigDecimal calculatedTotal = BigDecimal.ZERO;
         Order order = Order.builder()
                 .user(user)
@@ -99,7 +126,9 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         for (CartItemResponse item : cart.items()) {
-            BigDecimal subtotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
+            ProductVariant variant = variantById.get(item.variantId());
+            BigDecimal unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
+            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(item.quantity()));
             calculatedTotal = calculatedTotal.add(subtotal);
             order.addItem(OrderItem.builder()
                     .variantId(item.variantId())
@@ -107,7 +136,7 @@ public class OrderServiceImpl implements OrderService {
                     .sku(item.sku())
                     .productName(item.productName())
                     .variantName(item.variantName())
-                    .unitPrice(item.unitPrice())
+                    .unitPrice(unitPrice)
                     .quantity(item.quantity())
                     .subtotal(subtotal)
                     .build());
