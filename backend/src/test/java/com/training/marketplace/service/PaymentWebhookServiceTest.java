@@ -5,7 +5,7 @@ import com.training.marketplace.entity.Order;
 import com.training.marketplace.entity.OrderItem;
 import com.training.marketplace.enums.OrderStatus;
 import com.training.marketplace.enums.PaymentStatus;
-import com.training.marketplace.exception.BadRequestException;
+import com.training.marketplace.exception.ForbiddenException;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.service.impl.PaymentWebhookServiceImpl;
@@ -60,7 +60,7 @@ class PaymentWebhookServiceTest {
         item.setQuantity(2);
         order.setItems(List.of(item));
 
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
 
         PaygateWebhookRequest request = new PaygateWebhookRequest(
                 "PAYMENT_COMPLETED",
@@ -97,7 +97,7 @@ class PaymentWebhookServiceTest {
         order.setStatus(OrderStatus.CONFIRMED);
         order.setPaymentStatus(PaymentStatus.PAID);
 
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
 
         PaygateWebhookRequest request = new PaygateWebhookRequest(
                 "PAYMENT_COMPLETED",
@@ -122,7 +122,7 @@ class PaymentWebhookServiceTest {
     @Test
     void processPaygateWebhook_OrderNotFound_ThrowsResourceNotFoundException() {
         // given
-        when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+        when(orderRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
         PaygateWebhookRequest request = new PaygateWebhookRequest(
                 "PAYMENT_COMPLETED",
@@ -140,7 +140,7 @@ class PaymentWebhookServiceTest {
     }
 
     @Test
-    void processPaygateWebhook_InvalidSignature_ThrowsBadRequestException() {
+    void processPaygateWebhook_InvalidSignature_ThrowsForbiddenException() {
         // given
         PaygateWebhookRequest request = new PaygateWebhookRequest(
                 "PAYMENT_COMPLETED",
@@ -151,9 +151,63 @@ class PaymentWebhookServiceTest {
                 "SUCCESS"
         );
 
-        // when & then
+        // when & then — a wrong secret is an auth failure (403), and never touches the order/stock
         assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(request, "invalid-bad-signature"))
-                .isInstanceOf(BadRequestException.class)
+                .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Invalid webhook signature");
+        verifyNoInteractions(orderRepository, inventoryFacade);
+    }
+
+    @Test
+    void processPaygateWebhook_MissingSignature_WhenEnforced_ThrowsForbidden() {
+        // The endpoint is public, so a webhook with no signature must be rejected when enforcement is on.
+        ReflectionTestUtils.setField(paymentWebhookService, "requireSignature", true);
+        PaygateWebhookRequest request = new PaygateWebhookRequest(
+                "PAYMENT_COMPLETED", "TXN_1", 1L, "ORD-100", new BigDecimal("100.00"), "SUCCESS");
+
+        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(request, null))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Missing webhook signature");
+        verifyNoInteractions(orderRepository, inventoryFacade);
+    }
+
+    @Test
+    void processPaygateWebhook_SignatureMerelyContainingKey_IsRejected() {
+        // Old bug: String.contains() let "prefix-<key>-suffix" through. Exact constant-time match closes it.
+        ReflectionTestUtils.setField(paymentWebhookService, "requireSignature", true);
+        PaygateWebhookRequest request = new PaygateWebhookRequest(
+                "PAYMENT_COMPLETED", "TXN_1", 1L, "ORD-100", new BigDecimal("100.00"), "SUCCESS");
+
+        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(
+                request, "prefix-mock-merchant-api-key-123456-suffix"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Invalid webhook signature");
+        verifyNoInteractions(orderRepository, inventoryFacade);
+    }
+
+    @Test
+    void processPaygateWebhook_ValidSignature_WhenEnforced_Processes() {
+        // Enforcement on + the exact shared secret -> the webhook is authenticated and runs normally.
+        ReflectionTestUtils.setField(paymentWebhookService, "requireSignature", true);
+        Long orderId = 200L;
+        Order order = new Order();
+        order.setId(orderId);
+        order.setWarehouseId(1L);
+        order.setStatus(OrderStatus.PENDING);
+        order.setPaymentStatus(PaymentStatus.PENDING_PAYGATE);
+        OrderItem item = new OrderItem();
+        item.setVariantId(7L);
+        item.setQuantity(1);
+        order.setItems(List.of(item));
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
+
+        PaygateWebhookRequest request = new PaygateWebhookRequest(
+                "PAYMENT_COMPLETED", "TXN_1", 1L, "ORD-200", new BigDecimal("100.00"), "SUCCESS");
+
+        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(
+                request, "mock-merchant-api-key-123456");
+
+        assertThat(result.get("status")).isEqualTo("CONFIRMED");
+        verify(inventoryFacade).fulfill(eq(1L), eq(Map.of(7L, 1)));
     }
 }

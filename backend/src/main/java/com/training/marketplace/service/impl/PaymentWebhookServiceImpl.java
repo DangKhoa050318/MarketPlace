@@ -6,6 +6,7 @@ import com.training.marketplace.entity.OrderItem;
 import com.training.marketplace.enums.OrderStatus;
 import com.training.marketplace.enums.PaymentStatus;
 import com.training.marketplace.exception.BadRequestException;
+import com.training.marketplace.exception.ForbiddenException;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.service.InventoryFacade;
@@ -16,6 +17,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -30,6 +33,15 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
     @Value("${marketplace.paygate.api-key:mock-merchant-api-key-123456}")
     private String merchantApiKey;
 
+    /**
+     * When true (default), a webhook that arrives without a valid signature is rejected. The endpoint is
+     * {@code permitAll()}, so this shared-secret check is the only authentication guarding it. Set
+     * {@code marketplace.paygate.webhook.require-signature=false} only if the PayGate build in your
+     * environment does not yet echo the secret in the {@code X-Paygate-Signature} header.
+     */
+    @Value("${marketplace.paygate.webhook.require-signature:true}")
+    private boolean requireSignature;
+
     @Override
     @Transactional
     public Map<String, Object> processPaygateWebhook(PaygateWebhookRequest payload, String signature) {
@@ -40,13 +52,11 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
             throw new BadRequestException("Invalid payload: orderId and transactionRef are null");
         }
 
-        // 1. Signature / Authorization Verification (Security Check)
-        if (signature != null && !signature.isBlank()) {
-            if (!signature.equals(merchantApiKey) && !signature.contains(merchantApiKey)) {
-                log.warn("Invalid PayGate Webhook signature provided: {}", signature);
-                throw new BadRequestException("Invalid webhook signature / unauthorized request");
-            }
-        }
+        // 1. Signature / Authorization Verification (Security Check).
+        // PayGate authenticates each webhook by sending the shared merchant secret in X-Paygate-Signature.
+        // We reject a missing signature when enforcement is on, and compare exactly + in constant time so a
+        // value that merely *contains* the secret (old bug) or a response-timing side-channel cannot pass.
+        verifySignature(signature);
 
         // 2. Parse Order ID
         Long orderId = parseOrderId(payload.orderId());
@@ -54,12 +64,18 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
             throw new BadRequestException("Could not resolve valid order ID from string: " + payload.orderId());
         }
 
-        Order order = orderRepository.findById(orderId)
+        // Lock the order row (SELECT ... FOR UPDATE) so concurrent duplicate webhooks are serialized:
+        // the idempotency check below then reads-and-acts atomically, closing the race where two
+        // simultaneous retries both pass the guard and release/fulfill the same stock twice.
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
-        // 3. Idempotency Check: If order is already PAID, return early without duplicate stock operations
-        if (order.getPaymentStatus() == PaymentStatus.PAID && order.getStatus() == OrderStatus.CONFIRMED) {
-            log.info("Webhook received for already PAID order #{}. Returning idempotent result.", orderId);
+        // 3. Idempotency guard: PAID means fulfill already ran; CANCELLED means release already ran.
+        // A webhook replayed in either terminal state must be a no-op — PayGate can retry the same
+        // event multiple times, and re-running fulfill/release would corrupt stock (phantom stock).
+        if (order.getPaymentStatus() == PaymentStatus.PAID || order.getStatus() == OrderStatus.CANCELLED) {
+            log.info("Webhook for order #{} already in terminal state (status={}, payment={}). Idempotent skip.",
+                    orderId, order.getStatus(), order.getPaymentStatus());
             return Map.of(
                     "orderId", order.getId(),
                     "status", order.getStatus().name(),
@@ -100,6 +116,36 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
                 "paymentStatus", order.getPaymentStatus().name(),
                 "idempotent", false
         );
+    }
+
+    /**
+     * Authenticates the webhook against the shared PayGate secret. When enforcement is enabled a
+     * missing/blank signature is rejected; a present signature must match the secret exactly. The
+     * comparison is constant-time so the secret cannot be recovered through response-timing analysis.
+     */
+    private void verifySignature(String signature) {
+        if (signature == null || signature.isBlank()) {
+            if (requireSignature) {
+                log.warn("Rejected PayGate webhook: missing X-Paygate-Signature header");
+                throw new ForbiddenException("Missing webhook signature / unauthorized request");
+            }
+            log.warn("PayGate webhook accepted without a signature "
+                    + "(enforcement disabled via marketplace.paygate.webhook.require-signature=false)");
+            return;
+        }
+        if (!constantTimeEquals(signature, merchantApiKey)) {
+            log.warn("Rejected PayGate webhook: invalid X-Paygate-Signature");
+            throw new ForbiddenException("Invalid webhook signature / unauthorized request");
+        }
+    }
+
+    private boolean constantTimeEquals(String provided, String expected) {
+        if (expected == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                provided.getBytes(StandardCharsets.UTF_8),
+                expected.getBytes(StandardCharsets.UTF_8));
     }
 
     private Long parseOrderId(String rawOrderId) {
