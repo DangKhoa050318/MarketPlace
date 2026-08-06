@@ -18,12 +18,12 @@ import { OrderService } from '../../../core/services/order.service';
   ],
   template: `
     <div class="callback-container container">
-      <mat-card class="callback-card glass-panel text-center">
+      <mat-card class="callback-card text-center">
         <div class="status-icon-wrapper" [class.success]="isSuccess" [class.cancelled]="!isSuccess">
           <mat-icon class="status-icon">{{ isSuccess ? 'check_circle' : 'cancel' }}</mat-icon>
         </div>
 
-        <h1 class="callback-title text-gradient-cyan">
+        <h1 class="callback-title" [class.title-success]="isSuccess" [class.title-cancelled]="!isSuccess">
           {{ isSuccess ? 'Payment Completed Successfully!' : 'Payment Cancelled or Failed' }}
         </h1>
 
@@ -34,7 +34,7 @@ import { OrderService } from '../../../core/services/order.service';
           Your payment session was cancelled or failed to process.
         </p>
 
-        <div class="transaction-details-box glass-panel" *ngIf="orderId || transactionRef">
+        <div class="transaction-details-box" *ngIf="orderId || transactionRef">
           <div class="detail-row" *ngIf="orderId">
             <span class="detail-label">Order Reference:</span>
             <strong class="detail-val">#{{ cleanOrderId(orderId) }}</strong>
@@ -52,14 +52,14 @@ import { OrderService } from '../../../core/services/order.service';
         </div>
 
         <div class="actions-row">
-          <a mat-raised-button color="primary" class="btn-glowing" [routerLink]="['/orders', cleanOrderId(orderId)]" *ngIf="orderId">
-            <mat-icon>visibility</mat-icon> View Order Details
+          <a mat-raised-button color="primary" class="action-btn btn-primary" [routerLink]="['/orders', cleanOrderId(orderId)]" *ngIf="orderId">
+            <mat-icon class="btn-icon">visibility</mat-icon> View Order Details
           </a>
-          <a mat-stroked-button routerLink="/orders">
-            <mat-icon>format_list_bulleted</mat-icon> All Orders
+          <a mat-stroked-button class="action-btn" routerLink="/orders">
+            <mat-icon class="btn-icon">format_list_bulleted</mat-icon> All Orders
           </a>
-          <a mat-button routerLink="/products">
-            <mat-icon>shopping_bag</mat-icon> Continue Shopping
+          <a mat-button class="action-btn" routerLink="/products">
+            <mat-icon class="btn-icon">shopping_bag</mat-icon> Continue Shopping
           </a>
         </div>
       </mat-card>
@@ -67,27 +67,32 @@ import { OrderService } from '../../../core/services/order.service';
   `,
   styles: [`
     .callback-container {
-      padding: 40px 16px;
+      padding: 60px 16px;
       display: flex;
       justify-content: center;
       align-items: center;
-      min-height: 70vh;
+      min-height: 75vh;
+      background-color: #f8fafc;
     }
 
     .callback-card {
-      padding: 36px 32px;
+      padding: 40px 32px;
       max-width: 540px;
       width: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      border-radius: 20px;
+      border-radius: 16px;
+      background: #ffffff !important;
+      color: #0f172a !important;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+      border: 1px solid #e2e8f0 !important;
     }
 
     .status-icon-wrapper {
-      width: 80px;
-      height: 80px;
+      width: 76px;
+      height: 76px;
       border-radius: 50%;
       display: flex;
       justify-content: center;
@@ -95,42 +100,52 @@ import { OrderService } from '../../../core/services/order.service';
       margin-bottom: 20px;
     }
     .status-icon-wrapper.success {
-      background: rgba(16, 185, 129, 0.15);
-      color: #10b981;
+      background: #dcfce7;
+      color: #16a34a;
     }
     .status-icon-wrapper.cancelled {
-      background: rgba(239, 68, 68, 0.15);
-      color: #ef4444;
+      background: #fee2e2;
+      color: #dc2626;
     }
 
     .status-icon {
-      font-size: 54px;
-      width: 54px;
-      height: 54px;
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+      line-height: 48px;
     }
 
     .callback-title {
-      font-size: 1.6rem;
-      font-weight: 800;
-      margin: 0 0 8px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 0 0 10px;
+      line-height: 1.3;
+    }
+    .title-success {
+      color: #15803d;
+    }
+    .title-cancelled {
+      color: #b91c1c;
     }
 
     .callback-subtitle {
-      color: var(--text-muted);
+      color: #64748b;
       font-size: 0.95rem;
       margin-bottom: 24px;
+      line-height: 1.5;
     }
 
     .transaction-details-box {
       width: 100%;
-      padding: 16px 20px;
+      padding: 18px 20px;
       border-radius: 12px;
       margin-bottom: 28px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      background: rgba(255, 255, 255, 0.6);
-      border: 1px solid rgba(226, 232, 240, 0.8);
+      gap: 12px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      box-sizing: border-box;
     }
 
     .detail-row {
@@ -141,20 +156,21 @@ import { OrderService } from '../../../core/services/order.service';
     }
 
     .detail-label {
-      color: var(--text-muted);
+      color: #64748b;
       font-weight: 600;
     }
 
     .detail-val {
       font-weight: 700;
-      color: var(--text-main);
+      color: #0f172a;
     }
 
     .badge-status {
       font-size: 0.75rem;
       font-weight: 800;
-      padding: 3px 10px;
+      padding: 4px 12px;
       border-radius: 12px;
+      letter-spacing: 0.3px;
     }
     .badge-success {
       background: #dcfce7;
@@ -167,10 +183,35 @@ import { OrderService } from '../../../core/services/order.service';
 
     .actions-row {
       display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
       width: 100%;
+    }
+
+    @media (min-width: 480px) {
+      .actions-row {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+    }
+
+    .action-btn {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 6px;
+      padding: 0 16px !important;
+      height: 40px !important;
+      font-weight: 600 !important;
+    }
+
+    .btn-icon {
+      font-size: 18px !important;
+      width: 18px !important;
+      height: 18px !important;
+      line-height: 18px !important;
+      margin: 0 !important;
     }
 
     .text-cyan {
@@ -189,29 +230,44 @@ export class PaymentCallbackComponent implements OnInit {
     private orderService: OrderService
   ) {}
 
+  private getFirstString(val: any): string | null {
+    if (!val) return null;
+    if (Array.isArray(val)) {
+      return val.length > 0 ? String(val[0]) : null;
+    }
+    return String(val);
+  }
+
   get isSuccess(): boolean {
-    if (!this.status) return false;
-    const s = this.status.toUpperCase();
+    const raw = this.getFirstString(this.status);
+    if (!raw) return false;
+    const s = raw.toUpperCase();
     return s === 'SUCCESS' || s === 'PROCESSING' || s === 'COMPLETED' || s === 'PAID';
   }
 
   ngOnInit(): void {
     this.route.queryParams.subscribe(params => {
-      this.status = params['status'] || 'SUCCESS';
-      this.orderId = params['orderId'] || null;
-      this.transactionRef = params['transactionRef'] || null;
+      this.status = this.getFirstString(params['status']) || 'SUCCESS';
+      this.orderId = this.getFirstString(params['orderId']);
+      this.transactionRef = this.getFirstString(params['transactionRef']);
 
       if (this.isSuccess && this.orderId) {
         this.orderService.confirmPaygatePayment(this.orderId, this.transactionRef || undefined).subscribe({
           next: (res) => console.log('Payment status confirmed via callback:', res),
           error: (err) => console.warn('Could not auto-confirm payment status via callback:', err)
         });
+      } else if (!this.isSuccess && this.orderId) {
+        this.orderService.cancelPaygatePayment(this.orderId).subscribe({
+          next: (res) => console.log('Payment cancellation processed via callback:', res),
+          error: (err) => console.warn('Could not auto-cancel payment via callback:', err)
+        });
       }
     });
   }
 
-  cleanOrderId(rawId: string | null): string {
-    if (!rawId) return '';
-    return rawId.replace(/^ORD-/, '');
+  cleanOrderId(rawId: any): string {
+    const str = this.getFirstString(rawId);
+    if (!str) return '';
+    return str.replace(/^ORD-/, '');
   }
 }

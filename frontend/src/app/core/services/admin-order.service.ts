@@ -36,4 +36,9 @@ export class AdminOrderService {
     const payload: UpdateOrderStatusRequest = { status, note };
     return this.http.put<ApiResponse<Order>>(`${this.apiUrl}/${orderId}/status`, payload);
   }
+
+  countOrdersByUser(userId: number): Observable<ApiResponse<number>> {
+    const params = new HttpParams().set('userId', userId.toString());
+    return this.http.get<ApiResponse<number>>(`${this.apiUrl}/count`, { params });
+  }
 }

@@ -55,14 +55,17 @@ public class PaygateClientServiceImpl implements PaygateClientService {
         BigDecimal vndAmount = currencyConversionService.convertUsdToVnd(amount);
         String paymentMethodStr = (method != null && !method.isBlank()) ? method : "WALLET";
 
+        String dynamicReturnUrl = returnUrl;
+        String dynamicCancelUrl = cancelUrl != null && !cancelUrl.isBlank() ? cancelUrl : returnUrl + "?status=CANCELLED";
+
         PaygateCreateCheckoutRequest requestBody = new PaygateCreateCheckoutRequest(
                 apiKey,
                 orderIdStr,
                 vndAmount,
                 description != null ? description : "Thanh toan don hang #" + orderId + " tren Marketplace",
                 paymentMethodStr,
-                returnUrl,
-                cancelUrl
+                dynamicReturnUrl,
+                dynamicCancelUrl
         );
 
         HttpHeaders headers = new HttpHeaders();

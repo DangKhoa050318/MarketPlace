@@ -11,6 +11,7 @@ import { finalize } from 'rxjs/operators';
 import { ProductReview } from '../../../../core/models/review.model';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { ReviewService } from '../../../../core/services/review.service';
+import { AdminOrderService } from '../../../../core/services/admin-order.service';
 
 @Component({
   selector: 'app-admin-review-list',
@@ -119,6 +120,9 @@ import { ReviewService } from '../../../../core/services/review.service';
               </td>
               <td class="date-cell">{{ rv.createdAt | date:'mediumDate' }}</td>
               <td class="actions-col">
+                <button mat-stroked-button class="detail-btn" (click)="openDetail(rv)">
+                  <mat-icon>info</mat-icon> Detail
+                </button>
                 <button *ngIf="rv.status !== 'HIDDEN'" mat-stroked-button color="warn"
                         (click)="setStatus(rv, 'HIDDEN')" [disabled]="busyId === rv.id">
                   <mat-icon>visibility_off</mat-icon> Hide
@@ -141,6 +145,64 @@ import { ReviewService } from '../../../../core/services/review.service';
           <button mat-icon-button (click)="changePage(1)" [disabled]="page + 1 >= totalPages" aria-label="Next page">
             <mat-icon>chevron_right</mat-icon>
           </button>
+        </div>
+      </div>
+      <!-- Review detail modal -->
+      <div *ngIf="detailReview" class="rv-modal-backdrop" (click)="closeDetail()">
+        <div class="rv-modal surface-card" (click)="$event.stopPropagation()">
+          <div class="rv-modal-head">
+            <h3><mat-icon>rate_review</mat-icon> Review detail</h3>
+            <button mat-icon-button (click)="closeDetail()" aria-label="Close"><mat-icon>close</mat-icon></button>
+          </div>
+
+          <div class="rv-modal-body">
+            <div class="rv-reviewer">
+              <div class="rv-avatar">{{ (detailReview.userFullName || detailReview.username || '?').charAt(0) | uppercase }}</div>
+              <div class="rv-reviewer-info">
+                <strong>
+                  {{ detailReview.userFullName || detailReview.username }}
+                  <span *ngIf="detailReview.isVerifiedPurchase" class="verified" title="Verified purchase"><mat-icon>verified</mat-icon></span>
+                </strong>
+                <small>&#64;{{ detailReview.username }}</small>
+              </div>
+              <div class="rv-orders">
+                <span class="rv-orders-label">Số đơn đã đặt</span>
+                <strong *ngIf="!detailOrderCountLoading">{{ detailOrderCount === null ? '—' : detailOrderCount }}</strong>
+                <mat-spinner *ngIf="detailOrderCountLoading" diameter="18"></mat-spinner>
+              </div>
+            </div>
+
+            <div class="rv-meta">
+              <div><span class="rv-k">Sản phẩm</span><span class="rv-v">{{ detailReview.productName || ('#' + detailReview.productId) }}</span></div>
+              <div *ngIf="detailReview.variantName || detailReview.sku">
+                <span class="rv-k">Phân loại</span>
+                <span class="rv-v">{{ detailReview.variantName }}<em *ngIf="detailReview.sku"> · {{ detailReview.sku }}</em></span>
+              </div>
+              <div>
+                <span class="rv-k">Đánh giá</span>
+                <span class="rv-v stars">
+                  <mat-icon *ngFor="let s of stars" class="star" [class.filled]="s <= detailReview.rating">{{ s <= detailReview.rating ? 'star' : 'star_border' }}</mat-icon>
+                  <span class="rating-num">{{ detailReview.rating }}/5</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="rv-content">
+              <strong *ngIf="detailReview.title">{{ detailReview.title }}</strong>
+              <p *ngIf="detailReview.content">{{ detailReview.content }}</p>
+              <em *ngIf="!detailReview.title && !detailReview.content" class="rating-only">(chỉ có số sao, không có nội dung)</em>
+            </div>
+
+            <div class="rv-images" *ngIf="detailReview.imageUrl; else noImage">
+              <span class="rv-k">Hình ảnh đính kèm</span>
+              <a [href]="detailReview.imageUrl" target="_blank" rel="noopener noreferrer" class="rv-thumb">
+                <img [src]="detailReview.imageUrl" alt="Review image" />
+              </a>
+            </div>
+            <ng-template #noImage>
+              <div class="rv-images empty"><mat-icon>image_not_supported</mat-icon> Không có hình ảnh đính kèm</div>
+            </ng-template>
+          </div>
         </div>
       </div>
     </section>
@@ -183,6 +245,33 @@ import { ReviewService } from '../../../../core/services/review.service';
     .reply-box { margin-top: 8px; }
     .reply-box textarea { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; font-size: .8rem; resize: vertical; }
     .reply-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+    .detail-btn { margin-right: 6px; }
+    .rv-modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, .55); }
+    .rv-modal { width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+    .rv-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #eef2f7; }
+    .rv-modal-head h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.1rem; font-weight: 800; color: #0f172a; }
+    .rv-modal-body { padding: 18px 20px; display: grid; gap: 16px; }
+    .rv-reviewer { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #eef2f7; }
+    .rv-avatar { width: 44px; height: 44px; border-radius: 50%; background: #0284c7; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; flex-shrink: 0; }
+    .rv-reviewer-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    .rv-reviewer-info strong { color: #0f172a; font-size: .95rem; display: flex; align-items: center; gap: 5px; }
+    .rv-reviewer-info small { color: #94a3b8; font-size: .76rem; }
+    .rv-orders { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+    .rv-orders-label { color: #64748b; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .rv-orders strong { color: #0284c7; font-size: 1.35rem; font-weight: 850; }
+    .rv-meta { display: grid; gap: 8px; }
+    .rv-meta > div { display: flex; gap: 12px; align-items: baseline; }
+    .rv-k { flex: 0 0 92px; color: #64748b; font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+    .rv-v { color: #0f172a; font-size: .88rem; font-weight: 600; }
+    .rv-v.stars { display: inline-flex; align-items: center; gap: 2px; }
+    .rv-content { padding: 12px 14px; background: #f8fafc; border-radius: 10px; }
+    .rv-content strong { display: block; color: #0f172a; margin-bottom: 4px; }
+    .rv-content p { margin: 0; color: #334155; font-size: .86rem; line-height: 1.55; white-space: pre-wrap; }
+    .rv-images { display: grid; gap: 8px; }
+    .rv-thumb { display: inline-block; width: 140px; height: 140px; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .rv-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .rv-images.empty { display: flex; align-items: center; gap: 8px; color: #94a3b8; font-size: .82rem; font-style: italic; }
+    .rv-images.empty mat-icon { font-size: 18px; width: 18px; height: 18px; }
   `]
 })
 export class AdminReviewListComponent implements OnInit {
@@ -190,6 +279,10 @@ export class AdminReviewListComponent implements OnInit {
   loading = false;
   error = '';
   busyId: number | null = null;
+
+  detailReview: ProductReview | null = null;
+  detailOrderCount: number | null = null;
+  detailOrderCountLoading = false;
 
   replyingId: number | null = null;
   replyText = '';
@@ -210,6 +303,7 @@ export class AdminReviewListComponent implements OnInit {
 
   constructor(
     private reviewService: ReviewService,
+    private adminOrderService: AdminOrderService,
     private notification: NotificationService
   ) {}
 
@@ -284,6 +378,23 @@ export class AdminReviewListComponent implements OnInit {
   cancelReply(): void {
     this.replyingId = null;
     this.replyText = '';
+  }
+
+  openDetail(review: ProductReview): void {
+    this.detailReview = review;
+    this.detailOrderCount = null;
+    this.detailOrderCountLoading = true;
+    this.adminOrderService.countOrdersByUser(review.userId).pipe(
+      finalize(() => this.detailOrderCountLoading = false)
+    ).subscribe({
+      next: res => this.detailOrderCount = res.success ? (res.data ?? 0) : null,
+      error: () => this.detailOrderCount = null
+    });
+  }
+
+  closeDetail(): void {
+    this.detailReview = null;
+    this.detailOrderCount = null;
   }
 
   submitReply(review: ProductReview): void {
