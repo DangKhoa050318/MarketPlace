@@ -1,4 +1,4 @@
-﻿import { Component, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -12,12 +12,17 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+<<<<<<< HEAD
 import { finalize } from 'rxjs';
+=======
+import { MatTooltipModule } from '@angular/material/tooltip';
+>>>>>>> 0a0a607 (feat(vietqr): VietQR generator dialog, English UI, dynamic timer countdown, and compact action buttons)
 import { OrderService, Order } from '../../../core/services/order.service';
 import { ReviewService } from '../../../core/services/review.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-dialog.component';
+import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/vietqr-dialog.component';
 
 @Component({
   selector: 'app-order-list',
@@ -36,7 +41,9 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
     MatSelectModule,
     MatProgressSpinnerModule,
     MatDialogModule,
-    OrderReviewDialogComponent
+    MatTooltipModule,
+    OrderReviewDialogComponent,
+    VietQrDialogComponent
   ],
   template: `
     <div class="orders-page-container">
@@ -174,53 +181,57 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
               <th mat-header-cell *matHeaderCellDef>Actions</th>
               <td mat-cell *matCellDef="let order">
                 <div class="action-buttons">
-                  <button
-                    *ngIf="isPaymentEligibleForRetry(order)"
-                    mat-raised-button
-                    class="btn-pay-again"
-                    (click)="onRetryPayment(order)"
-                    [disabled]="retryingOrderId === order.id"
-                    title="Continue payment through PayGate">
+                  <a mat-icon-button class="icon-btn-action btn-view" [routerLink]="['/orders', order.id]" matTooltip="View Details">
+                    <mat-icon>visibility</mat-icon>
+                  </a>
+                  <button 
+                    *ngIf="order.status === 'PENDING' && order.paymentStatus === 'PENDING_PAYGATE' && !isSessionExpired(order) && order.paymentMethod === 'BANK_TRANSFER'" 
+                    mat-icon-button 
+                    class="icon-btn-action btn-vietqr" 
+                    (click)="openVietQrModal(order)"
+                    matTooltip="Pay via VietQR">
+                    <mat-icon>qr_code_2</mat-icon>
+                  </button>
+                  <button 
+                    *ngIf="order.status === 'PENDING' && order.paymentStatus === 'PENDING_PAYGATE' && !isSessionExpired(order) && order.paymentMethod !== 'BANK_TRANSFER'" 
+                    mat-icon-button 
+                    class="icon-btn-action btn-paygate" 
+                    (click)="continuePaygatePayment(order)"
+                    matTooltip="Pay via PayGate">
                     <mat-icon>payment</mat-icon>
-                    <span>{{ retryingOrderId === order.id ? 'Redirecting...' : 'Continue payment' }}</span>
                   </button>
                   <button
                     *ngIf="order.status === 'SHIPPED'"
-                    mat-raised-button
-                    class="btn-confirm-received"
-                    (click)="onConfirmReceived(order)"
-                    title="Confirm you received this order">
-                    <mat-icon>check_circle</mat-icon>
-                    <span>Received</span>
-                  </button>
-                  <button
-                    *ngIf="canCancelOrder(order)"
                     mat-icon-button
-                    color="warn"
-                    (click)="onCancelOrder(order)"
-                    [title]="cancelTitle(order)">
-                    <mat-icon>cancel</mat-icon>
+                    class="icon-btn-action btn-delivered"
+                    (click)="onConfirmReceived(order)"
+                    matTooltip="Confirm Order Received">
+                    <mat-icon>check_circle</mat-icon>
                   </button>
                   <button
                     *ngIf="canRequestReturn(order)"
                     mat-icon-button
-                    color="accent"
+                    class="icon-btn-action btn-return"
                     (click)="openReturnRequestForm(order)"
-                    title="Create Return Request">
+                    matTooltip="Create Return Request">
                     <mat-icon>assignment_return</mat-icon>
                   </button>
                   <button
                     *ngIf="hasUnreviewedItems(order)"
-                    mat-stroked-button
-                    class="btn-review-order"
+                    mat-icon-button
+                    class="icon-btn-action btn-review"
                     (click)="openOrderReviewModal(order)"
-                    title="Review Purchased Items">
+                    matTooltip="Review Purchased Items">
                     <mat-icon>rate_review</mat-icon>
-                    <span>Review</span>
                   </button>
-                  <a mat-icon-button color="primary" [routerLink]="['/orders', order.id]" title="View Order Details">
-                    <mat-icon>visibility</mat-icon>
-                  </a>
+                  <button 
+                    *ngIf="isCancelEligible(order)" 
+                    mat-icon-button 
+                    class="icon-btn-action btn-cancel"
+                    (click)="onCancelOrder(order)" 
+                    matTooltip="Cancel Order">
+                    <mat-icon>cancel</mat-icon>
+                  </button>
                 </div>
               </td>
             </ng-container>
@@ -745,6 +756,78 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
       border-color: rgba(255, 255, 255, 0.2) !important;
       color: var(--text-main) !important;
     }
+
+    .action-buttons {
+      display: flex;
+      align-items: center;
+      justify-content: flex-center;
+      gap: 6px;
+    }
+    .icon-btn-action {
+      width: 34px !important;
+      height: 34px !important;
+      line-height: 34px !important;
+      border-radius: 50% !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      padding: 0 !important;
+    }
+    .icon-btn-action mat-icon {
+      font-size: 18px !important;
+      width: 18px !important;
+      height: 18px !important;
+      margin: 0 !important;
+    }
+    .btn-view {
+      color: var(--accent-cyan, #00f2fe) !important;
+      background: rgba(0, 242, 254, 0.1) !important;
+    }
+    .btn-view:hover {
+      background: rgba(0, 242, 254, 0.3) !important;
+      transform: translateY(-2px);
+    }
+    .btn-vietqr {
+      color: #ff2d87 !important;
+      background: rgba(255, 45, 135, 0.12) !important;
+    }
+    .btn-vietqr:hover {
+      background: rgba(255, 45, 135, 0.3) !important;
+      transform: translateY(-2px);
+    }
+    .btn-paygate {
+      color: #38bdf8 !important;
+      background: rgba(56, 189, 248, 0.12) !important;
+    }
+    .btn-paygate:hover {
+      background: rgba(56, 189, 248, 0.3) !important;
+      transform: translateY(-2px);
+    }
+    .btn-delivered {
+      color: #22c55e !important;
+      background: rgba(34, 197, 94, 0.12) !important;
+    }
+    .btn-delivered:hover {
+      background: rgba(34, 197, 94, 0.3) !important;
+      transform: translateY(-2px);
+    }
+    .btn-review {
+      color: #eab308 !important;
+      background: rgba(234, 179, 8, 0.12) !important;
+    }
+    .btn-review:hover {
+      background: rgba(234, 179, 8, 0.3) !important;
+      transform: translateY(-2px);
+    }
+    .btn-cancel {
+      color: #ef4444 !important;
+      background: rgba(239, 68, 68, 0.12) !important;
+    }
+    .btn-cancel:hover {
+      background: rgba(239, 68, 68, 0.3) !important;
+      transform: translateY(-2px);
+    }
   `]
 })
 export class OrderListComponent implements OnInit {
@@ -773,6 +856,81 @@ export class OrderListComponent implements OnInit {
   ngOnInit(): void {
     this.loadOrders();
     this.loadReviewedOrderItemIds();
+  }
+
+  getRemainingSessionSeconds(order: Order): number {
+    if (!order.paygateExpiresAt) return 900;
+    const expires = new Date(order.paygateExpiresAt).getTime();
+    const now = new Date().getTime();
+    const diff = Math.floor((expires - now) / 1000);
+    return diff > 0 ? diff : 0;
+  }
+
+  isSessionExpired(order: Order): boolean {
+    if (order.status === 'CANCELLED') return true;
+    if (order.status === 'PENDING' && order.paygateExpiresAt) {
+      return this.getRemainingSessionSeconds(order) <= 0;
+    }
+    return false;
+  }
+
+  continuePaygatePayment(order: Order): void {
+    const url = order.paygatePayload?.paymentUrl;
+    if (url) {
+      window.location.href = url;
+    } else {
+      this.notification.error('PayGate payment URL not available');
+    }
+  }
+
+  openVietQrModal(order: Order): void {
+    const usdAmount = order.totalAmount || 0;
+    const vndAmount = Math.round(usdAmount * 25400);
+    const pg = order.paygatePayload;
+    const timerSecs = this.getRemainingSessionSeconds(order);
+    const dialogRef = this.dialog.open(VietQrDialogComponent, {
+      width: '840px',
+      maxWidth: '95vw',
+      panelClass: 'paygate-vqr-dialog-panel',
+      data: {
+        orderId: order.id,
+        amountVnd: vndAmount,
+        description: pg?.transferContent || `ORD-${order.id}`,
+        qrPayload: pg?.qrPayload,
+        bankName: pg?.bankAccount?.bankName,
+        accountNo: pg?.bankAccount?.accountNumber,
+        accountName: pg?.bankAccount?.accountHolder,
+        timerSeconds: timerSecs > 0 ? timerSecs : 900
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === true) {
+        this.orderService.confirmVietQrPayment(order.id).subscribe({
+          next: (res) => {
+            if (res.success) {
+              this.notification.success(`Payment confirmed! Order #${order.id} is now CONFIRMED.`);
+              this.loadOrders();
+            }
+          },
+          error: (err) => {
+            this.notification.error(err?.error?.message || 'Failed to confirm payment');
+          }
+        });
+      } else if (result === 'CANCEL') {
+        this.orderService.cancelVietQrPayment(order.id).subscribe({
+          next: (res) => {
+            if (res.success) {
+              this.notification.info(`Payment cancelled. Order #${order.id} has been CANCELLED and stock released.`);
+              this.loadOrders();
+            }
+          },
+          error: (err) => {
+            this.notification.error(err?.error?.message || 'Failed to cancel payment');
+          }
+        });
+      }
+    });
   }
 
   loadReviewedOrderItemIds(): void {

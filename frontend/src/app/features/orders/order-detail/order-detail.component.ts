@@ -14,7 +14,11 @@ import { NotificationService } from '../../../core/services/notification.service
 import { DeliveryService } from '../../../core/services/delivery.service';
 import { Delivery } from '../../../core/models/delivery.model';
 import { DeliveryTimelineComponent } from '../../../shared/components/delivery-timeline/delivery-timeline.component';
+<<<<<<< HEAD
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+=======
+import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/vietqr-dialog.component';
+>>>>>>> 0a0a607 (feat(vietqr): VietQR generator dialog, English UI, dynamic timer countdown, and compact action buttons)
 import { catchError, finalize, of, switchMap, tap } from 'rxjs';
 
 @Component({
@@ -30,7 +34,12 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
     MatTableModule,
     MatProgressSpinnerModule,
     MatDialogModule,
+<<<<<<< HEAD
     DeliveryTimelineComponent
+=======
+    DeliveryTimelineComponent,
+    VietQrDialogComponent
+>>>>>>> 0a0a607 (feat(vietqr): VietQR generator dialog, English UI, dynamic timer countdown, and compact action buttons)
   ],
   template: `
     <div class="order-detail-container">
@@ -57,6 +66,17 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
               <span class="badge-pill" [ngClass]="getStatusBadgeClass(order.status)">
                 {{ order.status }}
               </span>
+              <ng-container *ngIf="order.status === 'PENDING' && order.paymentStatus === 'PENDING_PAYGATE'">
+                <button *ngIf="!isSessionExpired && order.paymentMethod === 'BANK_TRANSFER'" mat-raised-button class="vietqr-btn" (click)="openVietQrModal()">
+                  <mat-icon>qr_code_2</mat-icon> VietQR
+                </button>
+                <button *ngIf="!isSessionExpired && order.paymentMethod !== 'BANK_TRANSFER'" mat-raised-button color="accent" class="paygate-btn" (click)="continuePaygatePayment()">
+                  <mat-icon>payment</mat-icon> PayGate
+                </button>
+                <span *ngIf="isSessionExpired" class="badge-pill badge-expired">
+                  <mat-icon style="font-size: 14px; width: 14px; height: 14px; margin-right: 4px;">timer_off</mat-icon> Payment Expired (Cancelled)
+                </span>
+              </ng-container>
               <button *ngIf="canCancelOrder()" mat-stroked-button color="warn" class="confirm-btn"
                       (click)="cancelOrder()" [disabled]="cancelling">
                 <mat-icon>cancel</mat-icon>
@@ -293,12 +313,47 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
       color: var(--text-muted);
       font-size: 0.9rem;
     }
+    .status-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
     .badge-pill {
       padding: 6px 14px;
-      border-radius: 16px;
+      border-radius: 20px;
       font-size: 0.85rem;
       font-weight: 700;
       text-transform: uppercase;
+    }
+    .vietqr-btn {
+      background: linear-gradient(135deg, #c20067 0%, #e11d48 100%) !important;
+      color: #ffffff !important;
+      border-radius: 20px !important;
+      font-weight: 700 !important;
+      height: 34px !important;
+      line-height: 34px !important;
+      padding: 0 16px !important;
+      box-shadow: 0 2px 8px rgba(194, 0, 103, 0.25) !important;
+      transition: all 0.2s ease !important;
+    }
+    .vietqr-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(194, 0, 103, 0.4) !important;
+    }
+    .paygate-btn {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+      color: #ffffff !important;
+      border-radius: 20px !important;
+      font-weight: 700 !important;
+      height: 34px !important;
+      line-height: 34px !important;
+      padding: 0 16px !important;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25) !important;
+      transition: all 0.2s ease !important;
+    }
+    .paygate-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4) !important;
     }
     .badge-pending { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
     .badge-confirmed { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); }
@@ -546,6 +601,85 @@ export class OrderDetailComponent implements OnInit {
     private notification: NotificationService,
     private dialog: MatDialog
   ) {}
+
+  get remainingSessionSeconds(): number {
+    if (!this.order?.paygateExpiresAt) return 900;
+    const expires = new Date(this.order.paygateExpiresAt).getTime();
+    const now = new Date().getTime();
+    const diff = Math.floor((expires - now) / 1000);
+    return diff > 0 ? diff : 0;
+  }
+
+  get isSessionExpired(): boolean {
+    if (this.order?.status === 'CANCELLED') return true;
+    if (this.order?.status === 'PENDING' && this.order?.paygateExpiresAt) {
+      return this.remainingSessionSeconds <= 0;
+    }
+    return false;
+  }
+
+  continuePaygatePayment(): void {
+    if (!this.order) return;
+    const url = this.order.paygatePayload?.paymentUrl;
+    if (url) {
+      window.location.href = url;
+    } else {
+      this.notification.error('PayGate payment URL not available');
+    }
+  }
+
+  openVietQrModal(): void {
+    if (!this.order) return;
+    const usdAmount = this.order.totalAmount || 0;
+    const vndAmount = Math.round(usdAmount * 25400);
+    const pg = this.order.paygatePayload;
+    const timerSecs = this.remainingSessionSeconds > 0 ? this.remainingSessionSeconds : 900;
+    const dialogRef = this.dialog.open(VietQrDialogComponent, {
+      width: '840px',
+      maxWidth: '95vw',
+      panelClass: 'paygate-vqr-dialog-panel',
+      data: {
+        orderId: this.order.id,
+        amountVnd: vndAmount,
+        description: pg?.transferContent || `ORD-${this.order.id}`,
+        qrPayload: pg?.qrPayload,
+        bankName: pg?.bankAccount?.bankName,
+        accountNo: pg?.bankAccount?.accountNumber,
+        accountName: pg?.bankAccount?.accountHolder,
+        timerSeconds: timerSecs
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === true && this.order) {
+        const orderId = this.order.id;
+        this.orderService.confirmVietQrPayment(orderId).subscribe({
+          next: (res) => {
+            if (res.success) {
+              this.notification.success('Payment confirmed! Your order is now CONFIRMED.');
+              this.loadOrderDetail(orderId);
+            }
+          },
+          error: (err) => {
+            this.notification.error(err?.error?.message || 'Failed to confirm payment');
+          }
+        });
+      } else if (result === 'CANCEL' && this.order) {
+        const orderId = this.order.id;
+        this.orderService.cancelVietQrPayment(orderId).subscribe({
+          next: (res) => {
+            if (res.success) {
+              this.notification.info('Payment cancelled. Reserved stock has been released.');
+              this.loadOrderDetail(orderId);
+            }
+          },
+          error: (err) => {
+            this.notification.error(err?.error?.message || 'Failed to cancel payment');
+          }
+        });
+      }
+    });
+  }
 
   ngOnInit(): void {
     const orderId = Number(this.route.snapshot.paramMap.get('id'));

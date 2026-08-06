@@ -58,6 +58,14 @@ export class OrderService {
     return this.http.post<ApiResponse<ReturnRequest>>(`${this.apiUrl}/${id}/return-requests`, request);
   }
 
+  confirmVietQrPayment(id: number): Observable<ApiResponse<Order>> {
+    return this.http.post<ApiResponse<Order>>(`${this.apiUrl}/${id}/confirm-vietqr`, {});
+  }
+
+  cancelVietQrPayment(id: number): Observable<ApiResponse<Order>> {
+    return this.http.post<ApiResponse<Order>>(`${this.apiUrl}/${id}/cancel-vietqr`, {});
+  }
+
   confirmPaygatePayment(orderId: string, transactionRef?: string): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/payments/paygate-webhook`, {
       event: 'PAYMENT_COMPLETED',
