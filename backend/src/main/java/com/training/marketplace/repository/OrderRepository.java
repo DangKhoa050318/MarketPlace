@@ -58,6 +58,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     long countByUserId(Long userId);
 
+    @EntityGraph(attributePaths = {"user", "items"})
+    java.util.List<Order> findByStatusAndPaygateExpiresAtBefore(OrderStatus status, java.time.LocalDateTime dateTime);
+
     @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status != com.training.marketplace.enums.OrderStatus.CANCELLED")
     java.math.BigDecimal calculateTotalRevenue();
 }

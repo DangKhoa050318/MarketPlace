@@ -20,6 +20,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { Cart, CartItem } from '../../core/models/cart.model';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.component';
+import { VietQrDialogComponent } from '../../shared/components/vietqr-dialog/vietqr-dialog.component';
 
 @Component({
   selector: 'app-cart',
@@ -36,7 +37,8 @@ import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.compo
     MatProgressSpinnerModule,
     MatDialogModule,
     MatTooltipModule,
-    CheckoutDialogComponent
+    CheckoutDialogComponent,
+    VietQrDialogComponent
   ],
   template: `
     <div class="cart-container">
@@ -844,6 +846,64 @@ export class CartComponent implements OnInit {
               this.notification.info(`Redirecting to PayGate Checkout...`);
               this.loadCart();
               window.location.href = targetUrl;
+            } else if (result.paymentMethod === 'BANK_TRANSFER') {
+              this.notification.success(`Order #${res.data?.id || ''} placed successfully! Please complete VietQR payment.`);
+              this.loadCart();
+              const usdAmount = res.data?.totalAmount || 0;
+              const vndAmount = Math.round(usdAmount * 25400);
+              const pg = res.data?.paygatePayload;
+              let timerSecs = 900;
+              if (res.data?.paygateExpiresAt) {
+                const expires = new Date(res.data.paygateExpiresAt).getTime();
+                const now = new Date().getTime();
+                const diff = Math.floor((expires - now) / 1000);
+                timerSecs = diff > 0 ? diff : 0;
+              }
+              const dialogRef = this.dialog.open(VietQrDialogComponent, {
+                width: '840px',
+                maxWidth: '95vw',
+                panelClass: 'paygate-vqr-dialog-panel',
+                disableClose: false,
+                data: {
+                  orderId: res.data?.id,
+                  amountVnd: vndAmount,
+                  description: pg?.transferContent || `ORD-${res.data?.id}`,
+                  qrPayload: pg?.qrPayload,
+                  bankName: pg?.bankAccount?.bankName,
+                  accountNo: pg?.bankAccount?.accountNumber,
+                  accountName: pg?.bankAccount?.accountHolder,
+                  timerSeconds: timerSecs
+                }
+              });
+              dialogRef.afterClosed().subscribe((result) => {
+                if (result === true && res.data?.id) {
+                  const orderId = res.data.id;
+                  this.orderService.confirmVietQrPayment(orderId).subscribe({
+                    next: () => {
+                      this.notification.success('Payment confirmed! Your order is now CONFIRMED.');
+                      this.router.navigate(['/orders', orderId]);
+                    },
+                    error: () => {
+                      this.router.navigate(['/orders', orderId]);
+                    }
+                  });
+                } else if (result === 'CANCEL' && res.data?.id) {
+                  const orderId = res.data.id;
+                  this.orderService.cancelVietQrPayment(orderId).subscribe({
+                    next: () => {
+                      this.notification.info('Payment cancelled. Reserved stock has been released.');
+                      this.router.navigate(['/orders', orderId]);
+                    },
+                    error: () => {
+                      this.router.navigate(['/orders', orderId]);
+                    }
+                  });
+                } else if (res.data?.id) {
+                  this.router.navigate(['/orders', res.data.id]);
+                } else {
+                  this.router.navigate(['/orders']);
+                }
+              });
             } else {
               this.notification.success(`Order #${res.data?.id || ''} placed successfully! Confirmation email has been dispatched.`);
               this.loadCart();

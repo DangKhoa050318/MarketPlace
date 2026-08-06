@@ -51,6 +51,7 @@ export interface Order {
   financeAmount?: number;
   paygateTransactionRef?: string;
   paygatePayload?: PaygatePayload;
+  paygateExpiresAt?: string;
   warehouseId?: number;
   note?: string;
   items: OrderItem[];
