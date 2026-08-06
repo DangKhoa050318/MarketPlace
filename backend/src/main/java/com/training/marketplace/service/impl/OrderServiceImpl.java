@@ -138,24 +138,32 @@ public class OrderServiceImpl implements OrderService {
         order.setTotalAmount(grandTotal);
 
         PaymentMethod paymentMethod = request.paymentMethod() != null ? request.paymentMethod() : PaymentMethod.COD;
-        BigDecimal upfront = request.upfrontAmount();
-        BigDecimal finance = request.financeAmount();
-
-        if (paymentMethod == PaymentMethod.COD || paymentMethod == PaymentMethod.CREDIT_CARD) {
+        // Payment split (deposit due now / amount financed) is derived server-side from the
+        // authoritative grandTotal and is NEVER taken from the request: a tampered upfrontAmount could
+        // otherwise let a client pay a fraction of what they owe now, pushing the rest into "finance".
+        BigDecimal upfront;
+        BigDecimal finance;
+        if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
+            // BNPL: fixed 30% deposit due now, the remainder is financed.
+            upfront = grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
+            finance = grandTotal.subtract(upfront);
+        } else {
+            // COD / CREDIT_CARD / BANK_TRANSFER / WALLET: full amount due now, nothing financed.
             upfront = grandTotal;
             finance = BigDecimal.ZERO;
-        } else if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
-            if (upfront == null || upfront.compareTo(BigDecimal.ZERO) <= 0) {
-                upfront = grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
-            }
-            finance = grandTotal.subtract(upfront);
         }
 
         order.setPaymentMethod(paymentMethod);
         order.setUpfrontAmount(upfront != null ? upfront : grandTotal);
         order.setFinanceAmount(finance != null ? finance : BigDecimal.ZERO);
 
-        if (paymentMethod == PaymentMethod.COD) {
+        // A 0đ order (e.g. a full-value coupon) has nothing to charge, and PayGate cannot process a
+        // zero-amount checkout — settle it immediately like a successful prepaid payment.
+        boolean zeroTotal = grandTotal.compareTo(BigDecimal.ZERO) == 0;
+        if (zeroTotal) {
+            order.setStatus(OrderStatus.CONFIRMED);
+            order.setPaymentStatus(PaymentStatus.PAID);
+        } else if (paymentMethod == PaymentMethod.COD) {
             order.setStatus(OrderStatus.CONFIRMED);
             order.setPaymentStatus(PaymentStatus.UNPAID);
         } else {
@@ -164,6 +172,13 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Order savedOrder = orderRepository.save(order);
+
+        // 0đ order is settled on creation, so convert its reservation into an actual stock decrement now
+        // (no PayGate webhook will arrive to do it). Fulfil exactly once — the SHIPPED transition skips
+        // orders that are already PAID.
+        if (zeroTotal && warehouseId != null && !quantityByVariant.isEmpty()) {
+            inventoryFacade.fulfill(warehouseId, quantityByVariant);
+        }
 
         // 3c. Record the redemption now the order id is known.
         if (appliedCoupon != null) {
@@ -204,7 +219,7 @@ public class OrderServiceImpl implements OrderService {
 
         OrderResponse baseResponse = orderMapper.toResponse(savedOrder);
         PaygatePayloadResponse paygatePayload = null;
-        if (paymentMethod != PaymentMethod.COD) {
+        if (paymentMethod != PaymentMethod.COD && !zeroTotal) {
             String methodStr = paymentMethod == PaymentMethod.BANK_TRANSFER ? "BANK_TRANSFER" : "WALLET";
             var pgSession = paygateClientService.createCheckoutSession(
                     savedOrder.getId(),
@@ -461,8 +476,12 @@ public class OrderServiceImpl implements OrderService {
                     "Complete the delivery tracking record to mark a shipped order as delivered");
         }
 
-        // When the order ships, convert the reservation into an actual stock decrement.
-        if (request.status() == OrderStatus.SHIPPED && order.getWarehouseId() != null) {
+        // When the order ships, convert the reservation into an actual stock decrement — but only if it
+        // wasn't already fulfilled at payment time. Prepaid (PayGate webhook) and 0đ orders are fulfilled
+        // when they reach PAID, so re-fulfilling here would decrement on-hand twice (phantom stock).
+        if (request.status() == OrderStatus.SHIPPED
+                && order.getWarehouseId() != null
+                && order.getPaymentStatus() != PaymentStatus.PAID) {
             inventoryFacade.fulfill(order.getWarehouseId(), quantitiesByVariant(order));
         }
 

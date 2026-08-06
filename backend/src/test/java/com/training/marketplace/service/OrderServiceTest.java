@@ -7,6 +7,8 @@ import com.training.marketplace.dto.response.OrderResponse;
 import com.training.marketplace.entity.Order;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.enums.OrderStatus;
+import com.training.marketplace.enums.PaymentMethod;
+import com.training.marketplace.enums.PaymentStatus;
 import com.training.marketplace.enums.Role;
 import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.mapper.OrderMapper;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +54,8 @@ class OrderServiceTest {
     @Mock private OrderEventPublisher orderEventPublisher;
     @Mock private PromotionService promotionService;
     @Mock private DeliveryService deliveryService;
+    @Mock private PaygateClientService paygateClientService;
+    @Mock private MerchandisingEventService merchandisingEventService;
 
     @InjectMocks private OrderServiceImpl orderService;
 
@@ -127,5 +133,56 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.createOrder(1L, request))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Insufficient stock");
+    }
+
+    @Test
+    @DisplayName("createOrder BNPL: upfront is server-computed 30%, client-tampered amount ignored")
+    void createOrder_bnpl_upfrontComputedServerSide_ignoresClientValue() {
+        // Attacker intercepts the request and sends a near-zero upfront to pay almost nothing now.
+        CreateOrderRequest request = new CreateOrderRequest(
+                "123 Main St", null, null, PaymentMethod.PAYGATE_BNPL,
+                new BigDecimal("0.01"), new BigDecimal("199.99"), 3);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(cartService.getCart(1L)).thenReturn(cartResponse);
+        when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+        when(orderMapper.toResponse(testOrder)).thenReturn(testOrderResponse);
+
+        orderService.createOrder(1L, request);
+
+        // grandTotal = 200.00 (2 × $100, free shipping ≥ $150). Server must set 30% = 60.00,
+        // financed = 140.00 — NOT the client's 0.01 / 199.99.
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        Order saved = captor.getValue();
+        assertThat(saved.getUpfrontAmount()).isEqualByComparingTo(new BigDecimal("60.00"));
+        assertThat(saved.getFinanceAmount()).isEqualByComparingTo(new BigDecimal("140.00"));
+    }
+
+    @Test
+    @DisplayName("createOrder: 0đ order (100% coupon) auto CONFIRMED/PAID, fulfils stock, skips PayGate")
+    void createOrder_zeroTotal_autoPaidAndFulfilled_skipsPaygate() {
+        // Full-value coupon wipes the $200 cart to $0 (free shipping ≥ $150). PayGate can't take a
+        // 0-amount checkout, so the order must settle immediately and never call PayGate.
+        CreateOrderRequest request = new CreateOrderRequest(
+                "123 Main St", null, "FREE100", PaymentMethod.PAYGATE_BNPL, null, null, 3);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(cartService.getCart(1L)).thenReturn(cartResponse);
+        when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
+        when(promotionService.consume(eq("FREE100"), eq(1L), any(CartResponse.class)))
+                .thenReturn(new AppliedCoupon(500L, "FREE100", new BigDecimal("200.00")));
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+        when(orderMapper.toResponse(testOrder)).thenReturn(testOrderResponse);
+
+        orderService.createOrder(1L, request);
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        Order saved = captor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(saved.getTotalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(inventoryFacade).fulfill(eq(1L), anyMap());   // stock committed now, no webhook will
+        verifyNoInteractions(paygateClientService);          // PayGate bypassed for a 0đ order
     }
 }
