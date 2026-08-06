@@ -5,11 +5,14 @@ import com.training.marketplace.dto.response.CartItemResponse;
 import com.training.marketplace.dto.response.CartResponse;
 import com.training.marketplace.dto.response.OrderResponse;
 import com.training.marketplace.entity.Order;
+import com.training.marketplace.entity.OrderItem;
 import com.training.marketplace.entity.ProductVariant;
+import com.training.marketplace.entity.RefundRequest;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.enums.OrderStatus;
 import com.training.marketplace.enums.PaymentMethod;
 import com.training.marketplace.enums.PaymentStatus;
+import com.training.marketplace.enums.RefundRequestStatus;
 import com.training.marketplace.enums.Role;
 import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.mapper.OrderMapper;
@@ -17,6 +20,7 @@ import com.training.marketplace.publisher.OrderEventPublisher;
 import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.repository.ProductRepository;
 import com.training.marketplace.repository.ProductVariantRepository;
+import com.training.marketplace.repository.RefundRequestRepository;
 import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.impl.OrderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,9 +61,10 @@ class OrderServiceTest {
     @Mock private OrderMapper orderMapper;
     @Mock private OrderEventPublisher orderEventPublisher;
     @Mock private PromotionService promotionService;
-    @Mock private DeliveryService deliveryService;
     @Mock private PaygateClientService paygateClientService;
     @Mock private MerchandisingEventService merchandisingEventService;
+    @Mock private DeliveryService deliveryService;
+    @Mock private RefundRequestRepository refundRequestRepository;
 
     @InjectMocks private OrderServiceImpl orderService;
 
@@ -75,7 +80,6 @@ class OrderServiceTest {
                 .role(Role.CUSTOMER).active(true).build();
         testUser.setId(1L);
 
-        // variantId=10, sku, productName, variantName, unitPrice, qty, subtotal, imageUrl
         CartItemResponse cartItem = new CartItemResponse(
                 10L, 100L, "LAP-1", "Laptop", "Silver / 16GB",
                 BigDecimal.valueOf(100.00), 2, BigDecimal.valueOf(200.00), null);
@@ -126,7 +130,7 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("createOrder: insufficient stock (facade throws) propagates BadRequestException")
+    @DisplayName("createOrder: insufficient stock propagates BadRequestException")
     void createOrder_insufficientStock_throwsException() {
         CreateOrderRequest request = new CreateOrderRequest("123 Main St", null, null);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
@@ -144,7 +148,6 @@ class OrderServiceTest {
     @Test
     @DisplayName("createOrder BNPL: upfront is server-computed 30%, client-tampered amount ignored")
     void createOrder_bnpl_upfrontComputedServerSide_ignoresClientValue() {
-        // Attacker intercepts the request and sends a near-zero upfront to pay almost nothing now.
         CreateOrderRequest request = new CreateOrderRequest(
                 "123 Main St", null, null, PaymentMethod.PAYGATE_BNPL,
                 new BigDecimal("0.01"), new BigDecimal("199.99"), 3);
@@ -157,8 +160,6 @@ class OrderServiceTest {
 
         orderService.createOrder(1L, request);
 
-        // grandTotal = 200.00 (2 × $100, free shipping ≥ $150). Server must set 30% = 60.00,
-        // financed = 140.00 — NOT the client's 0.01 / 199.99.
         ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
         verify(orderRepository).save(captor.capture());
         Order saved = captor.getValue();
@@ -167,10 +168,8 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("createOrder: 0đ order (100% coupon) auto CONFIRMED/PAID, fulfils stock, skips PayGate")
+    @DisplayName("createOrder: zero-total order auto CONFIRMED/PAID, fulfils stock, skips PayGate")
     void createOrder_zeroTotal_autoPaidAndFulfilled_skipsPaygate() {
-        // Full-value coupon wipes the $200 cart to $0 (free shipping ≥ $150). PayGate can't take a
-        // 0-amount checkout, so the order must settle immediately and never call PayGate.
         CreateOrderRequest request = new CreateOrderRequest(
                 "123 Main St", null, "FREE100", PaymentMethod.PAYGATE_BNPL, null, null, 3);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
@@ -190,17 +189,16 @@ class OrderServiceTest {
         assertThat(saved.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
         assertThat(saved.getTotalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
-        verify(inventoryFacade).fulfill(eq(1L), anyMap());   // stock committed now, no webhook will
-        verifyNoInteractions(paygateClientService);          // PayGate bypassed for a 0đ order
+        verify(inventoryFacade).fulfill(eq(1L), anyMap());
+        verifyNoInteractions(paygateClientService);
     }
 
     @Test
-    @DisplayName("createOrder: blocks checkout and asks to review cart when a variant's price changed")
+    @DisplayName("createOrder: blocks checkout when a variant price changed")
     void createOrder_priceChanged_blocksAndAsksToReviewCart() {
-        // Cart snapshot shows $100 (captured at add-to-cart), but admin has since raised it to $120.
         CreateOrderRequest request = new CreateOrderRequest("123 Main St", null, null);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(cartService.getCart(1L)).thenReturn(cartResponse);       // snapshot unitPrice = 100.00
+        when(cartService.getCart(1L)).thenReturn(cartResponse);
         when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
         ProductVariant repriced = ProductVariant.builder()
                 .productId(100L).sku("LAP-1").variantName("Silver / 16GB")
@@ -210,14 +208,82 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> orderService.createOrder(1L, request))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Giá đã thay đổi");
+                .hasMessageContaining("Gia da thay doi");
 
-        // Rejected before touching stock or persisting the order.
         verify(inventoryFacade, never()).reserve(any(), anyMap());
         verify(orderRepository, never()).save(any(Order.class));
     }
 
-    /** Stub the DB re-price lookup: variant 10 currently sells for $100.00 (matches the cart snapshot). */
+    @Test
+    @DisplayName("cancelUserOrder: paid online before ship refunds via PayGate and releases reservation")
+    void cancelUserOrder_paidOnlineBeforeShip_refundsAndReleasesReservation() {
+        Order order = paidOnlineOrder("TXN_123");
+        when(orderRepository.findById(100L)).thenReturn(Optional.of(order));
+        when(refundRequestRepository.findByIdempotencyKey("PAYGATE_REFUND:ORDER:100:FULL"))
+                .thenReturn(Optional.empty());
+        when(refundRequestRepository.save(any(RefundRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.save(order)).thenReturn(order);
+        when(orderMapper.toResponse(order)).thenReturn(testOrderResponse);
+
+        orderService.cancelUserOrder(1L, 100L);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        verify(paygateClientService).refund(
+                "TXN_123",
+                100L,
+                BigDecimal.valueOf(200.00),
+                "Customer cancelled before shipment",
+                "PAYGATE_REFUND:ORDER:100:FULL");
+        verify(inventoryFacade).release(eq(1L), eq(Map.of(10L, 2)));
+    }
+
+    @Test
+    @DisplayName("cancelUserOrder: paid online missing transactionRef still cancels and leaves refund pending")
+    void cancelUserOrder_paidOnlineMissingTransactionRef_setsRefundPending() {
+        Order order = paidOnlineOrder(null);
+        when(orderRepository.findById(100L)).thenReturn(Optional.of(order));
+        when(refundRequestRepository.findByIdempotencyKey("PAYGATE_REFUND:ORDER:100:FULL"))
+                .thenReturn(Optional.empty());
+        when(refundRequestRepository.save(any(RefundRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.save(order)).thenReturn(order);
+        when(orderMapper.toResponse(order)).thenReturn(testOrderResponse);
+
+        orderService.cancelUserOrder(1L, 100L);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_PENDING);
+        verify(paygateClientService, never()).refund(any(), any(), any(), any(), any());
+        verify(inventoryFacade).release(eq(1L), eq(Map.of(10L, 2)));
+    }
+
+    private Order paidOnlineOrder(String transactionRef) {
+        Order order = Order.builder()
+                .user(testUser)
+                .warehouseId(1L)
+                .status(OrderStatus.CONFIRMED)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .paymentStatus(PaymentStatus.PAID)
+                .totalAmount(BigDecimal.valueOf(200.00))
+                .shippingAddress("123 Main St")
+                .build();
+        order.setId(100L);
+        order.setPaygateTransactionRef(transactionRef);
+        order.addItem(OrderItem.builder()
+                .variantId(10L)
+                .productId(100L)
+                .sku("LAP-1")
+                .productName("Laptop")
+                .variantName("Silver / 16GB")
+                .unitPrice(BigDecimal.valueOf(100.00))
+                .quantity(2)
+                .subtotal(BigDecimal.valueOf(200.00))
+                .build());
+        return order;
+    }
+
     private void stubCurrentVariantPrice() {
         ProductVariant variant = ProductVariant.builder()
                 .productId(100L).sku("LAP-1").variantName("Silver / 16GB")

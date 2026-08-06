@@ -3,11 +3,14 @@ package com.training.marketplace.controller;
 import com.training.marketplace.common.ApiResponse;
 import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.request.CreateOrderRequest;
+import com.training.marketplace.dto.request.CreateReturnRequest;
 import com.training.marketplace.dto.response.OrderResponse;
+import com.training.marketplace.dto.response.ReturnRequestResponse;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.OrderService;
+import com.training.marketplace.service.ReturnRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -35,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderController {
 
     private final OrderService orderService;
+    private final ReturnRequestService returnRequestService;
     private final UserRepository userRepository;
 
     @PostMapping
@@ -95,6 +99,18 @@ public class OrderController {
             @PathVariable Long id) {
         Long userId = getUserId(authentication);
         return ApiResponse.success("Order marked as received", orderService.confirmReceived(userId, id));
+    }
+
+    @PostMapping("/{id}/return-requests")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Create a return request while an order is being delivered")
+    public ApiResponse<ReturnRequestResponse> createReturnRequest(
+            Authentication authentication,
+            @PathVariable Long id,
+            @RequestBody(required = false) CreateReturnRequest request) {
+        Long userId = getUserId(authentication);
+        ReturnRequestResponse response = returnRequestService.create(userId, id, request);
+        return ApiResponse.success("Return request created", response);
     }
 
     private Long getUserId(Authentication authentication) {

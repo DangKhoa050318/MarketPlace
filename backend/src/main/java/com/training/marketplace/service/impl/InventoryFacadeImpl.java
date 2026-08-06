@@ -88,8 +88,18 @@ public class InventoryFacadeImpl implements InventoryFacade {
         Map<Long, StockLevel> rows = lock(warehouseId, quantityByVariant);
         for (Map.Entry<Long, Integer> e : quantityByVariant.entrySet()) {
             StockLevel sl = require(rows, warehouseId, e.getKey());
-            // A returned order was already fulfilled, so its stock left as an on-hand decrement (reserved
-            // is 0). Add the quantity back on-hand; do not touch reservedQuantity.
+            // A returned order was already fulfilled, so add back on-hand stock; reservations stay unchanged.
+            sl.setQuantity(sl.getQuantity() + e.getValue());
+        }
+        stockLevelRepository.saveAll(rows.values());
+    }
+
+    @Override
+    @Transactional
+    public void restockReturn(Long warehouseId, Map<Long, Integer> quantityByVariant) {
+        Map<Long, StockLevel> rows = lock(warehouseId, quantityByVariant);
+        for (Map.Entry<Long, Integer> e : quantityByVariant.entrySet()) {
+            StockLevel sl = require(rows, warehouseId, e.getKey());
             sl.setQuantity(sl.getQuantity() + e.getValue());
         }
         stockLevelRepository.saveAll(rows.values());

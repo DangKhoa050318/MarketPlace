@@ -52,6 +52,10 @@ public class OrderItem {
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
+    @Column(name = "refunded_quantity", nullable = false)
+    @Builder.Default
+    private Integer refundedQuantity = 0;
+
     @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
 

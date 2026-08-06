@@ -17,7 +17,7 @@ import { MatMenuModule } from '@angular/material/menu';
 
 import { AdminOrderService } from '../../../../core/services/admin-order.service';
 import { NotificationService } from '../../../../core/services/notification.service';
-import { Order, OrderStatus } from '../../../../core/models/order.model';
+import { Order, OrderStatus, ReturnRequest } from '../../../../core/models/order.model';
 import { DeliveryService } from '../../../../core/services/delivery.service';
 import { Delivery, DeliveryEventType, DeliveryStatus } from '../../../../core/models/delivery.model';
 import { DeliveryTimelineComponent } from '../../../../shared/components/delivery-timeline/delivery-timeline.component';
@@ -74,6 +74,37 @@ import { DeliveryTimelineComponent } from '../../../../shared/components/deliver
             </mat-select>
           </mat-form-field>
         </div>
+
+        <section class="returns-panel">
+          <div class="returns-header">
+            <h3>Return & refund queue</h3>
+            <button mat-stroked-button type="button" (click)="loadReturnRequests()">Refresh queue</button>
+          </div>
+          <div *ngIf="returnRequests.length === 0" class="returns-empty">No open return requests.</div>
+          <div *ngFor="let request of returnRequests" class="return-row">
+            <div>
+              <strong>Return #{{ request.id }}</strong>
+              <span>Order #{{ request.orderId }}</span>
+              <span class="badge-pill" [ngClass]="getReturnChipClass(request.status)">{{ request.status }}</span>
+              <p>{{ request.reason }}</p>
+              <small *ngIf="request.orderItemId">Item #{{ request.orderItemId }} · Qty {{ request.quantity || 1 }}</small>
+              <small *ngIf="request.adminNote">Admin: {{ request.adminNote }}</small>
+              <small *ngIf="request.qcNote">QC: {{ request.qcNote }}</small>
+            </div>
+            <div class="return-actions">
+              <button *ngIf="request.status === 'REQUESTED'" mat-stroked-button color="primary" type="button"
+                      (click)="openReturnDecisionForm(request, true, false)">Approve return request</button>
+              <button *ngIf="request.status === 'REQUESTED'" mat-stroked-button type="button"
+                      (click)="openReturnDecisionForm(request, true, true)">Approve refund without return</button>
+              <button *ngIf="request.status === 'REQUESTED'" mat-stroked-button color="warn" type="button"
+                      (click)="openReturnDecisionForm(request, false, false)">Reject return request</button>
+              <button *ngIf="request.status === 'APPROVED' || request.status === 'RETURN_RECEIVED'" mat-stroked-button color="primary" type="button"
+                      (click)="openReturnQualityForm(request, true)">Quality inspection passed and refund</button>
+              <button *ngIf="request.status === 'APPROVED' || request.status === 'RETURN_RECEIVED'" mat-stroked-button color="warn" type="button"
+                      (click)="openReturnQualityForm(request, false)">Quality inspection failed</button>
+            </div>
+          </div>
+        </section>
 
         <!-- Loading Spinner -->
         <div *ngIf="loading" class="spinner-container">
@@ -168,6 +199,15 @@ import { DeliveryTimelineComponent } from '../../../../shared/components/deliver
                     matTooltip="Manage delivery tracking">
                     <mat-icon>local_shipping</mat-icon>
                   </button>
+
+                  <button
+                    *ngIf="(order.paymentStatus === 'PAID' || order.paymentStatus === 'PARTIALLY_REFUNDED') && order.items?.length"
+                    mat-icon-button
+                    class="refund-btn"
+                    (click)="openPartialRefundForm(order)"
+                    matTooltip="Create a partial refund for one order item">
+                    <mat-icon>payments</mat-icon>
+                  </button>
                 </div>
               </td>
             </ng-container>
@@ -191,6 +231,101 @@ import { DeliveryTimelineComponent } from '../../../../shared/components/deliver
           (page)="onPageChange($event)"
           showFirstLastButtons>
         </mat-paginator>
+      </div>
+
+      <!-- Return Decision Modal -->
+      <div *ngIf="returnAction" class="update-modal-backdrop">
+        <div class="update-card surface-card">
+          <div class="modal-header">
+            <h3>{{ returnActionTitle() }}</h3>
+            <button mat-icon-button type="button" (click)="closeReturnActionForm()"><mat-icon>close</mat-icon></button>
+          </div>
+
+          <div class="modal-body">
+            <div class="order-details-box">
+              <p><strong>Return request:</strong> #{{ returnAction.request.id }}</p>
+              <p><strong>Order:</strong> #{{ returnAction.request.orderId }}</p>
+              <p><strong>Customer reason:</strong> {{ returnAction.request.reason }}</p>
+              <div class="return-evidence-grid large" *ngIf="returnAction.request.evidenceImageUrls?.length">
+                <a *ngFor="let imageUrl of returnAction.request.evidenceImageUrls" [href]="imageUrl" target="_blank" rel="noopener noreferrer">
+                  <img [src]="imageUrl" alt="Customer return evidence">
+                </a>
+              </div>
+              <p *ngIf="returnAction.request.orderItemId">
+                <strong>Requested item:</strong> Order item #{{ returnAction.request.orderItemId }},
+                quantity {{ returnAction.request.quantity || 1 }}
+              </p>
+            </div>
+
+            <form (ngSubmit)="submitReturnActionForm()">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>{{ returnActionNoteLabel() }}</mat-label>
+                <textarea
+                  matInput
+                  rows="4"
+                  maxlength="1000"
+                  name="returnActionNote"
+                  [(ngModel)]="returnAction.note"
+                  [placeholder]="returnActionNotePlaceholder()"></textarea>
+              </mat-form-field>
+
+              <div class="modal-actions">
+                <button mat-button type="button" (click)="closeReturnActionForm()" [disabled]="returnActionSubmitting">Cancel</button>
+                <button mat-raised-button class="btn-solid-primary" type="submit"
+                        [disabled]="returnActionSubmitting || returnActionRequiresNote() && !returnAction.note.trim()">
+                  <mat-spinner *ngIf="returnActionSubmitting" diameter="20"></mat-spinner>
+                  <span *ngIf="!returnActionSubmitting">{{ returnActionSubmitLabel() }}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Partial Refund Modal -->
+      <div *ngIf="partialRefundDraft" class="update-modal-backdrop">
+        <div class="update-card surface-card">
+          <div class="modal-header">
+            <h3>Create Partial Refund for Order #{{ partialRefundDraft.order.id }}</h3>
+            <button mat-icon-button type="button" (click)="closePartialRefundForm()"><mat-icon>close</mat-icon></button>
+          </div>
+
+          <form (ngSubmit)="submitPartialRefundForm()">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Order item to refund</mat-label>
+              <mat-select name="partialRefundItemId" [(ngModel)]="partialRefundDraft.orderItemId" required>
+                <mat-option *ngFor="let item of partialRefundDraft.items" [value]="item.id">
+                  #{{ item.id }} - {{ item.productName }} - refundable quantity {{ item.quantity - (item.refundedQuantity || 0) }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Quantity to refund</mat-label>
+              <input matInput type="number" min="1" name="partialRefundQuantity" [(ngModel)]="partialRefundDraft.quantity" required>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Partial refund reason</mat-label>
+              <textarea
+                matInput
+                rows="4"
+                maxlength="1000"
+                name="partialRefundReason"
+                [(ngModel)]="partialRefundDraft.reason"
+                placeholder="Explain why only part of this order is being refunded, for example missing accessory, damaged item quantity, goodwill adjustment, or approved customer support case."></textarea>
+            </mat-form-field>
+
+            <div class="modal-actions">
+              <button mat-button type="button" (click)="closePartialRefundForm()" [disabled]="partialRefundSubmitting">Cancel</button>
+              <button mat-raised-button class="btn-solid-primary" type="submit"
+                      [disabled]="partialRefundSubmitting || !partialRefundDraft.orderItemId || !partialRefundDraft.reason.trim()">
+                <mat-spinner *ngIf="partialRefundSubmitting" diameter="20"></mat-spinner>
+                <span *ngIf="!partialRefundSubmitting">Create partial refund request</span>
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
 
       <!-- Update Order Status Modal -->
@@ -464,6 +599,16 @@ import { DeliveryTimelineComponent } from '../../../../shared/components/deliver
       color: #4f46e5;
     }
     .delivery-btn { color: #0284c7; }
+    .refund-btn { color: #16a34a; }
+    .returns-panel { border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px; margin-bottom: 18px; background: #f8fafc; }
+    .returns-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .returns-header h3 { margin: 0; font-size: 1rem; }
+    .returns-empty { color: var(--text-muted); padding: 10px 0 0; }
+    .return-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--border-subtle); }
+    .return-row div:first-child { display: flex; flex-direction: column; gap: 4px; }
+    .return-row p { margin: 0; color: var(--text-main); }
+    .return-row small { color: var(--text-muted); }
+    .return-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 
     .no-status-item {
       padding: 8px 16px;
@@ -530,6 +675,31 @@ import { DeliveryTimelineComponent } from '../../../../shared/components/deliver
       flex-direction: column;
       gap: 6px;
     }
+    .return-evidence-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 6px 0;
+    }
+    .return-evidence-grid a {
+      width: 58px;
+      height: 58px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #cbd5e1;
+      background: #e2e8f0;
+      display: block;
+    }
+    .return-evidence-grid.large a {
+      width: 88px;
+      height: 88px;
+    }
+    .return-evidence-grid img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
 
     .modal-actions {
       display: flex;
@@ -551,6 +721,7 @@ import { DeliveryTimelineComponent } from '../../../../shared/components/deliver
 export class AdminOrderListComponent implements OnInit {
   displayedColumns: string[] = ['id', 'userEmail', 'createdAt', 'totalAmount', 'status', 'actions'];
   orders: Order[] = [];
+  returnRequests: ReturnRequest[] = [];
   selectedStatus: string = 'ALL';
   loading = false;
   updating = false;
@@ -565,6 +736,23 @@ export class AdminOrderListComponent implements OnInit {
   delivery: Delivery | null = null;
   deliveryLoading = false;
   deliverySaving = false;
+  returnAction: {
+    request: ReturnRequest;
+    approved: boolean;
+    refundWithoutReturn: boolean;
+    qualityInspectionPassed?: boolean;
+    note: string;
+    mode: 'decision' | 'quality';
+  } | null = null;
+  returnActionSubmitting = false;
+  partialRefundDraft: {
+    order: Order;
+    items: NonNullable<Order['items']>;
+    orderItemId: number | null;
+    quantity: number;
+    reason: string;
+  } | null = null;
+  partialRefundSubmitting = false;
   readonly minEstimatedDelivery = this.localDateString(new Date());
   deliveryForm: FormGroup;
   deliveryStatusForm: FormGroup;
@@ -600,6 +788,7 @@ export class AdminOrderListComponent implements OnInit {
         this.selectedStatus = params['status'].toUpperCase();
       }
       this.loadOrders();
+      this.loadReturnRequests();
     });
   }
 
@@ -619,6 +808,17 @@ export class AdminOrderListComponent implements OnInit {
           this.notificationService.error(err.error?.message || 'Failed to load admin orders');
         }
       });
+  }
+
+  loadReturnRequests(): void {
+    this.adminOrderService.getReturnRequests().subscribe({
+      next: (response) => {
+        this.returnRequests = response.data || [];
+      },
+      error: (err) => {
+        this.notificationService.error(err.error?.message || 'Failed to load return requests');
+      }
+    });
   }
 
   onStatusFilterChange(): void {
@@ -652,6 +852,18 @@ export class AdminOrderListComponent implements OnInit {
     }
   }
 
+  getReturnChipClass(status: ReturnRequest['status']): string {
+    switch (status) {
+      case 'REQUESTED': return 'badge-pending';
+      case 'APPROVED':
+      case 'RETURN_RECEIVED': return 'badge-processing';
+      case 'COMPLETED': return 'badge-delivered';
+      case 'REJECTED':
+      case 'QC_FAILED': return 'badge-pending';
+      default: return 'badge-confirmed';
+    }
+  }
+
   getNextAllowedStatuses(currentStatus: OrderStatus): OrderStatus[] {
     switch (currentStatus) {
       case 'PENDING': return ['CONFIRMED', 'CANCELLED'];
@@ -675,6 +887,204 @@ export class AdminOrderListComponent implements OnInit {
           this.notificationService.error(err.error?.message || 'Failed to update order status');
         }
       });
+  }
+
+  openReturnDecisionForm(request: ReturnRequest, approved: boolean, refundWithoutReturn: boolean): void {
+    this.returnAction = {
+      request,
+      approved,
+      refundWithoutReturn,
+      note: '',
+      mode: 'decision'
+    };
+  }
+
+  openReturnQualityForm(request: ReturnRequest, passed: boolean): void {
+    this.returnAction = {
+      request,
+      approved: true,
+      refundWithoutReturn: false,
+      qualityInspectionPassed: passed,
+      note: '',
+      mode: 'quality'
+    };
+  }
+
+  closeReturnActionForm(): void {
+    this.returnAction = null;
+    this.returnActionSubmitting = false;
+  }
+
+  submitReturnActionForm(): void {
+    if (!this.returnAction) {
+      return;
+    }
+    if (this.returnActionRequiresNote() && !this.returnAction.note.trim()) {
+      this.notificationService.error(this.returnActionNoteLabel() + ' is required');
+      return;
+    }
+
+    this.returnActionSubmitting = true;
+    const action = this.returnAction;
+    const request$ = action.mode === 'decision'
+      ? this.adminOrderService.decideReturnRequest(
+          action.request.id,
+          action.approved,
+          action.refundWithoutReturn,
+          action.note.trim() || undefined)
+      : this.adminOrderService.recordReturnQc(
+          action.request.id,
+          Boolean(action.qualityInspectionPassed),
+          action.note.trim() || undefined);
+
+    request$.subscribe({
+      next: () => {
+        this.returnActionSubmitting = false;
+        this.notificationService.success(action.mode === 'quality'
+          ? 'Return quality inspection result saved'
+          : 'Return request decision saved');
+        this.closeReturnActionForm();
+        this.loadReturnRequests();
+        this.loadOrders();
+      },
+      error: (err) => {
+        this.returnActionSubmitting = false;
+        this.notificationService.error(err.error?.message || 'Failed to update return request');
+      }
+    });
+  }
+
+  returnActionTitle(): string {
+    if (!this.returnAction) {
+      return '';
+    }
+    if (this.returnAction.mode === 'quality') {
+      return this.returnAction.qualityInspectionPassed
+        ? 'Record Passed Return Quality Inspection'
+        : 'Record Failed Return Quality Inspection';
+    }
+    if (!this.returnAction.approved) {
+      return 'Reject Return Request';
+    }
+    return this.returnAction.refundWithoutReturn
+      ? 'Approve Refund Without Returning the Item'
+      : 'Approve Return Request';
+  }
+
+  returnActionNoteLabel(): string {
+    if (!this.returnAction) {
+      return 'Administrative note';
+    }
+    if (this.returnAction.mode === 'quality') {
+      return this.returnAction.qualityInspectionPassed
+        ? 'Quality inspection passed note'
+        : 'Quality inspection failure reason';
+    }
+    if (!this.returnAction.approved) {
+      return 'Return rejection reason';
+    }
+    return 'Administrative decision note';
+  }
+
+  returnActionNotePlaceholder(): string {
+    if (!this.returnAction) {
+      return '';
+    }
+    if (this.returnAction.mode === 'quality') {
+      return this.returnAction.qualityInspectionPassed
+        ? 'Describe the inspected condition, what was accepted back into stock, and why the refund can be released.'
+        : 'Describe the inspection failure clearly, such as missing item, damaged by customer use, serial mismatch, or incomplete package.';
+    }
+    if (!this.returnAction.approved) {
+      return 'Explain why this return request is rejected so customer support has a complete audit trail.';
+    }
+    if (this.returnAction.refundWithoutReturn) {
+      return 'Explain why this order qualifies for refund without return, such as low-value item, damaged item evidence, or customer support exception.';
+    }
+    return 'Add approval instructions, expected return condition, warehouse handling note, or support case reference.';
+  }
+
+  returnActionSubmitLabel(): string {
+    if (!this.returnAction) {
+      return 'Save';
+    }
+    if (this.returnAction.mode === 'quality') {
+      return this.returnAction.qualityInspectionPassed
+        ? 'Save inspection result and release refund'
+        : 'Save inspection failure';
+    }
+    if (!this.returnAction.approved) {
+      return 'Reject return request';
+    }
+    return this.returnAction.refundWithoutReturn
+      ? 'Approve refund without return'
+      : 'Approve return request';
+  }
+
+  returnActionRequiresNote(): boolean {
+    if (!this.returnAction) {
+      return false;
+    }
+    return !this.returnAction.approved
+      || this.returnAction.mode === 'quality' && !this.returnAction.qualityInspectionPassed
+      || this.returnAction.refundWithoutReturn;
+  }
+
+  openPartialRefundForm(order: Order): void {
+    const refundableItems = (order.items || []).filter(item => (item.quantity - (item.refundedQuantity || 0)) > 0);
+    if (refundableItems.length === 0) {
+      this.notificationService.error('No refundable items remain');
+      return;
+    }
+    this.partialRefundDraft = {
+      order,
+      items: refundableItems,
+      orderItemId: refundableItems[0].id,
+      quantity: 1,
+      reason: ''
+    };
+  }
+
+  closePartialRefundForm(): void {
+    this.partialRefundDraft = null;
+    this.partialRefundSubmitting = false;
+  }
+
+  submitPartialRefundForm(): void {
+    if (!this.partialRefundDraft) {
+      return;
+    }
+    const draft = this.partialRefundDraft;
+    const item = draft.items.find(candidate => candidate.id === draft.orderItemId);
+    if (!item) {
+      this.notificationService.error('A valid order item is required');
+      return;
+    }
+    const maxQty = item.quantity - (item.refundedQuantity || 0);
+    const quantity = Number(draft.quantity);
+    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > maxQty) {
+      this.notificationService.error(`Refund quantity must be a whole number between 1 and ${maxQty}`);
+      return;
+    }
+    const reason = draft.reason.trim();
+    if (!reason) {
+      this.notificationService.error('Partial refund reason is required');
+      return;
+    }
+    this.partialRefundSubmitting = true;
+    this.adminOrderService.partialRefund(draft.order.id, item.id, quantity, reason).subscribe({
+      next: () => {
+        this.partialRefundSubmitting = false;
+        this.notificationService.success('Partial refund requested');
+        this.closePartialRefundForm();
+        this.loadOrders();
+        this.loadReturnRequests();
+      },
+      error: (err) => {
+        this.partialRefundSubmitting = false;
+        this.notificationService.error(err.error?.message || 'Failed to request partial refund');
+      }
+    });
   }
 
   openUpdateModal(order: Order): void {

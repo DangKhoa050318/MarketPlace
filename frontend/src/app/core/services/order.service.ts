@@ -3,9 +3,16 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PageResponse } from '../models/api-response.model';
-import { Order, OrderItem, CreateOrderRequest, PaygatePayload } from '../models/order.model';
+import { Order, OrderItem, CreateOrderRequest, PaygatePayload, ReturnRequest } from '../models/order.model';
 
 export { Order, OrderItem, CreateOrderRequest, PaygatePayload };
+
+export interface CreateReturnRequestPayload {
+  orderItemId?: number;
+  quantity?: number;
+  reason: string;
+  evidenceImageUrls?: string[];
+}
 
 @Injectable({ providedIn: 'root' })
 export class OrderService {
@@ -45,6 +52,10 @@ export class OrderService {
 
   cancelOrder(id: number): Observable<ApiResponse<Order>> {
     return this.http.put<ApiResponse<Order>>(`${this.apiUrl}/${id}/cancel`, {});
+  }
+
+  createReturnRequest(id: number, request: CreateReturnRequestPayload): Observable<ApiResponse<ReturnRequest>> {
+    return this.http.post<ApiResponse<ReturnRequest>>(`${this.apiUrl}/${id}/return-requests`, request);
   }
 
   confirmPaygatePayment(orderId: string, transactionRef?: string): Observable<ApiResponse<any>> {
