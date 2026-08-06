@@ -12,6 +12,8 @@ import com.training.marketplace.entity.Order;
 import com.training.marketplace.enums.DeliveryEventType;
 import com.training.marketplace.enums.DeliveryStatus;
 import com.training.marketplace.enums.OrderStatus;
+import com.training.marketplace.enums.PaymentMethod;
+import com.training.marketplace.enums.PaymentStatus;
 import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.exception.ConflictException;
 import com.training.marketplace.exception.DuplicateResourceException;
@@ -151,6 +153,9 @@ public class DeliveryServiceImpl implements DeliveryService {
             delivery.setDeliveredAt(deliveredAt);
             order.setStatus(OrderStatus.DELIVERED);
             order.setDeliveredAt(deliveredAt);
+            if (order.getPaymentMethod() == PaymentMethod.COD) {
+                order.setPaymentStatus(PaymentStatus.PAID);
+            }
             orderRepository.save(order);
         }
 

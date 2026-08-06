@@ -429,6 +429,9 @@ public class OrderServiceImpl implements OrderService {
         deliveryService.completeForCustomerConfirmation(orderId, userId);
         order.setStatus(OrderStatus.DELIVERED);
         order.setDeliveredAt(LocalDateTime.now());
+        if (order.getPaymentMethod() == PaymentMethod.COD) {
+            order.setPaymentStatus(PaymentStatus.PAID);
+        }
         Order saved = orderRepository.save(order);
         log.info("Customer confirmed receipt of order {}", orderId);
         return orderMapper.toResponse(saved);
@@ -502,8 +505,13 @@ public class OrderServiceImpl implements OrderService {
 
         log.info("Admin updating order {} status {} -> {}", orderId, previousStatus, request.status());
         order.setStatus(request.status());
-        if (request.status() == OrderStatus.DELIVERED && order.getDeliveredAt() == null) {
-            order.setDeliveredAt(java.time.LocalDateTime.now());
+        if (request.status() == OrderStatus.DELIVERED) {
+            if (order.getDeliveredAt() == null) {
+                order.setDeliveredAt(java.time.LocalDateTime.now());
+            }
+            if (order.getPaymentMethod() == PaymentMethod.COD) {
+                order.setPaymentStatus(PaymentStatus.PAID);
+            }
         }
         if (request.note() != null && !request.note().isBlank()) {
             order.setNote(request.note());
