@@ -12,6 +12,8 @@ import com.training.marketplace.entity.User;
 import com.training.marketplace.enums.DeliveryEventType;
 import com.training.marketplace.enums.DeliveryStatus;
 import com.training.marketplace.enums.OrderStatus;
+import com.training.marketplace.enums.PaymentMethod;
+import com.training.marketplace.enums.PaymentStatus;
 import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.exception.ConflictException;
 import com.training.marketplace.exception.DuplicateResourceException;
@@ -170,6 +172,8 @@ class DeliveryServiceTest {
 
     @Test
     void updateStatus_delivered_updatesOrderAndAppendsEventAtomically() {
+        shippedOrder.setPaymentMethod(PaymentMethod.COD);
+        shippedOrder.setPaymentStatus(PaymentStatus.UNPAID);
         pendingDelivery.setStatus(DeliveryStatus.IN_TRANSIT);
         prepareLockedDelivery(pendingDelivery);
         when(deliveryRepository.saveAndFlush(pendingDelivery)).thenReturn(pendingDelivery);
@@ -184,6 +188,7 @@ class DeliveryServiceTest {
         assertThat(result.status()).isEqualTo(DeliveryStatus.DELIVERED);
         assertThat(result.deliveredAt()).isNotNull();
         assertThat(shippedOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
+        assertThat(shippedOrder.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
         verify(orderRepository).save(shippedOrder);
         verify(deliveryEventRepository).save(any(DeliveryEvent.class));
     }
