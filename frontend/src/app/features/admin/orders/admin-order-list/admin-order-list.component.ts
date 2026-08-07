@@ -158,6 +158,24 @@ import { DeliveryTimelineComponent } from '../../../../shared/components/deliver
               </td>
             </ng-container>
 
+            <!-- Refund / Return Status Column -->
+            <ng-container matColumnDef="refundStatus">
+              <th mat-header-cell *matHeaderCellDef> Refund / Return </th>
+              <td mat-cell *matCellDef="let order">
+                <div class="refund-state-stack">
+                  <span *ngIf="order.returnRequestStatus" class="badge-pill" [ngClass]="getReturnChipClass(order.returnRequestStatus)">
+                    {{ returnStatusLabel(order.returnRequestStatus) }}
+                  </span>
+                  <span *ngIf="order.refundRequestStatus" class="badge-pill" [ngClass]="getRefundChipClass(order.refundRequestStatus)">
+                    {{ refundStatusLabel(order.refundRequestStatus) }}
+                  </span>
+                  <span *ngIf="!order.returnRequestStatus && !order.refundRequestStatus" class="muted-state">
+                    No refund request
+                  </span>
+                </div>
+              </td>
+            </ng-container>
+
             <!-- Actions Column -->
             <ng-container matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef> Action / Status Transition </th>
@@ -341,6 +359,19 @@ import { DeliveryTimelineComponent } from '../../../../shared/components/deliver
               <p><strong>Customer:</strong> {{ selectedOrder.username || ('User #' + selectedOrder.userId) }} ({{ selectedOrder.userEmail }})</p>
               <p><strong>Shipping Address:</strong> {{ selectedOrder.shippingAddress || 'N/A' }}</p>
               <p><strong>Current Status:</strong> <span class="badge-pill" [ngClass]="getStatusChipClass(selectedOrder.status)">{{ selectedOrder.status }}</span></p>
+              <p><strong>Payment Status:</strong> <span class="badge-pill" [ngClass]="getPaymentChipClass(selectedOrder.paymentStatus)">{{ selectedOrder.paymentStatus || 'UNKNOWN' }}</span></p>
+              <p><strong>Refund Request:</strong>
+                <span *ngIf="selectedOrder.refundRequestStatus" class="badge-pill" [ngClass]="getRefundChipClass(selectedOrder.refundRequestStatus)">
+                  #{{ selectedOrder.refundRequestId }} {{ refundStatusLabel(selectedOrder.refundRequestStatus) }}
+                </span>
+                <span *ngIf="!selectedOrder.refundRequestStatus" class="muted-state">No direct refund request</span>
+              </p>
+              <p><strong>Return Request:</strong>
+                <span *ngIf="selectedOrder.returnRequestStatus" class="badge-pill" [ngClass]="getReturnChipClass(selectedOrder.returnRequestStatus)">
+                  #{{ selectedOrder.returnRequestId }} {{ returnStatusLabel(selectedOrder.returnRequestStatus) }}
+                </span>
+                <span *ngIf="!selectedOrder.returnRequestStatus" class="muted-state">No return request</span>
+              </p>
             </div>
 
             <form [formGroup]="updateForm" (ngSubmit)="onSaveStatusUpdate()">
@@ -600,6 +631,18 @@ import { DeliveryTimelineComponent } from '../../../../shared/components/deliver
     }
     .delivery-btn { color: #0284c7; }
     .refund-btn { color: #16a34a; }
+    .refund-state-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      min-width: 150px;
+    }
+    .muted-state {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 650;
+    }
     .returns-panel { border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px; margin-bottom: 18px; background: #f8fafc; }
     .returns-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .returns-header h3 { margin: 0; font-size: 1rem; }
@@ -719,7 +762,7 @@ import { DeliveryTimelineComponent } from '../../../../shared/components/deliver
   `]
 })
 export class AdminOrderListComponent implements OnInit {
-  displayedColumns: string[] = ['id', 'userEmail', 'createdAt', 'totalAmount', 'status', 'actions'];
+  displayedColumns: string[] = ['id', 'userEmail', 'createdAt', 'totalAmount', 'status', 'refundStatus', 'actions'];
   orders: Order[] = [];
   returnRequests: ReturnRequest[] = [];
   selectedStatus: string = 'ALL';
@@ -861,6 +904,49 @@ export class AdminOrderListComponent implements OnInit {
       case 'REJECTED':
       case 'QC_FAILED': return 'badge-pending';
       default: return 'badge-confirmed';
+    }
+  }
+
+  getRefundChipClass(status: string): string {
+    switch (status) {
+      case 'PENDING': return 'badge-processing';
+      case 'SUCCEEDED': return 'badge-delivered';
+      case 'FAILED': return 'badge-pending';
+      default: return 'badge-confirmed';
+    }
+  }
+
+  getPaymentChipClass(status?: string): string {
+    switch (status) {
+      case 'PAID': return 'badge-delivered';
+      case 'REFUNDED': return 'badge-delivered';
+      case 'PARTIALLY_REFUNDED': return 'badge-processing';
+      case 'REFUND_PENDING': return 'badge-processing';
+      case 'UNPAID':
+      case 'PENDING_PAYGATE':
+      default: return 'badge-pending';
+    }
+  }
+
+  returnStatusLabel(status: string): string {
+    switch (status) {
+      case 'REQUESTED': return 'Return requested';
+      case 'APPROVED': return 'Return approved';
+      case 'RETURN_RECEIVED': return 'Return received';
+      case 'QC_PASSED': return 'QC passed, refund pending';
+      case 'QC_FAILED': return 'QC failed';
+      case 'COMPLETED': return 'Return refund completed';
+      case 'REJECTED': return 'Return rejected';
+      default: return status;
+    }
+  }
+
+  refundStatusLabel(status: string): string {
+    switch (status) {
+      case 'PENDING': return 'Refund pending';
+      case 'SUCCEEDED': return 'Refund completed';
+      case 'FAILED': return 'Refund failed';
+      default: return status;
     }
   }
 

@@ -11,6 +11,7 @@ import com.training.marketplace.entity.Order;
 import com.training.marketplace.entity.OrderItem;
 import com.training.marketplace.entity.ProductVariant;
 import com.training.marketplace.entity.RefundRequest;
+import com.training.marketplace.entity.ReturnRequest;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.dto.response.PaygatePayloadResponse;
 import com.training.marketplace.enums.OrderStatus;
@@ -26,6 +27,7 @@ import com.training.marketplace.publisher.OrderEventPublisher;
 import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.repository.ProductRepository;
 import com.training.marketplace.repository.RefundRequestRepository;
+import com.training.marketplace.repository.ReturnRequestRepository;
 import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.AppliedCoupon;
 import com.training.marketplace.service.CartService;
@@ -72,6 +74,7 @@ public class OrderServiceImpl implements OrderService {
     private final DeliveryService deliveryService;
     private final RefundRequestRepository refundRequestRepository;
     private final OrderExpiryJob orderExpiryJob;
+    private final ReturnRequestRepository returnRequestRepository;
 
     @Override
     @Transactional
@@ -304,6 +307,10 @@ public class OrderServiceImpl implements OrderService {
                 baseResponse.paygateTransactionRef(),
                 paygatePayload,
                 savedOrder.getPaygateExpiresAt(),
+                baseResponse.refundRequestId(),
+                baseResponse.refundRequestStatus(),
+                baseResponse.returnRequestId(),
+                baseResponse.returnRequestStatus(),
                 baseResponse.note(),
                 baseResponse.items(),
                 baseResponse.createdAt(),
@@ -396,7 +403,7 @@ public class OrderServiceImpl implements OrderService {
         String cleanSearch = (search != null && !search.trim().isEmpty()) ? "%" + search.trim().toLowerCase() + "%" : null;
         Page<Order> page = orderRepository.findFilteredOrders(userId, status, paymentStatus, cleanSearch, pageable);
         page.getContent().forEach(this::ensureOrderItemProductIds);
-        return PageResponse.from(page, this::enrichOrderResponse);
+        return PageResponse.from(page, this::toOrderResponse);
     }
 
     @Override
@@ -442,7 +449,9 @@ public class OrderServiceImpl implements OrderService {
                 resp.id(), resp.userId(), resp.username(), resp.userEmail(), resp.shippingAddress(),
                 resp.totalAmount(), resp.discountAmount(), resp.shippingFee(), resp.couponCode(),
                 resp.status(), resp.paymentMethod(), resp.paymentStatus(), resp.upfrontAmount(),
-                resp.financeAmount(), resp.paygateTransactionRef(), payload, order.getPaygateExpiresAt(), resp.note(), resp.items(), resp.createdAt(), resp.updatedAt()
+                resp.financeAmount(), resp.paygateTransactionRef(), payload, order.getPaygateExpiresAt(),
+                resp.refundRequestId(), resp.refundRequestStatus(), resp.returnRequestId(), resp.returnRequestStatus(),
+                resp.note(), resp.items(), resp.createdAt(), resp.updatedAt()
         );
     }
 
@@ -473,7 +482,7 @@ public class OrderServiceImpl implements OrderService {
             throw new BadRequestException("Delivered orders cannot be cancelled directly. Please contact support for returns.");
         }
         if (order.getStatus() == OrderStatus.CANCELLED) {
-            return orderMapper.toResponse(order);
+            return toOrderResponse(order);
         }
 
         boolean paidOnline = order.getPaymentStatus() == PaymentStatus.PAID
@@ -496,7 +505,7 @@ public class OrderServiceImpl implements OrderService {
 
         Order savedOrder = orderRepository.save(order);
         log.info("User cancelled order {}: paymentStatus={}, reservation released", orderId, savedOrder.getPaymentStatus());
-        return orderMapper.toResponse(savedOrder);
+        return toOrderResponse(savedOrder);
     }
 
     @Override
@@ -589,7 +598,7 @@ public class OrderServiceImpl implements OrderService {
         }
         Order saved = orderRepository.save(order);
         log.info("Customer confirmed receipt of order {}", orderId);
-        return orderMapper.toResponse(saved);
+        return toOrderResponse(saved);
     }
 
     @Override
@@ -611,7 +620,7 @@ public class OrderServiceImpl implements OrderService {
         Page<Order> page = (status != null)
                 ? orderRepository.findAllByStatus(status, pageable)
                 : orderRepository.findAll(pageable);
-        return PageResponse.from(page, orderMapper::toResponse);
+        return PageResponse.from(page, this::toOrderResponse);
     }
 
     @Override
@@ -678,7 +687,44 @@ public class OrderServiceImpl implements OrderService {
         if (request.note() != null && !request.note().isBlank()) {
             order.setNote(request.note());
         }
-        return orderMapper.toResponse(orderRepository.save(order));
+        return toOrderResponse(orderRepository.save(order));
+    }
+
+    private OrderResponse toOrderResponse(Order order) {
+        OrderResponse base = orderMapper.toResponse(order);
+        RefundRequest latestRefund = order.getId() != null
+                ? refundRequestRepository.findFirstByOrderIdOrderByCreatedAtDesc(order.getId()).orElse(null)
+                : null;
+        ReturnRequest latestReturn = order.getId() != null
+                ? returnRequestRepository.findFirstByOrderIdOrderByCreatedAtDesc(order.getId()).orElse(null)
+                : null;
+        return new OrderResponse(
+                base.id(),
+                base.userId(),
+                base.username(),
+                base.userEmail(),
+                base.shippingAddress(),
+                base.totalAmount(),
+                base.discountAmount(),
+                base.shippingFee(),
+                base.couponCode(),
+                base.status(),
+                base.paymentMethod(),
+                base.paymentStatus(),
+                base.upfrontAmount(),
+                base.financeAmount(),
+                base.paygateTransactionRef(),
+                base.paygatePayload(),
+                order.getPaygateExpiresAt(),
+                latestRefund != null ? latestRefund.getId() : null,
+                latestRefund != null ? latestRefund.getStatus() : null,
+                latestReturn != null ? latestReturn.getId() : null,
+                latestReturn != null ? latestReturn.getStatus() : null,
+                base.note(),
+                base.items(),
+                base.createdAt(),
+                base.updatedAt()
+        );
     }
 
     private void requestPaygateRefund(Order order, String reason) {
@@ -711,7 +757,6 @@ public class OrderServiceImpl implements OrderService {
                     order.getPaygateTransactionRef(),
                     order.getId(),
                     order.getTotalAmount(),
-                    reason,
                     idempotencyKey);
             refundRequest.setTransactionRef(order.getPaygateTransactionRef());
             refundRequest.setStatus(RefundRequestStatus.SUCCEEDED);

@@ -14,6 +14,10 @@ public interface OrderMapper {
     @Mapping(target = "username", source = "user.username")
     @Mapping(target = "userEmail", source = "user.email")
     @Mapping(target = "paygatePayload", ignore = true)
+    @Mapping(target = "refundRequestId", ignore = true)
+    @Mapping(target = "refundRequestStatus", ignore = true)
+    @Mapping(target = "returnRequestId", ignore = true)
+    @Mapping(target = "returnRequestStatus", ignore = true)
     OrderResponse toResponse(Order order);
 
     OrderItemResponse toItemResponse(OrderItem orderItem);

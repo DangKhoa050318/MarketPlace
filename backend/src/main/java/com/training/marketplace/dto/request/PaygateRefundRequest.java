@@ -6,7 +6,6 @@ public record PaygateRefundRequest(
         String apiKey,
         String transactionRef,
         String orderId,
-        BigDecimal amount,
-        String reason
+        BigDecimal amount
 ) {
 }

@@ -11,6 +11,8 @@ import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.mapper.OrderMapper;
 import com.training.marketplace.repository.OrderRepository;
+import com.training.marketplace.repository.RefundRequestRepository;
+import com.training.marketplace.repository.ReturnRequestRepository;
 import com.training.marketplace.service.impl.OrderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -53,6 +56,12 @@ class AdminOrderServiceTest {
     @Mock
     private InventoryFacade inventoryFacade;
 
+    @Mock
+    private ReturnRequestRepository returnRequestRepository;
+
+    @Mock
+    private RefundRequestRepository refundRequestRepository;
+
     @InjectMocks
     private OrderServiceImpl orderService;
 
@@ -82,6 +91,11 @@ class AdminOrderServiceTest {
                 BigDecimal.ZERO, BigDecimal.ZERO, null, OrderStatus.PENDING, null, Collections.emptyList(),
                 LocalDateTime.now(), LocalDateTime.now()
         );
+
+        Mockito.lenient().when(refundRequestRepository.findFirstByOrderIdOrderByCreatedAtDesc(any()))
+                .thenReturn(Optional.empty());
+        Mockito.lenient().when(returnRequestRepository.findFirstByOrderIdOrderByCreatedAtDesc(any()))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -173,6 +187,7 @@ class AdminOrderServiceTest {
         UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.CANCELLED, null);
         when(orderRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenReturn(order);
+        when(orderMapper.toResponse(order)).thenReturn(sampleOrderResponse);
 
         orderService.updateOrderStatusByAdmin(2L, request);
 

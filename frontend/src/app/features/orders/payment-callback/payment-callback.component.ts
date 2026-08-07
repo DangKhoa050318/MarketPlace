@@ -251,16 +251,13 @@ export class PaymentCallbackComponent implements OnInit {
       this.orderId = this.getFirstString(params['orderId']);
       this.transactionRef = this.getFirstString(params['transactionRef']);
 
-      const cleanId = this.cleanOrderId(this.orderId);
-      const numericId = cleanId ? Number(cleanId) : null;
-
-      if (this.isSuccess && numericId) {
-        this.orderService.confirmVietQrPayment(numericId).subscribe({
+      if (this.isSuccess && this.orderId) {
+        this.orderService.confirmPaygatePayment(this.orderId, this.transactionRef || undefined).subscribe({
           next: (res) => console.log('Payment status confirmed via callback:', res),
           error: (err) => console.warn('Could not auto-confirm payment status via callback:', err)
         });
-      } else if (!this.isSuccess && numericId) {
-        this.orderService.cancelVietQrPayment(numericId).subscribe({
+      } else if (!this.isSuccess && this.orderId) {
+        this.orderService.cancelPaygatePayment(this.orderId).subscribe({
           next: (res) => console.log('Payment cancellation processed via callback:', res),
           error: (err) => console.warn('Could not auto-cancel payment via callback:', err)
         });

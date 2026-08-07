@@ -21,6 +21,7 @@ import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.repository.ProductRepository;
 import com.training.marketplace.repository.ProductVariantRepository;
 import com.training.marketplace.repository.RefundRequestRepository;
+import com.training.marketplace.repository.ReturnRequestRepository;
 import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.impl.OrderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +66,7 @@ class OrderServiceTest {
     @Mock private MerchandisingEventService merchandisingEventService;
     @Mock private DeliveryService deliveryService;
     @Mock private RefundRequestRepository refundRequestRepository;
+    @Mock private ReturnRequestRepository returnRequestRepository;
 
     @InjectMocks private OrderServiceImpl orderService;
 
@@ -234,7 +236,6 @@ class OrderServiceTest {
                 "TXN_123",
                 100L,
                 BigDecimal.valueOf(200.00),
-                "Customer cancelled before shipment",
                 "PAYGATE_REFUND:ORDER:100:FULL");
         verify(inventoryFacade).release(eq(1L), eq(Map.of(10L, 2)));
     }
@@ -255,7 +256,7 @@ class OrderServiceTest {
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_PENDING);
-        verify(paygateClientService, never()).refund(any(), any(), any(), any(), any());
+        verify(paygateClientService, never()).refund(any(), any(), any(), any());
         verify(inventoryFacade).release(eq(1L), eq(Map.of(10L, 2)));
     }
 
