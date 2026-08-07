@@ -14,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,30 +35,31 @@ public class AdminReviewController {
     @GetMapping
     @Operation(summary = "List reviews for moderation",
             description = "Paginated reviews filterable by star rating (1-5), status and product")
-    public ResponseEntity<ApiResponse<PageResponse<ProductReviewResponse>>> listReviews(
+    public ApiResponse<PageResponse<ProductReviewResponse>> listReviews(
             @RequestParam(required = false) Integer rating,
             @RequestParam(required = false) ReviewStatus status,
             @RequestParam(required = false) Long productId,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         PageResponse<ProductReviewResponse> response = reviewService.getReviewsForAdmin(rating, status, productId, pageable);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return ApiResponse.success(response);
     }
 
     @PutMapping("/{id}/status")
     @Operation(summary = "Moderate review status", description = "Approve, hide, or soft delete a customer review")
-    public ResponseEntity<ApiResponse<ProductReviewResponse>> updateReviewStatus(
+    public ApiResponse<ProductReviewResponse> updateReviewStatus(
             @PathVariable Long id,
             @Valid @RequestBody AdminUpdateReviewStatusRequest request) {
         ProductReviewResponse response = reviewService.adminUpdateStatus(id, request.status());
-        return ResponseEntity.ok(ApiResponse.success("Review status updated successfully", response));
+        return ApiResponse.success("Review status updated successfully", response);
     }
 
     @PutMapping("/{id}/reply")
     @Operation(summary = "Reply to a review", description = "Shop/seller public reply shown under the customer review")
-    public ResponseEntity<ApiResponse<ProductReviewResponse>> replyToReview(
+    public ApiResponse<ProductReviewResponse> replyToReview(
             @PathVariable Long id,
             @Valid @RequestBody AdminReviewReplyRequest request) {
         ProductReviewResponse response = reviewService.adminReply(id, request.reply());
-        return ResponseEntity.ok(ApiResponse.success("Reply saved", response));
+        return ApiResponse.success("Reply saved", response);
     }
 }
+

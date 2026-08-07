@@ -3,10 +3,8 @@ package com.training.marketplace.controller;
 import com.training.marketplace.common.ApiResponse;
 import com.training.marketplace.config.OpenApiSchemas;
 import com.training.marketplace.dto.response.DeliveryResponse;
-import com.training.marketplace.entity.User;
-import com.training.marketplace.exception.ResourceNotFoundException;
-import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.DeliveryService;
+import com.training.marketplace.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DeliveryController {
 
     private final DeliveryService deliveryService;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @GetMapping("/{orderId}/delivery")
     @PreAuthorize("hasRole('CUSTOMER')")
@@ -40,14 +38,8 @@ public class DeliveryController {
     })
     public ApiResponse<DeliveryResponse> getDelivery(
             @PathVariable Long orderId, Authentication authentication) {
-        return ApiResponse.success(deliveryService.getForCustomer(
-                orderId, resolveUser(authentication).getId()));
-    }
-
-    private User resolveUser(Authentication authentication) {
-        String identifier = authentication.getName();
-        return userRepository.findByUsername(identifier)
-                .or(() -> userRepository.findByEmail(identifier))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + identifier));
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
+        return ApiResponse.success(deliveryService.getForCustomer(orderId, userId));
     }
 }
+

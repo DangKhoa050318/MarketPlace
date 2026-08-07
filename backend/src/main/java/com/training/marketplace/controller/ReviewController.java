@@ -16,8 +16,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,84 +36,80 @@ public class ReviewController {
 
     @GetMapping("/api/v1/products/{productId}/reviews")
     @Operation(summary = "Get public product reviews", description = "Retrieve approved reviews for a product with optional star rating filter, pagination and sorting")
-    public ResponseEntity<ApiResponse<PageResponse<ProductReviewResponse>>> getProductReviews(
+    public ApiResponse<PageResponse<ProductReviewResponse>> getProductReviews(
             @PathVariable Long productId,
             @RequestParam(required = false) Integer rating,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        PageResponse<ProductReviewResponse> response = reviewService.getProductReviews(productId, rating, pageable);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return ApiResponse.success(reviewService.getProductReviews(productId, rating, pageable));
     }
 
     @GetMapping("/api/v1/products/{productId}/reviews/summary")
     @Operation(summary = "Get product rating summary", description = "Retrieve aggregate average rating, total reviews and 1-5 star breakdown")
-    public ResponseEntity<ApiResponse<RatingSummaryResponse>> getRatingSummary(@PathVariable Long productId) {
-        RatingSummaryResponse summary = reviewService.getRatingSummary(productId);
-        return ResponseEntity.ok(ApiResponse.success(summary));
+    public ApiResponse<RatingSummaryResponse> getRatingSummary(@PathVariable Long productId) {
+        return ApiResponse.success(reviewService.getRatingSummary(productId));
     }
 
     @GetMapping("/api/v1/products/ratings")
     @Operation(summary = "Batch product rating summaries",
             description = "Average rating + review count for a set of product ids (for storefront cards)")
-    public ResponseEntity<ApiResponse<java.util.List<ProductRatingSummaryResponse>>> getRatingSummaries(
+    public ApiResponse<java.util.List<ProductRatingSummaryResponse>> getRatingSummaries(
             @RequestParam java.util.List<Long> ids) {
-        return ResponseEntity.ok(ApiResponse.success(reviewService.getRatingSummaries(ids)));
+        return ApiResponse.success(reviewService.getRatingSummaries(ids));
     }
 
     @GetMapping("/api/v1/products/{productId}/reviews/eligibility")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'STAFF', 'MANAGER', 'ADMIN')")
     @Operation(summary = "Check user review eligibility", description = "Verify whether current user can submit a review and if verified purchase badge applies")
-    public ResponseEntity<ApiResponse<ReviewEligibilityResponse>> checkEligibility(
+    public ApiResponse<ReviewEligibilityResponse> checkEligibility(
             @PathVariable Long productId,
             Authentication authentication) {
-        ReviewEligibilityResponse response = reviewService.checkEligibility(productId, authentication.getName());
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return ApiResponse.success(reviewService.checkEligibility(productId, authentication.getName()));
     }
 
     @PostMapping("/api/v1/products/{productId}/reviews")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'STAFF', 'MANAGER', 'ADMIN')")
     @Operation(summary = "Create product review", description = "Submit a new rating and review for a product")
-    public ResponseEntity<ApiResponse<ProductReviewResponse>> createReview(
+    public ApiResponse<ProductReviewResponse> createReview(
             @PathVariable Long productId,
             @Valid @RequestBody CreateReviewRequest request,
             Authentication authentication) {
         ProductReviewResponse response = reviewService.createReview(productId, authentication.getName(), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Review created successfully", response));
+        return ApiResponse.success("Review created successfully", response);
     }
 
     @PutMapping("/api/v1/reviews/{id}")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'STAFF', 'MANAGER', 'ADMIN')")
     @Operation(summary = "Update user review", description = "Update rating, title, and content of an existing review owned by current user")
-    public ResponseEntity<ApiResponse<ProductReviewResponse>> updateReview(
+    public ApiResponse<ProductReviewResponse> updateReview(
             @PathVariable Long id,
             @Valid @RequestBody UpdateReviewRequest request,
             Authentication authentication) {
         ProductReviewResponse response = reviewService.updateReview(id, authentication.getName(), request);
-        return ResponseEntity.ok(ApiResponse.success("Review updated successfully", response));
+        return ApiResponse.success("Review updated successfully", response);
     }
 
     @DeleteMapping("/api/v1/reviews/{id}")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'STAFF', 'MANAGER', 'ADMIN')")
     @Operation(summary = "Delete user review", description = "Soft delete a product review owned by current user")
-    public ResponseEntity<ApiResponse<Void>> deleteReview(
+    public ApiResponse<Void> deleteReview(
             @PathVariable Long id,
             Authentication authentication) {
         reviewService.softDeleteReview(id, authentication.getName());
-        return ResponseEntity.ok(ApiResponse.success("Review deleted successfully", null));
+        return ApiResponse.success("Review deleted successfully", null);
     }
 
     @GetMapping("/api/v1/reviews/my-reviewed-product-ids")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'STAFF', 'MANAGER', 'ADMIN')")
     @Operation(summary = "Get user reviewed product IDs", description = "Retrieve list of product IDs reviewed by current authenticated user")
-    public ResponseEntity<ApiResponse<java.util.List<Long>>> getMyReviewedProductIds(Authentication authentication) {
-        java.util.List<Long> productIds = reviewService.getMyReviewedProductIds(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.success(productIds));
+    public ApiResponse<java.util.List<Long>> getMyReviewedProductIds(Authentication authentication) {
+        return ApiResponse.success(reviewService.getMyReviewedProductIds(authentication.getName()));
     }
 
     @GetMapping("/api/v1/reviews/my-reviewed-order-item-ids")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'STAFF', 'MANAGER', 'ADMIN')")
     @Operation(summary = "Get user reviewed order item IDs", description = "Retrieve list of order item IDs reviewed by current authenticated user")
-    public ResponseEntity<ApiResponse<java.util.List<Long>>> getMyReviewedOrderItemIds(Authentication authentication) {
-        java.util.List<Long> itemIds = reviewService.getMyReviewedOrderItemIds(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.success(itemIds));
+    public ApiResponse<java.util.List<Long>> getMyReviewedOrderItemIds(Authentication authentication) {
+        return ApiResponse.success(reviewService.getMyReviewedOrderItemIds(authentication.getName()));
     }
 }
+

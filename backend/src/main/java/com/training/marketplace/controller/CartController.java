@@ -4,17 +4,14 @@ import com.training.marketplace.common.ApiResponse;
 import com.training.marketplace.dto.request.AddToCartRequest;
 import com.training.marketplace.dto.request.UpdateCartItemRequest;
 import com.training.marketplace.dto.response.CartResponse;
-import com.training.marketplace.entity.User;
-import com.training.marketplace.exception.ResourceNotFoundException;
-import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.CartService;
+import com.training.marketplace.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,12 +29,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class CartController {
 
     private final CartService cartService;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @GetMapping
     @Operation(summary = "Get current user's shopping cart")
     public ApiResponse<CartResponse> getCart(Authentication authentication) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         return ApiResponse.success(cartService.getCart(userId));
     }
 
@@ -46,7 +43,7 @@ public class CartController {
     public ApiResponse<CartResponse> addItem(
             Authentication authentication,
             @Valid @RequestBody AddToCartRequest request) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         return ApiResponse.success("Item added to cart", cartService.addItem(userId, request));
     }
 
@@ -56,7 +53,7 @@ public class CartController {
             Authentication authentication,
             @PathVariable Long variantId,
             @Valid @RequestBody UpdateCartItemRequest request) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         return ApiResponse.success("Cart updated", cartService.updateQuantity(userId, variantId, request.quantity()));
     }
 
@@ -66,7 +63,7 @@ public class CartController {
     public void removeItem(
             Authentication authentication,
             @PathVariable Long variantId) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         cartService.removeItem(userId, variantId);
     }
 
@@ -74,19 +71,8 @@ public class CartController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Clear shopping cart")
     public void clearCart(Authentication authentication) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         cartService.clearCart(userId);
     }
-
-    private Long getUserId(Authentication authentication) {
-        Authentication auth = authentication != null ? authentication : SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null || "anonymousUser".equalsIgnoreCase(auth.getName())) {
-            throw new ResourceNotFoundException("Unauthenticated user context");
-        }
-        String identifier = auth.getName();
-        User user = userRepository.findByUsername(identifier)
-                .or(() -> userRepository.findByEmail(identifier))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + identifier));
-        return user.getId();
-    }
 }
+

@@ -6,11 +6,12 @@ import com.training.marketplace.dto.response.BannerResponse;
 import com.training.marketplace.dto.response.CampaignResponse;
 import com.training.marketplace.dto.response.CollectionResponse;
 import com.training.marketplace.entity.User;
-import com.training.marketplace.repository.UserRepository;
+import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.service.BannerService;
 import com.training.marketplace.service.CampaignService;
 import com.training.marketplace.service.CollectionService;
 import com.training.marketplace.service.MerchandisingEventService;
+import com.training.marketplace.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -43,7 +44,7 @@ public class MerchandisingController {
     private final CollectionService collectionService;
     private final BannerService bannerService;
     private final MerchandisingEventService merchandisingEventService;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @GetMapping("/campaigns")
     @Operation(summary = "Currently effective campaigns")
@@ -84,9 +85,12 @@ public class MerchandisingController {
                 || "anonymousUser".equals(authentication.getName())) {
             return null;
         }
-        return userRepository.findByUsername(authentication.getName())
-                .or(() -> userRepository.findByEmail(authentication.getName()))
-                .map(User::getId)
-                .orElse(null);
+        try {
+            User user = userService.getAuthenticatedUser(authentication);
+            return user != null ? user.getId() : null;
+        } catch (ResourceNotFoundException e) {
+            return null;
+        }
     }
 }
+
