@@ -7,10 +7,8 @@ import com.training.marketplace.dto.request.CreateDeliveryRequest;
 import com.training.marketplace.dto.request.UpdateDeliveryRequest;
 import com.training.marketplace.dto.request.UpdateDeliveryStatusRequest;
 import com.training.marketplace.dto.response.DeliveryResponse;
-import com.training.marketplace.entity.User;
-import com.training.marketplace.exception.ResourceNotFoundException;
-import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.DeliveryService;
+import com.training.marketplace.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -38,7 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminDeliveryController {
 
     private final DeliveryService deliveryService;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @PostMapping("/orders/{orderId}/delivery")
     @ResponseStatus(HttpStatus.CREATED)
@@ -54,8 +52,9 @@ public class AdminDeliveryController {
             @PathVariable Long orderId,
             @Valid @RequestBody CreateDeliveryRequest request,
             Authentication authentication) {
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         return ApiResponse.success("Delivery created", deliveryService.create(
-                orderId, resolveUser(authentication).getId(), request));
+                orderId, userId, request));
     }
 
     @GetMapping("/orders/{orderId}/delivery")
@@ -97,8 +96,9 @@ public class AdminDeliveryController {
             @PathVariable Long deliveryId,
             @Valid @RequestBody UpdateDeliveryStatusRequest request,
             Authentication authentication) {
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         return ApiResponse.success("Delivery status updated", deliveryService.updateStatus(
-                deliveryId, resolveUser(authentication).getId(), request));
+                deliveryId, userId, request));
     }
 
     @PostMapping("/deliveries/{deliveryId}/events")
@@ -114,14 +114,9 @@ public class AdminDeliveryController {
             @PathVariable Long deliveryId,
             @Valid @RequestBody AddDeliveryEventRequest request,
             Authentication authentication) {
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         return ApiResponse.success("Delivery event recorded", deliveryService.addEvent(
-                deliveryId, resolveUser(authentication).getId(), request));
-    }
-
-    private User resolveUser(Authentication authentication) {
-        String identifier = authentication.getName();
-        return userRepository.findByUsername(identifier)
-                .or(() -> userRepository.findByEmail(identifier))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + identifier));
+                deliveryId, userId, request));
     }
 }
+

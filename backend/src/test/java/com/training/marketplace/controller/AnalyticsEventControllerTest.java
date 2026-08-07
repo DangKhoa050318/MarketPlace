@@ -45,6 +45,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.training.marketplace.service.UserService;
+
 @WebMvcTest(AnalyticsEventController.class)
 @AutoConfigureMockMvc
 @Import(SecurityConfig.class)
@@ -60,7 +62,7 @@ class AnalyticsEventControllerTest {
     private AnalyticsEventService analyticsEventService;
 
     @MockBean
-    private UserRepository userRepository;
+    private UserService userService;
 
     @MockBean
     private JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -115,7 +117,7 @@ class AnalyticsEventControllerTest {
                 .active(true)
                 .build();
         user.setId(7L);
-        when(userRepository.findByUsername("customer")).thenReturn(Optional.of(user));
+        when(userService.getAuthenticatedUser(any())).thenReturn(user);
 
         UUID eventId = UUID.fromString("cbe865ca-3c3c-4dc6-b5cb-a30833342848");
         var request = browserProductView(eventId);

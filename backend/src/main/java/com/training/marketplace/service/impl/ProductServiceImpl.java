@@ -5,6 +5,7 @@ import com.training.marketplace.dto.request.ProductCatalogFilter;
 import com.training.marketplace.dto.request.UpdateProductRequest;
 import com.training.marketplace.dto.response.ProductResponse;
 import com.training.marketplace.dto.response.StorefrontProductResponse;
+import com.training.marketplace.dto.response.SuggestResult;
 import com.training.marketplace.entity.Product;
 import com.training.marketplace.exception.DuplicateResourceException;
 import com.training.marketplace.exception.ResourceNotFoundException;
@@ -22,6 +23,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -53,6 +56,12 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public Page<StorefrontProductResponse> browse(ProductCatalogFilter filter, Pageable pageable) {
         return storefrontCatalogRepository.browse(filter, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SuggestResult> suggest(String query, int limit) {
+        return storefrontCatalogRepository.suggest(query, limit);
     }
 
     @Override

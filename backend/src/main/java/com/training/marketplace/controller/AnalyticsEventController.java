@@ -6,8 +6,9 @@ import com.training.marketplace.dto.request.TrackAnalyticsEventRequest;
 import com.training.marketplace.dto.response.AnalyticsBatchIngestionResponse;
 import com.training.marketplace.dto.response.AnalyticsEventResponse;
 import com.training.marketplace.entity.User;
-import com.training.marketplace.repository.UserRepository;
+import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.service.AnalyticsEventService;
+import com.training.marketplace.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AnalyticsEventController {
 
     private final AnalyticsEventService analyticsEventService;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
@@ -62,9 +63,12 @@ public class AnalyticsEventController {
         if (authentication == null || !authentication.isAuthenticated()) {
             return null;
         }
-        return userRepository.findByUsername(authentication.getName())
-                .or(() -> userRepository.findByEmail(authentication.getName()))
-                .map(User::getId)
-                .orElse(null);
+        try {
+            User user = userService.getAuthenticatedUser(authentication);
+            return user != null ? user.getId() : null;
+        } catch (ResourceNotFoundException e) {
+            return null;
+        }
     }
 }
+

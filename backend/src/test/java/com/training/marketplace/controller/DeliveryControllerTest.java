@@ -8,11 +8,11 @@ import com.training.marketplace.entity.User;
 import com.training.marketplace.enums.DeliveryStatus;
 import com.training.marketplace.enums.Role;
 import com.training.marketplace.exception.ConflictException;
-import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.security.JwtAuthenticationFilter;
 import com.training.marketplace.security.RateLimitingFilter;
 import com.training.marketplace.security.SecurityConfig;
 import com.training.marketplace.service.DeliveryService;
+import com.training.marketplace.service.UserService;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +49,7 @@ class DeliveryControllerTest {
     @Autowired private ObjectMapper objectMapper;
 
     @MockBean private DeliveryService deliveryService;
-    @MockBean private UserRepository userRepository;
+    @MockBean private UserService userService;
     @MockBean private JwtAuthenticationFilter jwtAuthenticationFilter;
     @MockBean private RateLimitingFilter rateLimitingFilter;
 
@@ -86,7 +86,7 @@ class DeliveryControllerTest {
     @Test
     @WithMockUser(username = "customer", roles = "CUSTOMER")
     void customerCanReadOwnedOrderDelivery() throws Exception {
-        when(userRepository.findByUsername("customer")).thenReturn(Optional.of(customer));
+        when(userService.getAuthenticatedUser(any())).thenReturn(customer);
         when(deliveryService.getForCustomer(10L, 7L)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/orders/10/delivery"))
@@ -100,7 +100,7 @@ class DeliveryControllerTest {
     void staffCanCreateDeliveryForShippedOrder() throws Exception {
         CreateDeliveryRequest request = new CreateDeliveryRequest(
                 "GHN", "GHN-001", LocalDate.now().plusDays(2));
-        when(userRepository.findByUsername("staff")).thenReturn(Optional.of(staff));
+        when(userService.getAuthenticatedUser(any())).thenReturn(staff);
         when(deliveryService.create(eq(10L), eq(2L), any(CreateDeliveryRequest.class)))
                 .thenReturn(response);
 
@@ -126,7 +126,7 @@ class DeliveryControllerTest {
     @Test
     @WithMockUser(username = "staff", roles = "STAFF")
     void staleStatusCommandReturnsConflict() throws Exception {
-        when(userRepository.findByUsername("staff")).thenReturn(Optional.of(staff));
+        when(userService.getAuthenticatedUser(any())).thenReturn(staff);
         when(deliveryService.updateStatus(eq(20L), eq(2L), any(UpdateDeliveryStatusRequest.class)))
                 .thenThrow(new ConflictException(
                         "Delivery was changed by another request; reload it before updating status"));

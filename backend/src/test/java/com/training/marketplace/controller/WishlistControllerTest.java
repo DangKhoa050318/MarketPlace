@@ -6,10 +6,10 @@ import com.training.marketplace.dto.response.WishlistItemResponse;
 import com.training.marketplace.dto.response.WishlistStatusResponse;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.enums.Role;
-import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.security.JwtAuthenticationFilter;
 import com.training.marketplace.security.RateLimitingFilter;
 import com.training.marketplace.security.SecurityConfig;
+import com.training.marketplace.service.UserService;
 import com.training.marketplace.service.WishlistService;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +26,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -47,7 +46,7 @@ class WishlistControllerTest {
     @Autowired private MockMvc mockMvc;
 
     @MockBean private WishlistService wishlistService;
-    @MockBean private UserRepository userRepository;
+    @MockBean private UserService userService;
     @MockBean private JwtAuthenticationFilter jwtAuthenticationFilter;
     @MockBean private RateLimitingFilter rateLimitingFilter;
 
@@ -74,7 +73,7 @@ class WishlistControllerTest {
                 .active(true)
                 .build();
         user.setId(7L);
-        when(userRepository.findByUsername("customer")).thenReturn(Optional.of(user));
+        when(userService.getAuthenticatedUser(any())).thenReturn(user);
         auth = new UsernamePasswordAuthenticationToken(
                 "customer",
                 "password",

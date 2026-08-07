@@ -6,6 +6,9 @@ import com.training.marketplace.dto.response.UserResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import com.training.marketplace.entity.User;
+import org.springframework.security.core.Authentication;
+
 public interface UserService {
 
     Page<UserResponse> getAll(Pageable pageable);
@@ -14,9 +17,14 @@ public interface UserService {
 
     UserResponse getById(Long id);
 
+    User getAuthenticatedUser(Authentication authentication);
+
+    User getByIdentifier(String identifier);
+
     UserResponse create(CreateUserRequest request);
 
     UserResponse update(Long id, UpdateUserRequest request);
 
     void delete(Long id);
 }
+
