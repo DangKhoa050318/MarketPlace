@@ -208,12 +208,28 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
                   </button>
                   <button
                     *ngIf="canRequestReturn(order)"
-                    mat-icon-button
-                    class="icon-btn-action btn-return"
+                    mat-stroked-button
+                    color="accent"
+                    class="btn-return-refund"
                     (click)="openReturnRequestForm(order)"
-                    matTooltip="Create Return Request">
+                    title="Request return/refund after delivery review">
                     <mat-icon>assignment_return</mat-icon>
+                    <span>Return / refund</span>
                   </button>
+                  <span
+                    *ngIf="order.returnRequestStatus"
+                    class="return-status-chip"
+                    [title]="'Return/refund request status: ' + returnStatusLabel(order.returnRequestStatus)">
+                    <mat-icon>assignment_turned_in</mat-icon>
+                    {{ returnStatusLabel(order.returnRequestStatus) }}
+                  </span>
+                  <span
+                    *ngIf="!order.returnRequestStatus && order.refundRequestStatus"
+                    class="refund-status-chip"
+                    [title]="'Refund request status: ' + refundStatusLabel(order.refundRequestStatus)">
+                    <mat-icon>payments</mat-icon>
+                    {{ refundStatusLabel(order.refundRequestStatus) }}
+                  </span>
                   <button
                     *ngIf="hasUnreviewedItems(order)"
                     mat-icon-button
@@ -255,7 +271,7 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
           <div class="return-modal-header">
             <div>
               <h2>Return and Refund Request</h2>
-              <p>Order #{{ selectedReturnOrder.id }} · tell us what went wrong and attach photos if available.</p>
+              <p>Order #{{ selectedReturnOrder.id }} · use this only after shipping/delivery when you need to return goods or ask admin to review a refund.</p>
             </div>
             <button mat-icon-button type="button" (click)="closeReturnRequestForm()" aria-label="Close return request form">
               <mat-icon>close</mat-icon>
@@ -313,7 +329,7 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
           <div class="return-modal-actions">
             <button mat-button type="button" (click)="closeReturnRequestForm()" [disabled]="requestingReturn">Cancel</button>
             <button mat-raised-button color="primary" type="submit" [disabled]="!returnReason.trim() || requestingReturn">
-              {{ requestingReturn ? 'Submitting return request...' : 'Submit return request' }}
+              {{ requestingReturn ? 'Submitting return/refund request...' : 'Submit return/refund request' }}
             </button>
           </div>
         </form>
@@ -411,7 +427,18 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
     .badge-cancelled { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
     .action-buttons {
       display: flex;
-      gap: 4px;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .btn-return-refund {
+      min-height: 36px;
+      border-color: rgba(22, 163, 74, 0.35);
+      color: #15803d;
+      white-space: nowrap;
+    }
+    .btn-return-refund mat-icon {
+      margin-right: 4px;
     }
     .return-modal-backdrop {
       position: fixed;
@@ -651,6 +678,44 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
       gap: 8px;
       vertical-align: middle;
       white-space: nowrap;
+    }
+    .return-status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 34px;
+      padding: 0 10px;
+      border-radius: 6px;
+      background: #ecfdf5;
+      color: #166534;
+      border: 1px solid rgba(22, 163, 74, 0.25);
+      font-size: 0.78rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .return-status-chip mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+    .refund-status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 34px;
+      padding: 0 10px;
+      border-radius: 6px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid rgba(37, 99, 235, 0.25);
+      font-size: 0.78rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .refund-status-chip mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
     }
     .btn-pay-again {
       background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
@@ -1162,7 +1227,29 @@ export class OrderListComponent implements OnInit {
   }
 
   canRequestReturn(order: Order): boolean {
-    return order.status === 'SHIPPED' || order.status === 'DELIVERED';
+    return !order.returnRequestStatus && (order.status === 'SHIPPED' || order.status === 'DELIVERED');
+  }
+
+  returnStatusLabel(status: string): string {
+    switch (status) {
+      case 'REQUESTED': return 'Return requested';
+      case 'APPROVED': return 'Return approved';
+      case 'RETURN_RECEIVED': return 'Return received';
+      case 'QC_PASSED': return 'QC passed, refund pending';
+      case 'QC_FAILED': return 'QC failed';
+      case 'COMPLETED': return 'Refund completed';
+      case 'REJECTED': return 'Return rejected';
+      default: return status;
+    }
+  }
+
+  refundStatusLabel(status: string): string {
+    switch (status) {
+      case 'PENDING': return 'Refund pending';
+      case 'SUCCEEDED': return 'Refund completed';
+      case 'FAILED': return 'Refund failed';
+      default: return status;
+    }
   }
 
   refundableItems(order: Order): Order['items'] {

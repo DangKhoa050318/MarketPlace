@@ -286,7 +286,7 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
             return false;
         }
         try {
-            paygateClientService.refund(order.getPaygateTransactionRef(), order.getId(), amount, reason, idempotencyKey);
+            paygateClientService.refund(order.getPaygateTransactionRef(), order.getId(), amount, idempotencyKey);
             refundRequest.setStatus(RefundRequestStatus.SUCCEEDED);
             refundRequest.setFailureReason(null);
             refundRequestRepository.save(refundRequest);

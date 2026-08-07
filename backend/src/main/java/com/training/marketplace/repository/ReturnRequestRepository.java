@@ -11,5 +11,7 @@ import java.util.Optional;
 public interface ReturnRequestRepository extends JpaRepository<ReturnRequest, Long> {
     Optional<ReturnRequest> findByOrderIdAndStatusIn(Long orderId, Collection<ReturnRequestStatus> statuses);
 
+    Optional<ReturnRequest> findFirstByOrderIdOrderByCreatedAtDesc(Long orderId);
+
     List<ReturnRequest> findAllByStatusInOrderByCreatedAtDesc(Collection<ReturnRequestStatus> statuses);
 }

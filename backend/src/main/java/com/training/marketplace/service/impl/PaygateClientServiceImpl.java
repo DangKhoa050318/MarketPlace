@@ -131,7 +131,7 @@ public class PaygateClientServiceImpl implements PaygateClientService {
     }
 
     @Override
-    public void refund(String transactionRef, Long orderId, BigDecimal amount, String reason, String idempotencyKey) {
+    public void refund(String transactionRef, Long orderId, BigDecimal amount, String idempotencyKey) {
         if (transactionRef == null || transactionRef.isBlank()) {
             throw new IllegalArgumentException("PayGate transaction reference is required for refund");
         }
@@ -158,8 +158,7 @@ public class PaygateClientServiceImpl implements PaygateClientService {
                 apiKey,
                 transactionRef,
                 "ORD-" + orderId,
-                currencyConversionService.convertUsdToVnd(amount),
-                reason
+                currencyConversionService.convertUsdToVnd(amount)
         );
 
         log.info("Requesting PayGate merchant refund for transactionRef={}, orderId={}, amount={}, idempotencyKey={}",

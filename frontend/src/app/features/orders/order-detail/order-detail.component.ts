@@ -79,8 +79,18 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
               <button *ngIf="canRequestReturn()" mat-stroked-button color="accent" class="confirm-btn"
                       (click)="openReturnRequestForm()" [disabled]="requestingReturn">
                 <mat-icon>assignment_return</mat-icon>
-                Return request
+                Return / refund request
               </button>
+              <span *ngIf="order.returnRequestStatus" class="return-status-chip"
+                    [title]="'Return/refund request status: ' + returnStatusLabel(order.returnRequestStatus)">
+                <mat-icon>assignment_turned_in</mat-icon>
+                {{ returnStatusLabel(order.returnRequestStatus) }}
+              </span>
+              <span *ngIf="!order.returnRequestStatus && order.refundRequestStatus" class="refund-status-chip"
+                    [title]="'Refund request status: ' + refundStatusLabel(order.refundRequestStatus)">
+                <mat-icon>payments</mat-icon>
+                {{ refundStatusLabel(order.refundRequestStatus) }}
+              </span>
               <button *ngIf="canConfirmReceived()" mat-flat-button color="primary" class="confirm-btn"
                       (click)="confirmReceived()" [disabled]="confirming">
                 <mat-icon>check_circle</mat-icon>
@@ -90,6 +100,11 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
           </div>
 
           <form *ngIf="showReturnRequestForm" class="return-request-form" (ngSubmit)="createReturnRequest()">
+            <div class="return-request-intro">
+              <strong>Return / refund request</strong>
+              <span>Use this after shipping or delivery when the product is wrong, damaged, defective, missing parts, or needs admin refund review.</span>
+            </div>
+
             <label for="return-request-item">Item to return</label>
             <select
               id="return-request-item"
@@ -139,7 +154,7 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
             <div class="return-request-actions">
               <button mat-button type="button" (click)="closeReturnRequestForm()" [disabled]="requestingReturn">Cancel</button>
               <button mat-raised-button color="primary" type="submit" [disabled]="!returnReason.trim() || requestingReturn">
-                {{ requestingReturn ? 'Submitting return request...' : 'Submit return request' }}
+                {{ requestingReturn ? 'Submitting return/refund request...' : 'Submit return/refund request' }}
               </button>
             </div>
           </form>
@@ -355,6 +370,44 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
     .badge-shipped { background: rgba(20, 184, 166, 0.2); color: #2dd4bf; border: 1px solid rgba(20, 184, 166, 0.4); }
     .badge-delivered { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
     .badge-cancelled { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .return-status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 6px;
+      background: #ecfdf5;
+      color: #166534;
+      border: 1px solid rgba(22, 163, 74, 0.25);
+      font-size: 0.82rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .return-status-chip mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+    .refund-status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 6px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid rgba(37, 99, 235, 0.25);
+      font-size: 0.82rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .refund-status-chip mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
     .info-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -476,6 +529,24 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
       background: #f8fafc;
+    }
+    .return-request-intro {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 12px;
+      border: 1px solid rgba(22, 163, 74, 0.18);
+      border-radius: 6px;
+      background: #f0fdf4;
+      color: #14532d;
+    }
+    .return-request-intro strong {
+      font-size: 0.95rem;
+      font-weight: 850;
+    }
+    .return-request-intro span {
+      font-size: 0.86rem;
+      color: #166534;
     }
     .return-request-form label {
       font-size: 0.82rem;
@@ -793,6 +864,10 @@ export class OrderDetailComponent implements OnInit {
   }
 
   openReturnRequestForm(): void {
+    if (this.order?.returnRequestStatus) {
+      this.notification.info(`This order already has a return/refund request: ${this.returnStatusLabel(this.order.returnRequestStatus)}`);
+      return;
+    }
     this.showReturnRequestForm = true;
     this.returnOrderItemId = null;
     this.returnQuantity = 1;
@@ -810,6 +885,11 @@ export class OrderDetailComponent implements OnInit {
 
   createReturnRequest(): void {
     if (!this.order || this.requestingReturn) {
+      return;
+    }
+    if (this.order.returnRequestStatus) {
+      this.notification.info(`This order already has a return/refund request: ${this.returnStatusLabel(this.order.returnRequestStatus)}`);
+      this.closeReturnRequestForm();
       return;
     }
     const reason = this.returnReason.trim();
@@ -851,7 +931,29 @@ export class OrderDetailComponent implements OnInit {
   }
 
   canRequestReturn(): boolean {
-    return this.order?.status === 'SHIPPED' || this.order?.status === 'DELIVERED';
+    return !this.order?.returnRequestStatus && (this.order?.status === 'SHIPPED' || this.order?.status === 'DELIVERED');
+  }
+
+  returnStatusLabel(status: string): string {
+    switch (status) {
+      case 'REQUESTED': return 'Return/refund requested';
+      case 'APPROVED': return 'Return approved';
+      case 'RETURN_RECEIVED': return 'Returned item received';
+      case 'QC_PASSED': return 'QC passed, refund pending';
+      case 'QC_FAILED': return 'QC failed';
+      case 'COMPLETED': return 'Refund completed';
+      case 'REJECTED': return 'Return rejected';
+      default: return status;
+    }
+  }
+
+  refundStatusLabel(status: string): string {
+    switch (status) {
+      case 'PENDING': return 'Refund pending';
+      case 'SUCCEEDED': return 'Refund completed';
+      case 'FAILED': return 'Refund failed';
+      default: return status;
+    }
   }
 
   refundableItems(): Order['items'] {

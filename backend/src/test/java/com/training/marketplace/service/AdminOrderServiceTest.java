@@ -11,6 +11,7 @@ import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.mapper.OrderMapper;
 import com.training.marketplace.repository.OrderRepository;
+import com.training.marketplace.repository.ReturnRequestRepository;
 import com.training.marketplace.service.impl.OrderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,6 +53,9 @@ class AdminOrderServiceTest {
 
     @Mock
     private InventoryFacade inventoryFacade;
+
+    @Mock
+    private ReturnRequestRepository returnRequestRepository;
 
     @InjectMocks
     private OrderServiceImpl orderService;

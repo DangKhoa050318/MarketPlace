@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface RefundRequestRepository extends JpaRepository<RefundRequest, Long> {
     Optional<RefundRequest> findByIdempotencyKey(String idempotencyKey);
+
+    Optional<RefundRequest> findFirstByOrderIdOrderByCreatedAtDesc(Long orderId);
 }

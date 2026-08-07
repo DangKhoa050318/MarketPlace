@@ -67,7 +67,7 @@ export class OrderService {
   }
 
   confirmPaygatePayment(orderId: string, transactionRef?: string): Observable<ApiResponse<any>> {
-    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/payments/paygate-webhook`, {
+    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/payments/paygate-callback`, {
       event: 'PAYMENT_COMPLETED',
       orderId,
       transactionRef: transactionRef || 'TXN-DIRECT-CALLBACK',
@@ -76,7 +76,7 @@ export class OrderService {
   }
 
   cancelPaygatePayment(orderId: string): Observable<ApiResponse<any>> {
-    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/payments/paygate-webhook`, {
+    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/payments/paygate-callback`, {
       event: 'PAYMENT_CANCELLED',
       orderId,
       status: 'CANCELLED'
