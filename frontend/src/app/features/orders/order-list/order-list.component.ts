@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
@@ -12,19 +12,22 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { finalize } from 'rxjs';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { OrderService, Order } from '../../../core/services/order.service';
 import { ReviewService } from '../../../core/services/review.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-dialog.component';
+import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/vietqr-dialog.component';
 
 @Component({
   selector: 'app-order-list',
   standalone: true,
   imports: [
     CommonModule,
-    RouterLink,
     FormsModule,
+    RouterLink,
     MatTableModule,
     MatPaginatorModule,
     MatButtonModule,
@@ -35,7 +38,10 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
     MatSelectModule,
     MatProgressSpinnerModule,
     MatDialogModule,
-    OrderReviewDialogComponent
+    MatTooltipModule,
+    ConfirmDialogComponent,
+    OrderReviewDialogComponent,
+    VietQrDialogComponent
   ],
   template: `
     <div class="orders-page-container">
@@ -173,43 +179,71 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
               <th mat-header-cell *matHeaderCellDef>Actions</th>
               <td mat-cell *matCellDef="let order">
                 <div class="action-buttons">
-                  <button
-                    *ngIf="isPaymentEligibleForRetry(order)"
-                    mat-raised-button
-                    class="btn-pay-again"
-                    (click)="onRetryPayment(order)"
-                    [disabled]="retryingOrderId === order.id"
-                    title="Tiếp tục thanh toán qua PayGate">
-                    <mat-icon>payment</mat-icon>
-                    <span>{{ retryingOrderId === order.id ? 'Đang chuyển...' : 'Tiếp tục thanh toán' }}</span>
-                  </button>
-                  <button
-                    *ngIf="order.status === 'SHIPPED'"
-                    mat-raised-button
-                    class="btn-confirm-received"
-                    (click)="onConfirmReceived(order)"
-                    title="Xác nhận đã nhận hàng">
-                    <mat-icon>check_circle</mat-icon>
-                    <span>Đã nhận hàng</span>
-                  </button>
-                  <button
-                    *ngIf="hasUnreviewedItems(order)"
-                    mat-stroked-button
-                    class="btn-review-order"
-                    (click)="openOrderReviewModal(order)"
-                    title="Review Purchased Items">
-                    <mat-icon>rate_review</mat-icon>
-                    <span>Đánh giá</span>
-                  </button>
-                  <a mat-icon-button color="primary" [routerLink]="['/orders', order.id]" title="View Order Details">
+                  <a mat-icon-button class="icon-btn-action btn-view" [routerLink]="['/orders', order.id]" matTooltip="View Details">
                     <mat-icon>visibility</mat-icon>
                   </a>
                   <button 
-                    *ngIf="isCancelEligible(order)" 
+                    *ngIf="order.status === 'PENDING' && order.paymentStatus === 'PENDING_PAYGATE' && !isSessionExpired(order) && order.paymentMethod === 'BANK_TRANSFER'" 
                     mat-icon-button 
-                    color="warn" 
+                    class="icon-btn-action btn-vietqr" 
+                    (click)="openVietQrModal(order)"
+                    matTooltip="Pay via VietQR">
+                    <mat-icon>qr_code_2</mat-icon>
+                  </button>
+                  <button 
+                    *ngIf="order.status === 'PENDING' && order.paymentStatus === 'PENDING_PAYGATE' && !isSessionExpired(order) && order.paymentMethod !== 'BANK_TRANSFER'" 
+                    mat-icon-button 
+                    class="icon-btn-action btn-paygate" 
+                    (click)="continuePaygatePayment(order)"
+                    matTooltip="Pay via PayGate">
+                    <mat-icon>payment</mat-icon>
+                  </button>
+                  <button
+                    *ngIf="order.status === 'SHIPPED'"
+                    mat-icon-button
+                    class="icon-btn-action btn-delivered"
+                    (click)="onConfirmReceived(order)"
+                    matTooltip="Confirm Order Received">
+                    <mat-icon>check_circle</mat-icon>
+                  </button>
+                  <button
+                    *ngIf="canRequestReturn(order)"
+                    mat-stroked-button
+                    color="accent"
+                    class="btn-return-refund"
+                    (click)="openReturnRequestForm(order)"
+                    title="Request return/refund after delivery review">
+                    <mat-icon>assignment_return</mat-icon>
+                    <span>Return / refund</span>
+                  </button>
+                  <span
+                    *ngIf="order.returnRequestStatus"
+                    class="return-status-chip"
+                    [title]="'Return/refund request status: ' + returnStatusLabel(order.returnRequestStatus)">
+                    <mat-icon>assignment_turned_in</mat-icon>
+                    {{ returnStatusLabel(order.returnRequestStatus) }}
+                  </span>
+                  <span
+                    *ngIf="!order.returnRequestStatus && order.refundRequestStatus"
+                    class="refund-status-chip"
+                    [title]="'Refund request status: ' + refundStatusLabel(order.refundRequestStatus)">
+                    <mat-icon>payments</mat-icon>
+                    {{ refundStatusLabel(order.refundRequestStatus) }}
+                  </span>
+                  <button
+                    *ngIf="hasUnreviewedItems(order)"
+                    mat-icon-button
+                    class="icon-btn-action btn-review"
+                    (click)="openOrderReviewModal(order)"
+                    matTooltip="Review Purchased Items">
+                    <mat-icon>rate_review</mat-icon>
+                  </button>
+                  <button 
+                    *ngIf="canCancelOrder(order)" 
+                    mat-icon-button 
+                    class="icon-btn-action btn-cancel"
                     (click)="onCancelOrder(order)" 
-                    title="Cancel Order">
+                    matTooltip="Cancel Order">
                     <mat-icon>cancel</mat-icon>
                   </button>
                 </div>
@@ -230,6 +264,75 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
             class="glass-paginator">
           </mat-paginator>
         </div>
+      </div>
+
+      <div *ngIf="selectedReturnOrder" class="return-modal-backdrop">
+        <form class="return-modal" (ngSubmit)="submitReturnRequest(selectedReturnOrder)">
+          <div class="return-modal-header">
+            <div>
+              <h2>Return and Refund Request</h2>
+              <p>Order #{{ selectedReturnOrder.id }} · use this only after shipping/delivery when you need to return goods or ask admin to review a refund.</p>
+            </div>
+            <button mat-icon-button type="button" (click)="closeReturnRequestForm()" aria-label="Close return request form">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <div class="return-modal-body">
+            <label for="return-item">Item to return</label>
+            <select
+              id="return-item"
+              name="returnItem"
+              [(ngModel)]="returnOrderItemId"
+              (ngModelChange)="useMaxReturnQuantity(selectedReturnOrder)">
+              <option [ngValue]="null">Entire order</option>
+              <option *ngFor="let item of refundableItems(selectedReturnOrder)" [ngValue]="item.id">
+                {{ item.productName }} - refundable quantity {{ refundableQuantity(item) }}
+              </option>
+            </select>
+
+            <div class="return-quantity-summary">
+              <strong>Return quantity</strong>
+              <span>{{ returnQuantityLabel(selectedReturnOrder) }}</span>
+            </div>
+
+            <label for="return-reason">Return request reason</label>
+            <textarea
+              id="return-reason"
+              name="returnReason"
+              [(ngModel)]="returnReason"
+              rows="5"
+              maxlength="1000"
+              placeholder="Describe the issue clearly: defective item, wrong product, missing parts, damaged packaging, or delivery condition."></textarea>
+
+            <div class="return-evidence-upload">
+              <div>
+                <strong>Evidence images</strong>
+                <p>Upload up to 5 clear photos for admin review.</p>
+              </div>
+              <input #returnEvidenceInput type="file" accept="image/*" multiple hidden (change)="uploadReturnEvidence($event)">
+              <button mat-stroked-button type="button" (click)="returnEvidenceInput.click()" [disabled]="uploadingReturnEvidence || returnEvidenceImageUrls.length >= 5">
+                <mat-icon>add_photo_alternate</mat-icon>
+                {{ uploadingReturnEvidence ? 'Uploading images...' : 'Upload evidence images' }}
+              </button>
+              <div class="return-evidence-grid" *ngIf="returnEvidenceImageUrls.length">
+                <div class="return-evidence-thumb" *ngFor="let imageUrl of returnEvidenceImageUrls">
+                  <img [src]="imageUrl" alt="Return evidence image">
+                  <button mat-icon-button type="button" (click)="removeReturnEvidence(imageUrl)" aria-label="Remove evidence image">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="return-modal-actions">
+            <button mat-button type="button" (click)="closeReturnRequestForm()" [disabled]="requestingReturn">Cancel</button>
+            <button mat-raised-button color="primary" type="submit" [disabled]="!returnReason.trim() || requestingReturn">
+              {{ requestingReturn ? 'Submitting return/refund request...' : 'Submit return/refund request' }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   `,
@@ -324,7 +427,157 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
     .badge-cancelled { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
     .action-buttons {
       display: flex;
-      gap: 4px;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .btn-return-refund {
+      min-height: 36px;
+      border-color: rgba(22, 163, 74, 0.35);
+      color: #15803d;
+      white-space: nowrap;
+    }
+    .btn-return-refund mat-icon {
+      margin-right: 4px;
+    }
+    .return-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.58);
+    }
+    .return-modal {
+      width: min(680px, calc(100vw - 32px));
+      max-height: min(820px, calc(100vh - 32px));
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 10px;
+      background: #ffffff;
+      box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+      border: 1px solid #e2e8f0;
+    }
+    .return-modal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 22px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .return-modal-header h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 850;
+      color: #0f172a;
+    }
+    .return-modal-header p {
+      margin: 5px 0 0;
+      color: #64748b;
+      font-size: 0.92rem;
+    }
+    .return-modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 18px 22px;
+      overflow-y: auto;
+    }
+    .return-modal-body label {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: #334155;
+    }
+    .return-modal-body select,
+    .return-modal-body textarea {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font: inherit;
+      box-sizing: border-box;
+      background: #ffffff;
+    }
+    .return-modal-body textarea {
+      min-height: 132px;
+      resize: vertical;
+    }
+    .return-quantity-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 12px;
+      border: 1px solid #dbe4ee;
+      border-radius: 8px;
+      background: #f8fafc;
+      color: #334155;
+    }
+    .return-quantity-summary strong {
+      font-size: 0.84rem;
+    }
+    .return-quantity-summary span {
+      font-weight: 800;
+      color: #0f172a;
+      text-align: right;
+    }
+    .return-evidence-upload {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+      border: 1px dashed #94a3b8;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .return-evidence-upload strong {
+      font-size: 0.88rem;
+      color: #334155;
+    }
+    .return-evidence-upload p {
+      margin: 4px 0 0;
+      color: #64748b;
+      font-size: 0.84rem;
+    }
+    .return-evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+      gap: 10px;
+    }
+    .return-evidence-thumb {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #cbd5e1;
+      background: #e2e8f0;
+    }
+    .return-evidence-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .return-evidence-thumb button {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 26px;
+      height: 26px;
+      background: rgba(15, 23, 42, 0.72);
+      color: #ffffff;
+    }
+    .return-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 16px 22px;
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
     }
     .items-preview-stack {
       display: flex;
@@ -425,6 +678,44 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
       gap: 8px;
       vertical-align: middle;
       white-space: nowrap;
+    }
+    .return-status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 34px;
+      padding: 0 10px;
+      border-radius: 6px;
+      background: #ecfdf5;
+      color: #166534;
+      border: 1px solid rgba(22, 163, 74, 0.25);
+      font-size: 0.78rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .return-status-chip mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+    .refund-status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 34px;
+      padding: 0 10px;
+      border-radius: 6px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid rgba(37, 99, 235, 0.25);
+      font-size: 0.78rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .refund-status-chip mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
     }
     .btn-pay-again {
       background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
@@ -528,6 +819,78 @@ import { OrderReviewDialogComponent } from '../order-review-dialog/order-review-
       border-color: rgba(255, 255, 255, 0.2) !important;
       color: var(--text-main) !important;
     }
+
+    .action-buttons {
+      display: flex;
+      align-items: center;
+      justify-content: flex-center;
+      gap: 6px;
+    }
+    .icon-btn-action {
+      width: 34px !important;
+      height: 34px !important;
+      line-height: 34px !important;
+      border-radius: 50% !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      padding: 0 !important;
+    }
+    .icon-btn-action mat-icon {
+      font-size: 18px !important;
+      width: 18px !important;
+      height: 18px !important;
+      margin: 0 !important;
+    }
+    .btn-view {
+      color: var(--accent-cyan, #00f2fe) !important;
+      background: rgba(0, 242, 254, 0.1) !important;
+    }
+    .btn-view:hover {
+      background: rgba(0, 242, 254, 0.3) !important;
+      transform: translateY(-2px);
+    }
+    .btn-vietqr {
+      color: #ff2d87 !important;
+      background: rgba(255, 45, 135, 0.12) !important;
+    }
+    .btn-vietqr:hover {
+      background: rgba(255, 45, 135, 0.3) !important;
+      transform: translateY(-2px);
+    }
+    .btn-paygate {
+      color: #38bdf8 !important;
+      background: rgba(56, 189, 248, 0.12) !important;
+    }
+    .btn-paygate:hover {
+      background: rgba(56, 189, 248, 0.3) !important;
+      transform: translateY(-2px);
+    }
+    .btn-delivered {
+      color: #22c55e !important;
+      background: rgba(34, 197, 94, 0.12) !important;
+    }
+    .btn-delivered:hover {
+      background: rgba(34, 197, 94, 0.3) !important;
+      transform: translateY(-2px);
+    }
+    .btn-review {
+      color: #eab308 !important;
+      background: rgba(234, 179, 8, 0.12) !important;
+    }
+    .btn-review:hover {
+      background: rgba(234, 179, 8, 0.3) !important;
+      transform: translateY(-2px);
+    }
+    .btn-cancel {
+      color: #ef4444 !important;
+      background: rgba(239, 68, 68, 0.12) !important;
+    }
+    .btn-cancel:hover {
+      background: rgba(239, 68, 68, 0.3) !important;
+      transform: translateY(-2px);
+    }
   `]
 })
 export class OrderListComponent implements OnInit {
@@ -538,6 +901,13 @@ export class OrderListComponent implements OnInit {
   currentPage = 0;
   displayedColumns = ['id', 'createdAt', 'itemsPreview', 'totalAmount', 'paymentMethod', 'status', 'actions'];
   reviewedOrderItemIds = new Set<number>();
+  selectedReturnOrder: Order | null = null;
+  returnOrderItemId: number | null = null;
+  returnQuantity = 1;
+  returnReason = '';
+  returnEvidenceImageUrls: string[] = [];
+  uploadingReturnEvidence = false;
+  requestingReturn = false;
 
   constructor(
     private orderService: OrderService,
@@ -549,6 +919,81 @@ export class OrderListComponent implements OnInit {
   ngOnInit(): void {
     this.loadOrders();
     this.loadReviewedOrderItemIds();
+  }
+
+  getRemainingSessionSeconds(order: Order): number {
+    if (!order.paygateExpiresAt) return 900;
+    const expires = new Date(order.paygateExpiresAt).getTime();
+    const now = new Date().getTime();
+    const diff = Math.floor((expires - now) / 1000);
+    return diff > 0 ? diff : 0;
+  }
+
+  isSessionExpired(order: Order): boolean {
+    if (order.status === 'CANCELLED') return true;
+    if (order.status === 'PENDING' && order.paygateExpiresAt) {
+      return this.getRemainingSessionSeconds(order) <= 0;
+    }
+    return false;
+  }
+
+  continuePaygatePayment(order: Order): void {
+    const url = order.paygatePayload?.paymentUrl;
+    if (url) {
+      window.location.href = url;
+    } else {
+      this.notification.error('PayGate payment URL not available');
+    }
+  }
+
+  openVietQrModal(order: Order): void {
+    const usdAmount = order.totalAmount || 0;
+    const vndAmount = Math.round(usdAmount * 25400);
+    const pg = order.paygatePayload;
+    const timerSecs = this.getRemainingSessionSeconds(order);
+    const dialogRef = this.dialog.open(VietQrDialogComponent, {
+      width: '840px',
+      maxWidth: '95vw',
+      panelClass: 'paygate-vqr-dialog-panel',
+      data: {
+        orderId: order.id,
+        amountVnd: vndAmount,
+        description: pg?.transferContent || `ORD-${order.id}`,
+        qrPayload: pg?.qrPayload,
+        bankName: pg?.bankAccount?.bankName,
+        accountNo: pg?.bankAccount?.accountNumber,
+        accountName: pg?.bankAccount?.accountHolder,
+        timerSeconds: timerSecs > 0 ? timerSecs : 900
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result === true) {
+        this.orderService.confirmVietQrPayment(order.id).subscribe({
+          next: (res) => {
+            if (res.success) {
+              this.notification.success(`Payment confirmed! Order #${order.id} is now CONFIRMED.`);
+              this.loadOrders();
+            }
+          },
+          error: (err) => {
+            this.notification.error(err?.error?.message || 'Failed to confirm payment');
+          }
+        });
+      } else if (result === 'CANCEL') {
+        this.orderService.cancelVietQrPayment(order.id).subscribe({
+          next: (res) => {
+            if (res.success) {
+              this.notification.info(`Payment cancelled. Order #${order.id} has been CANCELLED and stock released.`);
+              this.loadOrders();
+            }
+          },
+          error: (err) => {
+            this.notification.error(err?.error?.message || 'Failed to cancel payment');
+          }
+        });
+      }
+    });
   }
 
   loadReviewedOrderItemIds(): void {
@@ -637,10 +1082,13 @@ export class OrderListComponent implements OnInit {
   }
 
   onCancelOrder(order: Order): void {
+    const paidOnline = order.paymentStatus === 'PAID' && order.paymentMethod !== 'COD';
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
       data: {
-        title: 'Cancel Order',
-        message: `Are you sure you want to cancel Order #${order.id}?`
+        title: paidOnline ? 'Cancel & Refund Order' : 'Cancel Order',
+        message: paidOnline
+          ? `Order #${order.id} has been paid. Cancelling now will request a PayGate refund and release reserved stock.`
+          : `Are you sure you want to cancel Order #${order.id}?`
       }
     });
 
@@ -648,7 +1096,9 @@ export class OrderListComponent implements OnInit {
       if (confirmed) {
         this.orderService.cancelOrder(order.id).subscribe({
           next: () => {
-            this.notification.success(`Order #${order.id} cancelled successfully`);
+            this.notification.success(paidOnline
+              ? `Order #${order.id} cancelled and refund requested`
+              : `Order #${order.id} cancelled successfully`);
             this.loadOrders();
           },
           error: (err) => {
@@ -668,16 +1118,11 @@ export class OrderListComponent implements OnInit {
            order.paymentMethod !== 'COD';
   }
 
-  isCancelEligible(order: Order): boolean {
-    return (order.status === 'PENDING' || order.status === 'CONFIRMED') &&
-           order.paymentStatus !== 'PAID';
-  }
-
   onConfirmReceived(order: Order): void {
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
       data: {
-        title: 'Xác nhận đã nhận hàng',
-        message: `Bạn xác nhận đã nhận được đơn hàng #${order.id}?`
+        title: 'Confirm received order',
+        message: `Confirm that you received Order #${order.id}?`
       }
     });
 
@@ -685,11 +1130,11 @@ export class OrderListComponent implements OnInit {
       if (confirmed) {
         this.orderService.confirmReceived(order.id).subscribe({
           next: () => {
-            this.notification.success(`Đã xác nhận nhận thành công đơn hàng #${order.id}`);
+            this.notification.success(`Order #${order.id} marked as received`);
             this.loadOrders();
           },
           error: (err) => {
-            this.notification.error(err.error?.message || 'Không thể cập nhật trạng thái đơn hàng');
+            this.notification.error(err.error?.message || 'Unable to update order status');
           }
         });
       }
@@ -703,17 +1148,183 @@ export class OrderListComponent implements OnInit {
         this.retryingOrderId = null;
         const targetUrl = res.data?.paymentUrl;
         if (targetUrl) {
-          this.notification.info('Đang chuyển hướng sang cổng thanh toán PayGate...');
+          this.notification.info('Redirecting to PayGate payment...');
           window.location.href = targetUrl;
         } else {
-          this.notification.error('Không thể khởi tạo phiên thanh toán mới. Vui lòng thử lại sau.');
+          this.notification.error('Unable to create a new payment session. Please try again later.');
         }
       },
       error: (err) => {
         this.retryingOrderId = null;
-        this.notification.error(err.error?.message || 'Không thể kết nối đến hệ thống thanh toán.');
+        this.notification.error(err.error?.message || 'Unable to connect to the payment system.');
       }
     });
+  }
+
+  openReturnRequestForm(order: Order): void {
+    this.selectedReturnOrder = order;
+    this.returnOrderItemId = null;
+    this.returnQuantity = 1;
+    this.returnReason = '';
+    this.returnEvidenceImageUrls = [];
+  }
+
+  closeReturnRequestForm(): void {
+    this.selectedReturnOrder = null;
+    this.returnOrderItemId = null;
+    this.returnQuantity = 1;
+    this.returnReason = '';
+    this.returnEvidenceImageUrls = [];
+  }
+
+  submitReturnRequest(order: Order): void {
+    const reason = this.returnReason.trim();
+    if (!reason) {
+      this.notification.error('Return request reason is required');
+      return;
+    }
+    const item = this.returnOrderItemId
+      ? this.refundableItems(order).find(candidate => candidate.id === this.returnOrderItemId)
+      : undefined;
+    const quantity = item ? this.refundableQuantity(item) : undefined;
+    if (item && (!quantity || quantity <= 0 || quantity > this.refundableQuantity(item))) {
+      this.notification.error(`Return quantity must be between 1 and ${this.refundableQuantity(item)}`);
+      return;
+    }
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Create Return Request',
+        message: `Submit a return request for Order #${order.id} with the reason you entered?`
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((confirmed: boolean) => {
+      if (confirmed) {
+        this.requestingReturn = true;
+        this.orderService.createReturnRequest(order.id, {
+          orderItemId: item?.id,
+          quantity,
+          reason,
+          evidenceImageUrls: this.returnEvidenceImageUrls
+        }).subscribe({
+          next: () => {
+            this.requestingReturn = false;
+            this.notification.success(`Return request created for Order #${order.id}`);
+            this.closeReturnRequestForm();
+            this.loadOrders();
+          },
+          error: (err) => {
+            this.requestingReturn = false;
+            this.notification.error(err.error?.message || 'Failed to create return request');
+          }
+        });
+      }
+    });
+  }
+
+  canCancelOrder(order: Order): boolean {
+    return order.status === 'PENDING' || order.status === 'CONFIRMED' || order.status === 'PROCESSING';
+  }
+
+  canRequestReturn(order: Order): boolean {
+    return !order.returnRequestStatus && (order.status === 'SHIPPED' || order.status === 'DELIVERED');
+  }
+
+  returnStatusLabel(status: string): string {
+    switch (status) {
+      case 'REQUESTED': return 'Return requested';
+      case 'APPROVED': return 'Return approved';
+      case 'RETURN_RECEIVED': return 'Return received';
+      case 'QC_PASSED': return 'QC passed, refund pending';
+      case 'QC_FAILED': return 'QC failed';
+      case 'COMPLETED': return 'Refund completed';
+      case 'REJECTED': return 'Return rejected';
+      default: return status;
+    }
+  }
+
+  refundStatusLabel(status: string): string {
+    switch (status) {
+      case 'PENDING': return 'Refund pending';
+      case 'SUCCEEDED': return 'Refund completed';
+      case 'FAILED': return 'Refund failed';
+      default: return status;
+    }
+  }
+
+  refundableItems(order: Order): Order['items'] {
+    return (order.items || []).filter(item => this.refundableQuantity(item) > 0);
+  }
+
+  refundableQuantity(item: Order['items'][number]): number {
+    return item.quantity - (item.refundedQuantity || 0);
+  }
+
+  useMaxReturnQuantity(order: Order): void {
+    const item = this.returnOrderItemId
+      ? this.refundableItems(order).find(candidate => candidate.id === this.returnOrderItemId)
+      : undefined;
+    this.returnQuantity = item ? this.refundableQuantity(item) : 1;
+  }
+
+  returnQuantityLabel(order: Order): string {
+    const item = this.returnOrderItemId
+      ? this.refundableItems(order).find(candidate => candidate.id === this.returnOrderItemId)
+      : undefined;
+    if (item) {
+      return `All ${this.refundableQuantity(item)} item(s)`;
+    }
+    const total = this.refundableItems(order).reduce((sum, current) => sum + this.refundableQuantity(current), 0);
+    return `Entire order (${total} item(s))`;
+  }
+
+  uploadReturnEvidence(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files || []).slice(0, 5 - this.returnEvidenceImageUrls.length);
+    input.value = '';
+    if (files.length === 0) {
+      return;
+    }
+    this.uploadingReturnEvidence = true;
+    let completed = 0;
+    const finishOne = () => {
+      completed += 1;
+      if (completed === files.length) {
+        this.uploadingReturnEvidence = false;
+      }
+    };
+    files.forEach(file => {
+      this.reviewService.uploadImage(file).pipe(
+        finalize(finishOne)
+      ).subscribe({
+        next: (response) => {
+          if (response.success && response.data?.url) {
+            this.returnEvidenceImageUrls = [...this.returnEvidenceImageUrls, response.data.url].slice(0, 5);
+            this.notification.success('Evidence image uploaded');
+          }
+        },
+        error: (err) => {
+          this.notification.error(err?.error?.message || 'Failed to upload evidence image');
+        }
+      });
+    });
+  }
+
+  removeReturnEvidence(imageUrl: string): void {
+    this.returnEvidenceImageUrls = this.returnEvidenceImageUrls.filter(url => url !== imageUrl);
+  }
+
+  cancelTitle(order: Order): string {
+    if (order.paymentStatus === 'PENDING_PAYGATE') {
+      return 'Cancel unpaid PayGate session';
+    }
+    if (order.paymentStatus === 'PAID' && order.paymentMethod !== 'COD') {
+      return 'Cancel and refund via PayGate';
+    }
+    if (order.paymentStatus === 'REFUND_PENDING') {
+      return 'Refund pending in PayGate';
+    }
+    return 'Cancel Order';
   }
 
   getStatusBadgeClass(status: string): string {

@@ -12,7 +12,6 @@ import com.training.marketplace.service.impl.PaymentWebhookServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -25,7 +24,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,16 +35,16 @@ class PaymentWebhookServiceTest {
     @Mock
     private InventoryFacade inventoryFacade;
 
-    @InjectMocks
     private PaymentWebhookServiceImpl paymentWebhookService;
 
     @BeforeEach
     void setUp() {
+        paymentWebhookService = new PaymentWebhookServiceImpl(orderRepository, inventoryFacade);
         ReflectionTestUtils.setField(paymentWebhookService, "merchantApiKey", "mock-merchant-api-key-123456");
     }
 
     @Test
-    void processPaygateWebhook_Success_UpdatesOrderAndFulfillsStock() {
+    void processPaygateWebhook_Success_UpdatesOrderWithoutFulfillingStock() {
         // given
         Long orderId = 100L;
         Order order = new Order();
@@ -82,9 +80,9 @@ class PaymentWebhookServiceTest {
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(order.getPaygateTransactionRef()).isEqualTo("TXN_998877");
 
         verify(orderRepository).save(order);
-        verify(inventoryFacade).fulfill(eq(1L), eq(Map.of(55L, 2)));
     }
 
     @Test
@@ -116,7 +114,6 @@ class PaymentWebhookServiceTest {
         assertThat(result.get("paymentStatus")).isEqualTo("PAID");
 
         verify(orderRepository, never()).save(any());
-        verify(inventoryFacade, never()).fulfill(any(), any());
     }
 
     @Test
@@ -187,7 +184,7 @@ class PaymentWebhookServiceTest {
 
     @Test
     void processPaygateWebhook_ValidSignature_WhenEnforced_Processes() {
-        // Enforcement on + the exact shared secret -> the webhook is authenticated and runs normally.
+        // Enforcement on + the exact shared secret -> the webhook is authenticated and marks payment paid.
         ReflectionTestUtils.setField(paymentWebhookService, "requireSignature", true);
         Long orderId = 200L;
         Order order = new Order();
@@ -208,7 +205,9 @@ class PaymentWebhookServiceTest {
                 request, "mock-merchant-api-key-123456");
 
         assertThat(result.get("status")).isEqualTo("CONFIRMED");
-        verify(inventoryFacade).fulfill(eq(1L), eq(Map.of(7L, 1)));
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(order.getPaygateTransactionRef()).isEqualTo("TXN_1");
+        verify(inventoryFacade, never()).fulfill(eq(1L), eq(Map.of(7L, 1)));
     }
 
     @Test

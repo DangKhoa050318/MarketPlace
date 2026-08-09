@@ -11,6 +11,7 @@ public record OrderItemResponse(
         String variantName,
         BigDecimal unitPrice,
         Integer quantity,
+        Integer refundedQuantity,
         BigDecimal subtotal
 ) {
 }

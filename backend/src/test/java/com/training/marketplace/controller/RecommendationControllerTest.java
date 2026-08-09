@@ -38,6 +38,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.training.marketplace.service.UserService;
+
 @WebMvcTest(RecommendationController.class)
 @AutoConfigureMockMvc
 @Import(SecurityConfig.class)
@@ -52,7 +54,7 @@ class RecommendationControllerTest {
     @MockBean
     private RecommendationService recommendationService;
     @MockBean
-    private UserRepository userRepository;
+    private UserService userService;
     @MockBean
     private JwtAuthenticationFilter jwtAuthenticationFilter;
     @MockBean
@@ -117,7 +119,7 @@ class RecommendationControllerTest {
                 .active(true)
                 .build();
         user.setId(7L);
-        when(userRepository.findByUsername("customer")).thenReturn(Optional.of(user));
+        when(userService.getAuthenticatedUser(any())).thenReturn(user);
         when(recommendationService.recommend(
                 7L,
                 null,
@@ -160,7 +162,7 @@ class RecommendationControllerTest {
                 .andExpect(jsonPath("$.message").value("Recommendation placement is required"));
 
         verify(recommendationService).recommend(null, null, null, null, null, 12);
-        verifyNoInteractions(userRepository);
+        verifyNoInteractions(userService);
     }
 
     @Test

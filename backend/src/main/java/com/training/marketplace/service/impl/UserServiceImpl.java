@@ -47,6 +47,26 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public User getAuthenticatedUser(org.springframework.security.core.Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw new ResourceNotFoundException("User", "authentication", "null");
+        }
+        return getByIdentifier(authentication.getName());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public User getByIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new ResourceNotFoundException("User", "identifier", "empty");
+        }
+        return userRepository.findByUsername(identifier)
+                .or(() -> userRepository.findByEmail(identifier))
+                .orElseThrow(() -> new ResourceNotFoundException("User", "username/email", identifier));
+    }
+
+    @Override
     @Transactional
     public UserResponse create(CreateUserRequest request) {
         if (userRepository.existsByUsername(request.username())) {

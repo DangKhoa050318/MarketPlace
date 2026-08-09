@@ -4,8 +4,9 @@ import com.training.marketplace.common.ApiResponse;
 import com.training.marketplace.dto.request.RecordRecentlyViewedRequest;
 import com.training.marketplace.dto.response.RecentlyViewedProductResponse;
 import com.training.marketplace.entity.User;
-import com.training.marketplace.repository.UserRepository;
+import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.service.RecentlyViewedProductService;
+import com.training.marketplace.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -33,7 +34,7 @@ public class RecentlyViewedProductController {
     private static final int DEFAULT_LIMIT = 20;
 
     private final RecentlyViewedProductService recentlyViewedService;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -71,8 +72,12 @@ public class RecentlyViewedProductController {
         if (authentication == null || !authentication.isAuthenticated()) {
             return null;
         }
-        return userRepository.findByUsername(authentication.getName())
-                .map(User::getId)
-                .orElse(null);
+        try {
+            User user = userService.getAuthenticatedUser(authentication);
+            return user != null ? user.getId() : null;
+        } catch (ResourceNotFoundException e) {
+            return null;
+        }
     }
 }
+

@@ -3,11 +3,12 @@ package com.training.marketplace.controller;
 import com.training.marketplace.common.ApiResponse;
 import com.training.marketplace.common.PageResponse;
 import com.training.marketplace.dto.request.CreateOrderRequest;
+import com.training.marketplace.dto.request.CreateReturnRequest;
 import com.training.marketplace.dto.response.OrderResponse;
-import com.training.marketplace.entity.User;
-import com.training.marketplace.exception.ResourceNotFoundException;
-import com.training.marketplace.repository.UserRepository;
+import com.training.marketplace.dto.response.ReturnRequestResponse;
 import com.training.marketplace.service.OrderService;
+import com.training.marketplace.service.ReturnRequestService;
+import com.training.marketplace.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -17,7 +18,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,7 +35,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderController {
 
     private final OrderService orderService;
-    private final UserRepository userRepository;
+    private final ReturnRequestService returnRequestService;
+    private final UserService userService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -43,7 +44,7 @@ public class OrderController {
     public ApiResponse<OrderResponse> createOrder(
             Authentication authentication,
             @Valid @RequestBody CreateOrderRequest request) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         OrderResponse response = orderService.createOrder(userId, request);
         return ApiResponse.success("Order placed successfully", response);
     }
@@ -56,7 +57,7 @@ public class OrderController {
             @RequestParam(required = false) com.training.marketplace.enums.PaymentStatus paymentStatus,
             @RequestParam(required = false) String search,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         return ApiResponse.success(orderService.getUserOrders(userId, status, paymentStatus, search, pageable));
     }
 
@@ -65,7 +66,7 @@ public class OrderController {
     public ApiResponse<OrderResponse> getUserOrderById(
             Authentication authentication,
             @PathVariable Long id) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         return ApiResponse.success(orderService.getUserOrderById(userId, id));
     }
 
@@ -74,7 +75,7 @@ public class OrderController {
     public ApiResponse<com.training.marketplace.dto.response.PaygatePayloadResponse> retryPayment(
             Authentication authentication,
             @PathVariable Long id) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         com.training.marketplace.dto.response.PaygatePayloadResponse response = orderService.retryOrderPayment(userId, id);
         return ApiResponse.success("Payment session created", response);
     }
@@ -84,8 +85,26 @@ public class OrderController {
     public ApiResponse<OrderResponse> cancelUserOrder(
             Authentication authentication,
             @PathVariable Long id) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         return ApiResponse.success("Order cancelled successfully", orderService.cancelUserOrder(userId, id));
+    }
+
+    @PostMapping("/{id}/confirm-vietqr")
+    @Operation(summary = "User manual confirmation of VietQR bank transfer payment")
+    public ApiResponse<OrderResponse> confirmVietQrPayment(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
+        return ApiResponse.success("Payment confirmed successfully", orderService.confirmVietQrPayment(userId, id));
+    }
+
+    @PostMapping("/{id}/cancel-vietqr")
+    @Operation(summary = "User manual cancellation of VietQR bank transfer payment")
+    public ApiResponse<OrderResponse> cancelVietQrPayment(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
+        return ApiResponse.success("Payment cancelled successfully", orderService.cancelVietQrPayment(userId, id));
     }
 
     @PutMapping("/{id}/confirm-received")
@@ -93,19 +112,20 @@ public class OrderController {
     public ApiResponse<OrderResponse> confirmReceived(
             Authentication authentication,
             @PathVariable Long id) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         return ApiResponse.success("Order marked as received", orderService.confirmReceived(userId, id));
     }
 
-    private Long getUserId(Authentication authentication) {
-        Authentication auth = authentication != null ? authentication : SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null) {
-            throw new ResourceNotFoundException("Unauthenticated user context");
-        }
-        String identifier = auth.getName();
-        User user = userRepository.findByUsername(identifier)
-                .or(() -> userRepository.findByEmail(identifier))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + identifier));
-        return user.getId();
+    @PostMapping("/{id}/return-requests")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Create a return request while an order is being delivered")
+    public ApiResponse<ReturnRequestResponse> createReturnRequest(
+            Authentication authentication,
+            @PathVariable Long id,
+            @RequestBody(required = false) CreateReturnRequest request) {
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
+        ReturnRequestResponse response = returnRequestService.create(userId, id, request);
+        return ApiResponse.success("Return request created", response);
     }
 }
+

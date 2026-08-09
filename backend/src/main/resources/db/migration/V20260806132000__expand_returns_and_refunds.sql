@@ -1,0 +1,13 @@
+ALTER TABLE order_items
+    ADD COLUMN IF NOT EXISTS refunded_quantity INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE return_requests
+    ADD COLUMN IF NOT EXISTS order_item_id BIGINT REFERENCES order_items(id),
+    ADD COLUMN IF NOT EXISTS quantity INTEGER,
+    ADD COLUMN IF NOT EXISTS admin_note TEXT,
+    ADD COLUMN IF NOT EXISTS qc_note TEXT,
+    ADD COLUMN IF NOT EXISTS refund_without_return BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE refund_requests
+    ADD COLUMN IF NOT EXISTS order_item_id BIGINT REFERENCES order_items(id),
+    ADD COLUMN IF NOT EXISTS quantity INTEGER;

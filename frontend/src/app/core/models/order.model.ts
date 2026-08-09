@@ -1,6 +1,8 @@
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 export type PaymentMethod = 'COD' | 'CREDIT_CARD' | 'PAYGATE_BNPL' | 'BANK_TRANSFER';
-export type PaymentStatus = 'UNPAID' | 'PENDING_PAYGATE' | 'PAID' | 'REFUNDED';
+export type PaymentStatus = 'UNPAID' | 'PENDING_PAYGATE' | 'PAID' | 'REFUND_PENDING' | 'PARTIALLY_REFUNDED' | 'REFUNDED';
+export type RefundRequestStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED';
+export type ReturnRequestStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'RETURN_RECEIVED' | 'QC_PASSED' | 'QC_FAILED' | 'COMPLETED';
 
 export interface PaygatePayload {
   orderId: number;
@@ -30,6 +32,7 @@ export interface OrderItem {
   variantName?: string;
   unitPrice: number;
   quantity: number;
+  refundedQuantity?: number;
   subtotal: number;
 }
 
@@ -48,7 +51,13 @@ export interface Order {
   paymentStatus?: PaymentStatus;
   upfrontAmount?: number;
   financeAmount?: number;
+  paygateTransactionRef?: string;
+  refundRequestId?: number;
+  refundRequestStatus?: RefundRequestStatus;
+  returnRequestId?: number;
+  returnRequestStatus?: ReturnRequestStatus;
   paygatePayload?: PaygatePayload;
+  paygateExpiresAt?: string;
   warehouseId?: number;
   note?: string;
   items: OrderItem[];
@@ -69,4 +78,20 @@ export interface CreateOrderRequest {
 export interface UpdateOrderStatusRequest {
   status: OrderStatus;
   note?: string;
+}
+
+export interface ReturnRequest {
+  id: number;
+  orderId: number;
+  userId: number;
+  orderItemId?: number;
+  quantity?: number;
+  status: ReturnRequestStatus;
+  reason?: string;
+  evidenceImageUrls?: string[];
+  adminNote?: string;
+  qcNote?: string;
+  refundWithoutReturn?: boolean;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -8,7 +8,6 @@ import com.training.marketplace.dto.request.UpdateProductRequest;
 import com.training.marketplace.dto.response.ProductResponse;
 import com.training.marketplace.dto.response.StorefrontProductResponse;
 import com.training.marketplace.exception.BadRequestException;
-import com.training.marketplace.repository.StorefrontCatalogRepository;
 import com.training.marketplace.service.ProductService;
 
 import java.util.List;
@@ -41,7 +40,6 @@ import java.math.BigDecimal;
 public class ProductController {
 
     private final ProductService productService;
-    private final StorefrontCatalogRepository storefrontCatalogRepository;
 
     @GetMapping
     @Operation(summary = "List all products with optional search query and pagination")
@@ -115,7 +113,7 @@ public class ProductController {
         if (query == null || query.isBlank()) {
             return ApiResponse.success(List.of());
         }
-        return ApiResponse.success(storefrontCatalogRepository.suggest(query, 10));
+        return ApiResponse.success(productService.suggest(query, 10));
     }
 
     @GetMapping("/{id:[0-9]+}")

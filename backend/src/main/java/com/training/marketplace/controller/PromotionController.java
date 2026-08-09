@@ -7,12 +7,10 @@ import com.training.marketplace.dto.request.CreatePromotionCodeRequest;
 import com.training.marketplace.dto.request.UpdatePromotionCodeRequest;
 import com.training.marketplace.dto.response.CouponPreviewResponse;
 import com.training.marketplace.dto.response.PromotionCodeResponse;
-import com.training.marketplace.entity.User;
 import com.training.marketplace.enums.DiscountType;
-import com.training.marketplace.exception.ResourceNotFoundException;
-import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.AuditService;
 import com.training.marketplace.service.PromotionService;
+import com.training.marketplace.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -22,7 +20,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,7 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PromotionController {
 
     private final PromotionService promotionService;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final AuditService auditService;
 
     @PostMapping("/preview")
@@ -53,7 +50,7 @@ public class PromotionController {
     public ApiResponse<CouponPreviewResponse> preview(
             Authentication authentication,
             @Valid @RequestBody ApplyCouponRequest request) {
-        Long userId = getUserId(authentication);
+        Long userId = userService.getAuthenticatedUser(authentication).getId();
         return ApiResponse.success(promotionService.preview(userId, request.code()));
     }
 
@@ -108,17 +105,5 @@ public class PromotionController {
     private String actor(Authentication authentication) {
         return authentication != null ? authentication.getName() : null;
     }
-
-    private Long getUserId(Authentication authentication) {
-        Authentication auth = authentication != null
-                ? authentication : SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getName() == null) {
-            throw new ResourceNotFoundException("Unauthenticated user context");
-        }
-        String identifier = auth.getName();
-        User user = userRepository.findByUsername(identifier)
-                .or(() -> userRepository.findByEmail(identifier))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + identifier));
-        return user.getId();
-    }
 }
+

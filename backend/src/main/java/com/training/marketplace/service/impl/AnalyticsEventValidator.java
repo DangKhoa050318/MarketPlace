@@ -10,7 +10,6 @@ import com.training.marketplace.entity.ProductVariant;
 import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.repository.ProductRepository;
 import com.training.marketplace.repository.ProductVariantRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -18,6 +17,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Set;
+
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Component
 public class AnalyticsEventValidator {

@@ -187,8 +187,8 @@ export interface CheckoutDialogData {
           class="btn-glowing"
           (click)="onSubmit()"
           [disabled]="form.invalid || submitting || isBnplSplitInvalid()">
-          <mat-icon>{{ selectedMethod === 'COD' ? 'shopping_bag' : 'open_in_new' }}</mat-icon>
-          {{ submitting ? 'Processing...' : (selectedMethod === 'COD' ? 'Confirm COD Order' : 'Proceed to PayGate Portal') }}
+          <mat-icon>{{ selectedMethod === 'COD' ? 'shopping_bag' : (selectedMethod === 'BANK_TRANSFER' ? 'qr_code_2' : 'open_in_new') }}</mat-icon>
+          {{ submitting ? 'Processing...' : (selectedMethod === 'COD' ? 'Confirm COD Order' : (selectedMethod === 'BANK_TRANSFER' ? 'Confirm & Show VietQR Code' : 'Proceed to PayGate Portal')) }}
         </button>
       </mat-dialog-actions>
     </div>

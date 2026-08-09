@@ -7,7 +7,7 @@ import com.training.marketplace.dto.response.CartItemResponse;
 import com.training.marketplace.dto.response.CartResponse;
 import com.training.marketplace.entity.User;
 import com.training.marketplace.enums.Role;
-import com.training.marketplace.repository.UserRepository;
+import com.training.marketplace.service.UserService;
 import com.training.marketplace.security.JwtAuthenticationFilter;
 import com.training.marketplace.security.RateLimitingFilter;
 import com.training.marketplace.security.SecurityConfig;
@@ -57,7 +57,7 @@ class CartControllerTest {
     private CartService cartService;
 
     @MockBean
-    private UserRepository userRepository;
+    private UserService userService;
 
     @MockBean
     private JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -90,7 +90,7 @@ class CartControllerTest {
                 .build();
         mockUser.setId(1L);
 
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(mockUser));
+        when(userService.getAuthenticatedUser(any())).thenReturn(mockUser);
         auth = new UsernamePasswordAuthenticationToken("testuser", "password", List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER")));
     }
 

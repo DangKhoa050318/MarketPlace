@@ -15,4 +15,6 @@ public interface PaygateClientService {
     PaygateCreateCheckoutResponse createCheckoutSession(Long orderId, BigDecimal amount, String description,
                                                         String method, BigDecimal upfrontAmount, BigDecimal financeAmount,
                                                         Long merchantCustomerId, String customerName);
+
+    void refund(String transactionRef, Long orderId, BigDecimal amount, String idempotencyKey);
 }
