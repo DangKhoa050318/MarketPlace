@@ -181,9 +181,16 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal upfront;
         BigDecimal finance;
         if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
-            // BNPL: fixed 30% deposit due now, the remainder is financed.
-            upfront = grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
-            finance = grandTotal.subtract(upfront);
+            // BNPL: use request values if provided, otherwise default to 30% deposit due now.
+            upfront = request.upfrontAmount() != null ? request.upfrontAmount() : grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
+            finance = request.financeAmount() != null ? request.financeAmount() : grandTotal.subtract(upfront);
+            
+            // Ensure they sum up correctly
+            if (upfront.add(finance).compareTo(grandTotal) != 0) {
+                // If they don't sum up exactly, fallback to safe calculation or throw error.
+                // We'll throw an error to prevent mismatched totals.
+                throw new BadRequestException("Upfront amount and finance amount must exactly equal the total order amount");
+            }
         } else {
             // COD / CREDIT_CARD / BANK_TRANSFER / WALLET: full amount due now, nothing financed.
             upfront = grandTotal;
@@ -231,9 +238,7 @@ public class OrderServiceImpl implements OrderService {
             log.warn("Merchandising attribution skipped for order {}: {}", savedOrder.getId(), ex.getMessage());
         }
 
-        // 4. Clear cart.
-        cartService.clearCart(userId);
-
+        // Cart will be cleared after successful PayGate session creation or at the end for COD/Wallet
         // 5. Publish OrderCreatedEvent (payment → notification; and downstream export bridge).
         List<OrderCreatedEvent.OrderItemInfo> eventItems = savedOrder.getItems().stream()
                 .map(i -> new OrderCreatedEvent.OrderItemInfo(
@@ -257,12 +262,27 @@ public class OrderServiceImpl implements OrderService {
         OrderResponse baseResponse = orderMapper.toResponse(savedOrder);
         PaygatePayloadResponse paygatePayload = null;
         if (paymentMethod != PaymentMethod.COD && !zeroTotal) {
-            String methodStr = paymentMethod == PaymentMethod.BANK_TRANSFER ? "BANK_TRANSFER" : "WALLET";
+            String methodStr;
+            if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
+                methodStr = "BNPL";
+            } else if (paymentMethod == PaymentMethod.BANK_TRANSFER) {
+                methodStr = "BANK_TRANSFER";
+            } else {
+                methodStr = "WALLET";
+            }
+
+            BigDecimal pgUpfront = paymentMethod == PaymentMethod.PAYGATE_BNPL ? savedOrder.getUpfrontAmount() : null;
+            BigDecimal pgFinance = paymentMethod == PaymentMethod.PAYGATE_BNPL ? savedOrder.getFinanceAmount() : null;
+
             var pgSession = paygateClientService.createCheckoutSession(
                     savedOrder.getId(),
                     savedOrder.getTotalAmount(),
                     "Thanh toan don hang #" + savedOrder.getId() + " tren Marketplace",
-                    methodStr
+                    methodStr,
+                    pgUpfront,
+                    pgFinance,
+                    userId,
+                    user.getUsername()
             );
             var sessionData = (pgSession != null) ? pgSession.data() : null;
             String targetPaymentUrl = (sessionData != null) ? sessionData.paymentUrl() : null;
@@ -288,6 +308,9 @@ public class OrderServiceImpl implements OrderService {
                     sessionData != null ? sessionData.qrPayload() : null
             );
         }
+
+        // 4. Clear cart only after successful order placement and external API calls
+        cartService.clearCart(userId);
 
         return new OrderResponse(
                 baseResponse.id(),
@@ -355,13 +378,27 @@ public class OrderServiceImpl implements OrderService {
             );
         }
 
-        String methodStr = paymentMethod == PaymentMethod.BANK_TRANSFER ? "BANK_TRANSFER" : "WALLET";
+        String methodStr;
+        if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
+            methodStr = "BNPL";
+        } else if (paymentMethod == PaymentMethod.BANK_TRANSFER) {
+            methodStr = "BANK_TRANSFER";
+        } else {
+            methodStr = "WALLET";
+        }
+
+        BigDecimal upfront = paymentMethod == PaymentMethod.PAYGATE_BNPL ? order.getUpfrontAmount() : null;
+        BigDecimal finance = paymentMethod == PaymentMethod.PAYGATE_BNPL ? order.getFinanceAmount() : null;
 
         var pgSession = paygateClientService.createCheckoutSession(
                 order.getId(),
                 order.getTotalAmount(),
                 "Thanh toan lai don hang #" + order.getId() + " tren Marketplace",
-                methodStr
+                methodStr,
+                upfront,
+                finance,
+                userId,
+                order.getUser().getUsername()
         );
 
         var sessionData = (pgSession != null) ? pgSession.data() : null;
