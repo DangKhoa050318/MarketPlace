@@ -182,9 +182,16 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal upfront;
         BigDecimal finance;
         if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
-            // BNPL: fixed 30% deposit due now, the remainder is financed.
-            upfront = grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
-            finance = grandTotal.subtract(upfront);
+            // BNPL: use request values if provided, otherwise default to 30% deposit due now.
+            upfront = request.upfrontAmount() != null ? request.upfrontAmount() : grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
+            finance = request.financeAmount() != null ? request.financeAmount() : grandTotal.subtract(upfront);
+            
+            // Ensure they sum up correctly
+            if (upfront.add(finance).compareTo(grandTotal) != 0) {
+                // If they don't sum up exactly, fallback to safe calculation or throw error.
+                // We'll throw an error to prevent mismatched totals.
+                throw new BadRequestException("Upfront amount and finance amount must exactly equal the total order amount");
+            }
         } else {
             // COD / CREDIT_CARD / BANK_TRANSFER / WALLET: full amount due now, nothing financed.
             upfront = grandTotal;
@@ -232,9 +239,7 @@ public class OrderServiceImpl implements OrderService {
             log.warn("Merchandising attribution skipped for order {}: {}", savedOrder.getId(), ex.getMessage());
         }
 
-        // 4. Clear cart.
-        cartService.clearCart(userId);
-
+        // Cart will be cleared after successful PayGate session creation or at the end for COD/Wallet
         // 5. Publish OrderCreatedEvent (payment → notification; and downstream export bridge).
         List<OrderCreatedEvent.OrderItemInfo> eventItems = savedOrder.getItems().stream()
                 .map(i -> new OrderCreatedEvent.OrderItemInfo(
@@ -257,6 +262,9 @@ public class OrderServiceImpl implements OrderService {
 
         OrderResponse baseResponse = orderMapper.toResponse(savedOrder);
         PaygatePayloadResponse paygatePayload = paymentService.createPaymentSession(savedOrder, paymentMethod);
+
+        // 4. Clear cart only after successful order placement and external API calls
+        cartService.clearCart(userId);
 
         return new OrderResponse(
                 baseResponse.id(),
@@ -288,6 +296,7 @@ public class OrderServiceImpl implements OrderService {
                 baseResponse.updatedAt()
         );
     }
+
 
 
 

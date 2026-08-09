@@ -40,14 +40,25 @@ class OrderEventPublisherTest {
                 List.of(item)
         );
 
-        // When
-        orderEventPublisher.publishOrderCreatedEvent(event);
+        // Initialize transaction context for testing
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            // When
+            orderEventPublisher.publishOrderCreatedEvent(event);
 
-        // Then
-        verify(rabbitTemplate).convertAndSend(
-                RabbitMQConfig.ORDER_EXCHANGE,
-                RabbitMQConfig.ORDER_CREATED_ROUTING_KEY,
-                event
-        );
+            // Trigger afterCommit manually to simulate successful transaction commit
+            org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+
+            // Then
+            verify(rabbitTemplate).convertAndSend(
+                    RabbitMQConfig.ORDER_EXCHANGE,
+                    RabbitMQConfig.ORDER_CREATED_ROUTING_KEY,
+                    event
+            );
+        } finally {
+            // Clean up
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 }

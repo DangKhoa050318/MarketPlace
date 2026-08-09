@@ -92,9 +92,9 @@ marketplace:
   paygate:
     api-url: ${PAYGATE_API_URL:http://localhost:8081}
     checkout-url: ${PAYGATE_CHECKOUT_URL:http://localhost:4201/checkout}
-    api-key: ${PAYGATE_API_KEY:mock-merchant-api-key-123456}
-    return-url: ${PAYGATE_RETURN_URL:http://localhost:4200/orders/callback?status=SUCCESS}
-    cancel-url: ${PAYGATE_CANCEL_URL:http://localhost:4200/orders/callback?status=CANCELLED}
+    api-key: ${PAYGATE_API_KEY:marketplace-api-key-123456}
+    return-url: ${PAYGATE_RETURN_URL:http://localhost:4200/orders/callback}
+    cancel-url: ${PAYGATE_CANCEL_URL:http://localhost:4200/orders/callback}
     webhook:
       # The webhook endpoint is public (permitAll); this shared-secret signature is its only auth.
       # Keep true in real environments. Set false only if the PayGate build here does not yet send
