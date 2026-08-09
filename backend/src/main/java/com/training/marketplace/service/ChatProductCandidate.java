@@ -11,6 +11,9 @@ public record ChatProductCandidate(
         String categoryName,
         String brand,
         String imageUrl,
+        Long recommendedVariantId,
+        String recommendedVariantName,
+        BigDecimal recommendedVariantPrice,
         BigDecimal minPrice,
         BigDecimal maxPrice,
         long availableStock

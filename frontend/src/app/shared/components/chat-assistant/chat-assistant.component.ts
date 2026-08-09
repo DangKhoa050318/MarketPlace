@@ -8,7 +8,10 @@ import { finalize } from 'rxjs';
 import { ChatProductCard, ChatMessageResponse } from '../../../core/models/chat-assistant.model';
 import { AnalyticsEventSource, AnalyticsEventType } from '../../../core/models/analytics-event.model';
 import { AnalyticsService } from '../../../core/services/analytics.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { CartService } from '../../../core/services/cart.service';
 import { ChatAssistantService } from '../../../core/services/chat-assistant.service';
+import { ChatCartCommand, ChatCartCommandService } from '../../../core/services/chat-cart-command.service';
 
 interface UiMessage {
   role: 'user' | 'assistant';
@@ -37,6 +40,9 @@ export class ChatAssistantComponent {
   constructor(
     private chatService: ChatAssistantService,
     private analytics: AnalyticsService,
+    private authService: AuthService,
+    private cartService: CartService,
+    private cartCommandService: ChatCartCommandService,
     private router: Router
   ) {}
 
@@ -51,8 +57,15 @@ export class ChatAssistantComponent {
 
     this.messages.push({ role: 'user', text: message });
     this.draft = '';
-    this.loading = true;
     this.scrollSoon();
+
+    const cartCommand = this.cartCommandService.parse(message);
+    if (cartCommand) {
+      this.handleCartCommand(cartCommand);
+      return;
+    }
+
+    this.loading = true;
     this.chatService.send(message, this.pageContext()).pipe(
       finalize(() => {
         this.loading = false;
@@ -121,6 +134,79 @@ export class ChatAssistantComponent {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency', currency: 'VND', maximumFractionDigits: 0
     }).format(value);
+  }
+
+  private handleCartCommand(command: ChatCartCommand): void {
+    const recommendation = this.latestRecommendation();
+    if (!recommendation) {
+      this.reply('Mình chưa có danh sách sản phẩm gần đây. Bạn hãy yêu cầu mình gợi ý sản phẩm trước nhé.');
+      return;
+    }
+
+    const products = recommendation.products;
+    if (!command.position && products.length > 1) {
+      this.reply(`Danh sách gần nhất có ${products.length} sản phẩm. Bạn muốn thêm sản phẩm thứ mấy vào giỏ hàng?`);
+      return;
+    }
+
+    const position = command.position || 1;
+    const product = products[position - 1];
+    if (!product) {
+      this.reply(`Danh sách gần nhất chỉ có ${products.length} sản phẩm. Bạn vui lòng chọn vị trí từ 1 đến ${products.length}.`);
+      return;
+    }
+
+    if (!this.authService.isAuthenticated()) {
+      this.reply('Bạn cần đăng nhập trước khi thêm sản phẩm vào giỏ hàng. Danh sách gợi ý vẫn được giữ để bạn chọn lại sau khi đăng nhập.');
+      return;
+    }
+
+    this.loading = true;
+    this.cartService.addToCart(product.recommendedVariantId).pipe(
+      finalize(() => {
+        this.loading = false;
+        this.scrollSoon();
+      })
+    ).subscribe({
+      next: response => {
+        if (!response.success) {
+          this.reply('Mình chưa thể thêm sản phẩm vào giỏ hàng lúc này. Bạn vui lòng thử lại nhé.');
+          return;
+        }
+        this.reply(
+          `Đã thêm ${product.name} (${product.recommendedVariantName}) vào giỏ hàng với giá ${this.formatPrice(product.recommendedVariantPrice)}.`
+        );
+        this.analytics.track(
+          AnalyticsEventType.AddToCart,
+          {
+            conversationId: recommendation.conversationId,
+            traceId: recommendation.traceId,
+            initiatedBy: 'CHAT_COMMAND'
+          },
+          {
+            productId: product.productId,
+            variantId: product.recommendedVariantId,
+            quantity: 1,
+            unitPrice: product.recommendedVariantPrice,
+            source: AnalyticsEventSource.ChatAssistant
+          }
+        );
+      },
+      error: () => this.reply(
+        'Mình chưa thể thêm sản phẩm vào giỏ hàng. Bạn hãy kiểm tra lại đăng nhập hoặc thử lại sau nhé.'
+      )
+    });
+  }
+
+  private latestRecommendation(): ChatMessageResponse | undefined {
+    return [...this.messages]
+      .reverse()
+      .find(message => message.response?.products.length)?.response;
+  }
+
+  private reply(text: string): void {
+    this.messages.push({ role: 'assistant', text });
+    this.scrollSoon();
   }
 
   private pageContext(): { productId?: number } | undefined {

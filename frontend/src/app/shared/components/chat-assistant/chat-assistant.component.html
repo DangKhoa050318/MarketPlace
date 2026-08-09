@@ -37,7 +37,8 @@
           <div class="product-copy">
             <strong>{{ product.name }}</strong>
             <span class="category">{{ product.categoryName }}<ng-container *ngIf="product.brand"> · {{ product.brand }}</ng-container></span>
-            <span class="price">Từ {{ formatPrice(product.minPrice) }}</span>
+            <span class="price">{{ formatPrice(product.recommendedVariantPrice) }}</span>
+            <span class="category">Phiên bản đề xuất: {{ product.recommendedVariantName }}</span>
             <span class="reason">{{ product.reason }}</span>
             <button
               *ngIf="product.voucher"

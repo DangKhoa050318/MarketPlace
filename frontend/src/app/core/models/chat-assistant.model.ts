@@ -32,6 +32,9 @@ export interface ChatProductCard {
   categoryId: number;
   categoryName: string;
   brand?: string;
+  recommendedVariantId: number;
+  recommendedVariantName: string;
+  recommendedVariantPrice: number;
   minPrice: number;
   maxPrice: number;
   availableStock: number;

@@ -46,6 +46,8 @@ class ChatProductQueryRepositoryTest {
         assertThat(sqlCaptor.getValue())
                 .containsPattern("WHERE\\s+p\\.active = TRUE")
                 .containsPattern("v\\.price <= \\?\\s+GROUP BY")
+                .contains("AS recommended_variant_id")
+                .contains("COALESCE(sl.quantity - sl.reserved_quantity, 0) > 0")
                 .doesNotContain("WHEREp.active")
                 .doesNotContain("?GROUP BY");
     }

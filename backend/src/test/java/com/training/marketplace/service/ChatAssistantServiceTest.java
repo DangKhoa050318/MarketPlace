@@ -79,6 +79,8 @@ class ChatAssistantServiceTest {
 
         assertThat(response.intents()).contains(ChatIntent.BEST_SELLER, ChatIntent.CAMPAIGN_OFFERS);
         assertThat(response.products()).hasSize(1);
+        assertThat(response.products().get(0).recommendedVariantId()).isEqualTo(101L);
+        assertThat(response.products().get(0).recommendedVariantName()).isEqualTo("16GB / 512GB");
         assertThat(response.products().get(0).availableStock()).isEqualTo(8);
         assertThat(response.products().get(0).voucher().code()).isEqualTo("SCHOOL10");
         assertThat(response.products().get(0).reason()).contains("bán chạy").contains("voucher");
@@ -212,6 +214,9 @@ class ChatAssistantServiceTest {
                 "Laptop",
                 "MarketBrand",
                 null,
+                101L,
+                "16GB / 512GB",
+                new BigDecimal("18000000"),
                 new BigDecimal("18000000"),
                 new BigDecimal("19500000"),
                 8);

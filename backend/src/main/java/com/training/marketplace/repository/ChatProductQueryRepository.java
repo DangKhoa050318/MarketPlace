@@ -94,8 +94,19 @@ public class ChatProductQueryRepository {
                        c.name AS category_name,
                        p.brand,
                        p.image_url,
-                       MIN(v.price) AS min_price,
-                       MAX(v.price) AS max_price,
+                       (ARRAY_AGG(v.id ORDER BY v.price ASC, v.id ASC)
+                           FILTER (WHERE COALESCE(sl.quantity - sl.reserved_quantity, 0) > 0))[1]
+                           AS recommended_variant_id,
+                       (ARRAY_AGG(v.variant_name ORDER BY v.price ASC, v.id ASC)
+                           FILTER (WHERE COALESCE(sl.quantity - sl.reserved_quantity, 0) > 0))[1]
+                           AS recommended_variant_name,
+                       MIN(v.price) FILTER (
+                           WHERE COALESCE(sl.quantity - sl.reserved_quantity, 0) > 0)
+                           AS recommended_variant_price,
+                       MIN(v.price) FILTER (
+                           WHERE COALESCE(sl.quantity - sl.reserved_quantity, 0) > 0) AS min_price,
+                       MAX(v.price) FILTER (
+                           WHERE COALESCE(sl.quantity - sl.reserved_quantity, 0) > 0) AS max_price,
                        COALESCE(SUM(sl.quantity - sl.reserved_quantity), 0) AS available_stock
                   FROM products p
                   JOIN categories c ON c.id = p.category_id
@@ -119,6 +130,9 @@ public class ChatProductQueryRepository {
                 rs.getString("category_name"),
                 rs.getString("brand"),
                 rs.getString("image_url"),
+                rs.getLong("recommended_variant_id"),
+                rs.getString("recommended_variant_name"),
+                rs.getBigDecimal("recommended_variant_price"),
                 rs.getBigDecimal("min_price"),
                 rs.getBigDecimal("max_price"),
                 rs.getLong("available_stock")), params.toArray());
