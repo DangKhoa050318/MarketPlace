@@ -62,6 +62,10 @@ export class OrderService {
     return this.http.post<ApiResponse<Order>>(`${this.apiUrl}/${id}/confirm-vietqr`, {});
   }
 
+  cancelPayment(id: number): Observable<ApiResponse<Order>> {
+    return this.http.post<ApiResponse<Order>>(`${this.apiUrl}/${id}/cancel-payment`, {});
+  }
+
   cancelVietQrPayment(id: number): Observable<ApiResponse<Order>> {
     return this.http.post<ApiResponse<Order>>(`${this.apiUrl}/${id}/cancel-vietqr`, {});
   }

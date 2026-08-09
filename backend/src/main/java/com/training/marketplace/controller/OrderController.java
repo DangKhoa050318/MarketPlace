@@ -101,9 +101,9 @@ public class OrderController {
         return ApiResponse.success("Payment confirmed successfully", orderService.enrichOrderResponse(order));
     }
 
-    @PostMapping("/{id}/cancel-vietqr")
-    @Operation(summary = "User manual cancellation of VietQR bank transfer payment")
-    public ApiResponse<OrderResponse> cancelVietQrPayment(
+    @PostMapping({"/{id}/cancel-payment", "/{id}/cancel-vietqr"})
+    @Operation(summary = "User manual cancellation of pending online payment")
+    public ApiResponse<OrderResponse> cancelPayment(
             Authentication authentication,
             @PathVariable Long id) {
         Long userId = userService.getAuthenticatedUser(authentication).getId();

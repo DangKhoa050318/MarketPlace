@@ -15,5 +15,5 @@ public interface PaymentWebhookService {
      * @param signature Header signature or authorization token (optional)
      * @return Map containing response metadata (orderId, status, paymentStatus)
      */
-    Map<String, Object> processPaygateWebhook(PaygateWebhookRequest payload, String signature);
+    Map<String, Object> processPaygateWebhook(PaygateWebhookRequest payload, String signature, String rawPayload);
 }

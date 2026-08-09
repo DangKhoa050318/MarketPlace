@@ -168,7 +168,7 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
               <th mat-header-cell *matHeaderCellDef>Payment</th>
               <td mat-cell *matCellDef="let order">
                 <span *ngIf="order.paymentMethod" class="badge-payment-chip">
-                  <span class="pay-method-text">{{ order.paymentMethod === 'COD' ? 'COD' : (order.paymentMethod === 'PAYGATE_BNPL' ? 'BNPL' : 'Paygate Card') }}</span>
+                  <span class="pay-method-text">{{ order.paymentMethod === 'COD' ? 'COD' : (order.paymentMethod === 'PAYGATE_BNPL' ? 'BNPL' : (order.paymentMethod === 'BANK_TRANSFER' ? 'VietQR' : 'Paygate')) }}</span>
                 </span>
                 <span *ngIf="!order.paymentMethod" class="text-muted">—</span>
               </td>
@@ -976,7 +976,7 @@ export class OrderListComponent implements OnInit {
         this.orderService.confirmVietQrPayment(order.id).subscribe({
           next: (res) => {
             if (res.success) {
-              this.notification.success(`Payment confirmed! Order #${order.id} is now CONFIRMED.`);
+              this.notification.success(`Payment for Order #${order.id} is being processed...`);
               this.loadOrders();
             }
           },

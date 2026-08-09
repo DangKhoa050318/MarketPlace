@@ -54,20 +54,21 @@ public class PaygateClientServiceImpl implements PaygateClientService {
     }
 
     @Override
-    public PaygateCreateCheckoutResponse createCheckoutSession(Long orderId, BigDecimal amount, String description, String method) {
+    public PaygateCreateCheckoutResponse createCheckoutSession(Long orderId, BigDecimal amount, String description,
+            String method) {
         return createCheckoutSession(orderId, amount, description, method, null, null);
     }
 
     @Override
     public PaygateCreateCheckoutResponse createCheckoutSession(Long orderId, BigDecimal amount, String description,
-                                                               String method, BigDecimal upfrontAmount, BigDecimal financeAmount) {
+            String method, BigDecimal upfrontAmount, BigDecimal financeAmount) {
         return createCheckoutSession(orderId, amount, description, method, upfrontAmount, financeAmount, null, null);
     }
 
     @Override
     public PaygateCreateCheckoutResponse createCheckoutSession(Long orderId, BigDecimal amount, String description,
-                                                               String method, BigDecimal upfrontAmount, BigDecimal financeAmount,
-                                                               Long merchantCustomerId, String customerName) {
+            String method, BigDecimal upfrontAmount, BigDecimal financeAmount,
+            Long merchantCustomerId, String customerName) {
         String fullEndpoint = apiUrl + "/api/v1/checkout/create";
         String orderIdStr = "ORD-" + orderId;
         BigDecimal vndAmount = currencyConversionService.convertUsdToVnd(amount);
@@ -79,14 +80,16 @@ public class PaygateClientServiceImpl implements PaygateClientService {
 
         String dynamicReturnUrl;
         if (returnUrl != null && !returnUrl.isBlank()) {
-            dynamicReturnUrl = returnUrl.contains("status=") ? returnUrl : (returnUrl + (returnUrl.contains("?") ? "&" : "?") + "status=SUCCESS");
+            dynamicReturnUrl = returnUrl.contains("status=") ? returnUrl
+                    : (returnUrl + (returnUrl.contains("?") ? "&" : "?") + "status=SUCCESS");
         } else {
             dynamicReturnUrl = "http://localhost:4200/orders/callback?status=SUCCESS";
         }
 
         String dynamicCancelUrl;
         if (cancelUrl != null && !cancelUrl.isBlank()) {
-            dynamicCancelUrl = cancelUrl.contains("status=") ? cancelUrl : (cancelUrl + (cancelUrl.contains("?") ? "&" : "?") + "status=CANCELLED");
+            dynamicCancelUrl = cancelUrl.contains("status=") ? cancelUrl
+                    : (cancelUrl + (cancelUrl.contains("?") ? "&" : "?") + "status=CANCELLED");
         } else {
             dynamicCancelUrl = returnUrl + (returnUrl.contains("?") ? "&" : "?") + "status=CANCELLED";
         }
@@ -108,8 +111,7 @@ public class PaygateClientServiceImpl implements PaygateClientService {
                 merchantCustomerId != null ? merchantCustomerId.toString() : null,
                 customerName,
                 dynamicReturnUrl,
-                dynamicCancelUrl
-        );
+                dynamicCancelUrl);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -129,15 +131,15 @@ public class PaygateClientServiceImpl implements PaygateClientService {
         HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
         try {
-            log.info("Sending checkout session creation request to PayGate: endpoint={}, orderId={}, method={}, upfront={}, finance={}",
+            log.info(
+                    "Sending checkout session creation request to PayGate: endpoint={}, orderId={}, method={}, upfront={}, finance={}",
                     fullEndpoint, orderIdStr, paymentMethodStr, vndUpfront, vndFinance);
-            PaygateCreateCheckoutResponse response = restTemplate.postForObject(fullEndpoint, entity, PaygateCreateCheckoutResponse.class);
+            PaygateCreateCheckoutResponse response = restTemplate.postForObject(fullEndpoint, entity,
+                    PaygateCreateCheckoutResponse.class);
 
-            boolean isSuccess = response != null && (
-                    Boolean.TRUE.equals(response.success()) ||
+            boolean isSuccess = response != null && (Boolean.TRUE.equals(response.success()) ||
                     "SUCCESS".equalsIgnoreCase(response.status()) ||
-                    (response.code() != null && response.code() == 200)
-            ) && response.data() != null;
+                    (response.code() != null && response.code() == 200)) && response.data() != null;
 
             if (isSuccess) {
                 log.info("Successfully created PayGate session: token={}, paymentUrl={}, method={}",
@@ -150,7 +152,8 @@ public class PaygateClientServiceImpl implements PaygateClientService {
         }
 
         // Fallback for offline local dev mode
-        String mockToken = "CHK_MOCK_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
+        String mockToken = "CHK_MOCK_"
+                + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
         String fallbackPaymentUrl = checkoutUrl + "?token=" + mockToken;
 
         String transferContent = null;
@@ -167,7 +170,10 @@ public class PaygateClientServiceImpl implements PaygateClientService {
             mockAccountNumber = "8888999988";
             mockAccountName = "PAYGATE GATEWAY SYSTEM";
             try {
-                vietQrUrl = "https://img.vietqr.io/image/970422-" + mockAccountNumber + "-compact2.png?amount=" + vndAmount + "&addInfo=" + java.net.URLEncoder.encode(transferContent, java.nio.charset.StandardCharsets.UTF_8) + "&accountName=PAYGATE%20GATEWAY%20SYSTEM";
+                vietQrUrl = "https://img.vietqr.io/image/970422-" + mockAccountNumber + "-compact2.png?amount="
+                        + vndAmount + "&addInfo="
+                        + java.net.URLEncoder.encode(transferContent, java.nio.charset.StandardCharsets.UTF_8)
+                        + "&accountName=PAYGATE%20GATEWAY%20SYSTEM";
             } catch (Exception ignored) {
                 vietQrUrl = null;
             }
@@ -188,9 +194,7 @@ public class PaygateClientServiceImpl implements PaygateClientService {
                         mockBankCode,
                         mockAccountNumber,
                         mockAccountName,
-                        null
-                )
-        );
+                        null));
     }
 
     @Override
@@ -205,7 +209,8 @@ public class PaygateClientServiceImpl implements PaygateClientService {
             throw new IllegalArgumentException("Refund amount must be greater than zero");
         }
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("PayGate merchant API key is not configured; cannot request PayGate refund");
+            throw new IllegalStateException(
+                    "PayGate merchant API key is not configured; cannot request PayGate refund");
         }
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new IllegalArgumentException("Idempotency key is required for PayGate refund");
@@ -221,14 +226,40 @@ public class PaygateClientServiceImpl implements PaygateClientService {
                 apiKey,
                 transactionRef,
                 "ORD-" + orderId,
-                currencyConversionService.convertUsdToVnd(amount)
-        );
+                currencyConversionService.convertUsdToVnd(amount));
 
         log.info("Requesting PayGate merchant refund for transactionRef={}, orderId={}, amount={}, idempotencyKey={}",
                 transactionRef, request.orderId(), request.amount(), idempotencyKey);
-        ResponseEntity<String> response = restTemplate.postForEntity(endpoint, new HttpEntity<>(request, headers), String.class);
+        ResponseEntity<String> response = restTemplate.postForEntity(endpoint, new HttpEntity<>(request, headers),
+                String.class);
         if (!response.getStatusCode().is2xxSuccessful()) {
             throw new IllegalStateException("PayGate refund failed with status " + response.getStatusCode().value());
+        }
+    }
+
+    @Override
+    public void simulateBankTransfer(Long orderId, BigDecimal amountUsd) {
+        String fullEndpoint = apiUrl + "/api/v1/integration/bank-webhook";
+        String orderIdStr = "ORD-" + orderId;
+        BigDecimal vndAmount = currencyConversionService.convertUsdToVnd(amountUsd);
+
+        java.util.Map<String, Object> requestBody = java.util.Map.of(
+                "transferContent", "PAYGATE " + orderIdStr,
+                "amount", vndAmount,
+                "referenceNo", "S2S_SIM_" + System.currentTimeMillis());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<java.util.Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        try {
+            log.info("Sending S2S Bank Transfer simulation to PayGate: endpoint={}, transferContent={}, amount={}",
+                    fullEndpoint, "PAYGATE " + orderIdStr, vndAmount);
+            restTemplate.postForObject(fullEndpoint, entity, String.class);
+        } catch (Exception e) {
+            log.error("Failed to call PayGate Bank Webhook S2S: {}", e.getMessage(), e);
+            throw new BadRequestException("Could not process S2S Bank Transfer payment with PayGate");
         }
     }
 }
