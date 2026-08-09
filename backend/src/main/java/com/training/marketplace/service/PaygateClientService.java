@@ -17,4 +17,6 @@ public interface PaygateClientService {
                                                         Long merchantCustomerId, String customerName);
 
     void refund(String transactionRef, Long orderId, BigDecimal amount, String idempotencyKey);
+
+    void simulateBankTransfer(Long orderId, BigDecimal amount);
 }

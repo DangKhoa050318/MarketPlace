@@ -45,12 +45,23 @@ public class PaymentServiceImpl implements PaymentService {
             return null;
         }
 
-        String methodStr = paymentMethod == PaymentMethod.BANK_TRANSFER ? "VIETQR" : "PAYGATE";
+        String methodStr;
+        if (paymentMethod == PaymentMethod.BANK_TRANSFER) {
+            methodStr = "VIETQR";
+        } else if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
+            methodStr = "BNPL";
+        } else {
+            methodStr = "PAYGATE";
+        }
         var pgSession = paygateClientService.createCheckoutSession(
                 order.getId(),
                 order.getTotalAmount(),
                 "Thanh toan don hang #" + order.getId() + " tren Marketplace",
-                methodStr
+                methodStr,
+                order.getUpfrontAmount(),
+                order.getFinanceAmount(),
+                order.getUser().getId(),
+                order.getUser().getFullName()
         );
         var sessionData = (pgSession != null) ? pgSession.data() : null;
         String targetPaymentUrl = (sessionData != null) ? sessionData.paymentUrl() : null;
@@ -117,13 +128,24 @@ public class PaymentServiceImpl implements PaymentService {
             );
         }
 
-        String methodStr = paymentMethod == PaymentMethod.BANK_TRANSFER ? "VIETQR" : "PAYGATE";
+        String methodStr;
+        if (paymentMethod == PaymentMethod.BANK_TRANSFER) {
+            methodStr = "VIETQR";
+        } else if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
+            methodStr = "BNPL";
+        } else {
+            methodStr = "PAYGATE";
+        }
 
         var pgSession = paygateClientService.createCheckoutSession(
                 order.getId(),
                 order.getTotalAmount(),
                 "Thanh toan lai don hang #" + order.getId() + " tren Marketplace",
-                methodStr
+                methodStr,
+                order.getUpfrontAmount(),
+                order.getFinanceAmount(),
+                order.getUser().getId(),
+                order.getUser().getFullName()
         );
 
         var sessionData = (pgSession != null) ? pgSession.data() : null;
@@ -193,9 +215,13 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public Order confirmVietQrPayment(Long userId, Long orderId) {
-        Order order = orderRepository.findByIdForUpdate(orderId)
+        // Use a regular read — NOT findByIdForUpdate — because the outbound HTTP call to PayGate
+        // below will synchronously trigger a webhook callback that itself acquires FOR UPDATE on
+        // this same row. Holding a pessimistic lock here while blocking on the HTTP round-trip
+        // would deadlock (this tx waits for PayGate, PayGate's webhook waits for this tx's lock).
+        Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
         if (!order.getUser().getId().equals(userId)) {
@@ -212,17 +238,14 @@ public class PaymentServiceImpl implements PaymentService {
             throw new BadRequestException("Order is cancelled and cannot be paid");
         }
 
-        order.setStatus(OrderStatus.CONFIRMED);
-        order.setPaymentStatus(PaymentStatus.PAID);
-        Order savedOrder = orderRepository.save(order);
+        // Trigger S2S Bank Transfer simulation to PayGate.
+        // PayGate will process settlement and send a signed Webhook (X-Signature) back to MarketPlace.
+        // The webhook handler (PaymentWebhookServiceImpl) will acquire its own FOR UPDATE lock
+        // and atomically update the order to CONFIRMED + PAID.
+        paygateClientService.simulateBankTransfer(orderId, order.getTotalAmount());
 
-        // Fulfill stock (convert reservation to actual stock decrement)
-        if (savedOrder.getWarehouseId() != null && savedOrder.getItems() != null && !savedOrder.getItems().isEmpty()) {
-            inventoryFacade.fulfill(savedOrder.getWarehouseId(), quantitiesByVariant(savedOrder));
-        }
-
-        log.info("User confirmed VietQR transfer for Order #{}: updated to CONFIRMED & PAID, stock fulfilled.", orderId);
-        return savedOrder;
+        log.info("Triggered S2S VietQR transfer for Order #{}. Awaiting/processed PayGate signed Webhook.", orderId);
+        return orderRepository.findById(orderId).orElse(order);
     }
 
     @Override

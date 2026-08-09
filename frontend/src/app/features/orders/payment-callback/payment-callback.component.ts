@@ -250,15 +250,30 @@ export class PaymentCallbackComponent implements OnInit {
 
   ngOnInit(): void {
     this.route.queryParams.subscribe(params => {
-      this.status = this.getFirstString(params['status']) || 'CANCELLED';
+      const urlStatus = this.getFirstString(params['status']) || 'CANCELLED';
       this.orderId = this.getFirstString(params['orderId']);
       this.transactionRef = this.getFirstString(params['transactionRef']);
 
-      // Fetch the real order status from the server (set by webhook, not by us).
-      // The PayGate → MarketPlace webhook may arrive before or after this redirect,
-      // so we poll briefly to give it time to land.
+      // Instead of trusting the URL's SUCCESS status, we default to PROCESSING
+      // if it claims success, and wait for the backend to confirm.
+      if (urlStatus.toUpperCase() === 'SUCCESS') {
+         this.status = 'PROCESSING';
+      } else {
+         this.status = urlStatus;
+      }
+
       if (this.orderId) {
-        this.pollOrderStatus(this.cleanOrderId(this.orderId), 0);
+        const numericId = this.cleanOrderId(this.orderId);
+        if (urlStatus.toUpperCase() === 'CANCELLED' && numericId) {
+          // Proactively cancel the order on the backend so it transitions from PENDING
+          // to CANCELLED and reserved stock is released.
+          this.orderService.cancelPayment(Number(numericId)).subscribe({
+            next: () => this.pollOrderStatus(numericId, 0),
+            error: () => this.pollOrderStatus(numericId, 0)
+          });
+        } else {
+          this.pollOrderStatus(numericId, 0);
+        }
       }
     });
   }

@@ -23,10 +23,20 @@ public class PaymentWebhookController {
     @PostMapping("/paygate-webhook")
     @Operation(summary = "Receive Webhook IPN notification from PayGate microservice (server-to-server only)")
     public ApiResponse<Map<String, Object>> handlePaygateWebhook(
-            @RequestHeader(value = "X-Paygate-Signature", required = false) String signature,
-            @RequestBody PaygateWebhookRequest payload) {
+            @RequestHeader(value = "X-Signature", required = false) String signature,
+            @RequestBody String rawPayload) {
         log.info("Received PayGate Webhook request on endpoint /paygate-webhook");
-        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(payload, signature);
+        
+        PaygateWebhookRequest payload;
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            payload = mapper.readValue(rawPayload, PaygateWebhookRequest.class);
+        } catch (Exception e) {
+            log.error("Failed to parse PayGate Webhook payload", e);
+            throw new com.training.marketplace.exception.BadRequestException("Invalid webhook payload format");
+        }
+
+        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(payload, signature, rawPayload);
         return ApiResponse.success("PayGate Webhook processed successfully", result);
     }
 }

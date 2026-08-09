@@ -44,12 +44,13 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
 
     @Override
     @Transactional
-    public Map<String, Object> processPaygateWebhook(PaygateWebhookRequest payload, String signature) {
-        log.info("Processing PayGate Webhook: event={}, transactionRef={}, orderId={}, status={}, amount={}, signature={}",
-                payload.event(), payload.transactionRef(), payload.orderId(), payload.status(), payload.amount(), signature);
+    public Map<String, Object> processPaygateWebhook(PaygateWebhookRequest payload, String signature, String rawPayload) {
+        log.info("Processing webhook from PayGate: event={}, orderId={}, txRef={}",
+                payload.event(), payload.orderId(), payload.transactionRef());
 
         if (payload.orderId() == null && payload.transactionRef() == null) {
-            throw new BadRequestException("Invalid payload: orderId and transactionRef are null");
+            log.warn("Ignoring PayGate webhook with null orderId and transactionRef — acknowledging to stop retries");
+            return Map.of("ignored", true, "reason", "missing-order-id-and-txref");
         }
 
         if (payload.transactionRef() != null && payload.transactionRef().startsWith("TXN-REFUND-")) {
@@ -63,13 +64,14 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
         }
 
         // 1. Signature / Authorization Verification (Security Check).
-        // PayGate authenticates each webhook by sending the shared merchant secret in X-Paygate-Signature.
-        verifySignature(signature);
+        // PayGate authenticates each webhook by sending the shared merchant secret in X-Signature.
+        verifySignature(signature, rawPayload);
 
         // 2. Parse Order ID
         Long orderId = parseOrderId(payload.orderId());
         if (orderId == null) {
-            throw new BadRequestException("Could not resolve valid order ID from string: " + payload.orderId());
+            log.warn("Could not resolve valid order ID from string: '{}' — acknowledging to stop retries", payload.orderId());
+            return Map.of("ignored", true, "reason", "unparseable-order-id", "rawOrderId", String.valueOf(payload.orderId()));
         }
 
         // Lock the order row (SELECT ... FOR UPDATE) so concurrent duplicate webhooks are serialized:
@@ -133,19 +135,35 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
      * missing/blank signature is rejected; a present signature must match the secret exactly. The
      * comparison is constant-time so the secret cannot be recovered through response-timing analysis.
      */
-    private void verifySignature(String signature) {
+    private void verifySignature(String signature, String rawPayload) {
         if (signature == null || signature.isBlank()) {
             if (requireSignature) {
-                log.warn("Rejected PayGate webhook: missing X-Paygate-Signature header");
+                log.warn("Rejected PayGate webhook: missing X-Signature header");
                 throw new ForbiddenException("Missing webhook signature / unauthorized request");
             }
             log.warn("PayGate webhook accepted without a signature "
                     + "(enforcement disabled via marketplace.paygate.webhook.require-signature=false)");
             return;
         }
-        if (!constantTimeEquals(signature, merchantApiKey)) {
-            log.warn("Rejected PayGate webhook: invalid X-Paygate-Signature");
-            throw new ForbiddenException("Invalid webhook signature / unauthorized request");
+
+        try {
+            if (rawPayload == null || rawPayload.isBlank()) {
+                if (constantTimeEquals(signature, merchantApiKey)) {
+                    return;
+                }
+                throw new ForbiddenException("Invalid webhook signature / unauthorized request");
+            }
+
+            String expectedSignature = com.training.marketplace.utils.HmacUtils.generateSignature(rawPayload, merchantApiKey);
+            if (!constantTimeEquals(signature, expectedSignature) && !constantTimeEquals(signature, merchantApiKey)) {
+                log.warn("Rejected PayGate webhook: invalid X-Signature. Expected {}, got {}", expectedSignature, signature);
+                throw new ForbiddenException("Invalid webhook signature / unauthorized request");
+            }
+        } catch (ForbiddenException fe) {
+            throw fe;
+        } catch (Exception e) {
+            log.error("Failed to verify webhook HMAC signature", e);
+            throw new ForbiddenException("Error verifying webhook signature");
         }
     }
 
