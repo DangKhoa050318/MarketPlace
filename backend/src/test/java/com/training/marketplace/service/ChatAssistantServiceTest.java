@@ -113,6 +113,42 @@ class ChatAssistantServiceTest {
     }
 
     @Test
+    void deterministicLatestBudgetOverridesOlderAiBudget() {
+        UUID conversationId = UUID.randomUUID();
+        when(conversationStore.find(conversationId)).thenReturn(Optional.of(
+                new ChatConversationSnapshot(
+                        conversationId,
+                        "s:session-1",
+                        List.of(new ChatHistoryMessage("user", "Tìm laptop dưới 20 triệu")))));
+        when(aiGateway.analyze(any(), any(), any())).thenReturn(Optional.of(
+                new ChatIntentAnalysis(
+                        List.of(ChatIntent.PRODUCT_DISCOVERY),
+                        "laptop",
+                        null,
+                        null,
+                        new BigDecimal("20000000"),
+                        null,
+                        Map.of(),
+                        false,
+                        null)));
+        when(discoveryService.discover(any(), eq(false), eq(null), eq("session-1")))
+                .thenReturn(List.of());
+
+        service.reply(
+                null,
+                "session-1",
+                new ChatMessageRequest(conversationId, "Tôi muốn laptop dưới 2 triệu", null));
+
+        ArgumentCaptor<ChatSearchCriteria> criteriaCaptor =
+                ArgumentCaptor.forClass(ChatSearchCriteria.class);
+        verify(discoveryService).discover(
+                criteriaCaptor.capture(), eq(false), eq(null), eq("session-1"));
+        assertThat(criteriaCaptor.getValue().query()).isEqualTo("laptop");
+        assertThat(criteriaCaptor.getValue().maxPrice())
+                .isEqualByComparingTo(new BigDecimal("2000000"));
+    }
+
+    @Test
     void doesNotSuggestProductsWhenNoCampaignOfferIsEffective() {
         when(conversationStore.find(any())).thenReturn(Optional.empty());
         when(aiGateway.analyze(any(), any(), any())).thenReturn(Optional.empty());

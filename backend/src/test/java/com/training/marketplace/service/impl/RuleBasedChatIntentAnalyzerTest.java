@@ -64,7 +64,20 @@ class RuleBasedChatIntentAnalyzerTest {
                 null);
 
         assertThat(result.maxPrice()).isEqualByComparingTo(new BigDecimal("15000000"));
+        assertThat(result.query()).isEqualTo("laptop");
         assertThat(result.needsClarification()).isFalse();
+    }
+
+    @Test
+    void latestBudgetReplacesEarlierConversationBudget() {
+        var result = analyzer.analyze(
+                "Tôi muốn dưới 2 triệu",
+                List.of(new ChatHistoryMessage("user", "Tìm laptop dưới 20 triệu")),
+                null);
+
+        assertThat(result.query()).isEqualTo("laptop");
+        assertThat(result.minPrice()).isNull();
+        assertThat(result.maxPrice()).isEqualByComparingTo(new BigDecimal("2000000"));
     }
 
     @Test

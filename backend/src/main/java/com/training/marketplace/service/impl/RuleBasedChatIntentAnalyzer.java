@@ -59,7 +59,8 @@ public class RuleBasedChatIntentAnalyzer {
                     null);
         }
 
-        String combined = recentUserContext(history) + " " + message;
+        String historyContext = recentUserContext(history);
+        String combined = historyContext + " " + message;
         String normalized = normalize(combined);
         Set<ChatIntent> intents = new LinkedHashSet<>();
 
@@ -74,16 +75,15 @@ public class RuleBasedChatIntentAnalyzer {
             intents.add(ChatIntent.PRODUCT_DISCOVERY);
         }
 
-        BigDecimal minPrice = extractPrice(normalized, MIN_PRICE);
-        BigDecimal maxPrice = extractPrice(normalized, MAX_PRICE);
-        Matcher range = RANGE_PRICE.matcher(normalized);
-        if (range.find()) {
-            BigDecimal multiplier = multiplier(range.group(3));
-            minPrice = decimal(range.group(1)).multiply(multiplier);
-            maxPrice = decimal(range.group(2)).multiply(multiplier);
-        }
+        PriceRange currentPrice = extractPrices(normalize(message));
+        PriceRange historyPrice = extractPrices(normalize(historyContext));
+        BigDecimal minPrice = currentPrice.hasConstraint() ? currentPrice.minPrice() : historyPrice.minPrice();
+        BigDecimal maxPrice = currentPrice.hasConstraint() ? currentPrice.maxPrice() : historyPrice.maxPrice();
 
         String query = cleanupQuery(message);
+        if (query == null || query.isBlank()) {
+            query = recentUserQuery(history);
+        }
         boolean noExplicitNeed = (query == null || query.isBlank())
                 && minPrice == null
                 && maxPrice == null
@@ -122,6 +122,35 @@ public class RuleBasedChatIntentAnalyzer {
         }
         String unit = matcher.group(2);
         return decimal(matcher.group(1)).multiply(multiplier(unit == null ? "trieu" : unit));
+    }
+
+    private PriceRange extractPrices(String normalized) {
+        BigDecimal minPrice = extractPrice(normalized, MIN_PRICE);
+        BigDecimal maxPrice = extractPrice(normalized, MAX_PRICE);
+        Matcher range = RANGE_PRICE.matcher(normalized);
+        if (range.find()) {
+            BigDecimal rangeMultiplier = multiplier(range.group(3));
+            minPrice = decimal(range.group(1)).multiply(rangeMultiplier);
+            maxPrice = decimal(range.group(2)).multiply(rangeMultiplier);
+        }
+        return new PriceRange(minPrice, maxPrice);
+    }
+
+    private String recentUserQuery(List<ChatHistoryMessage> history) {
+        if (history == null) {
+            return null;
+        }
+        for (int index = history.size() - 1; index >= 0; index--) {
+            ChatHistoryMessage item = history.get(index);
+            if (!"user".equalsIgnoreCase(item.role())) {
+                continue;
+            }
+            String query = cleanupQuery(item.content());
+            if (query != null && !query.isBlank()) {
+                return query;
+            }
+        }
+        return null;
     }
 
     private BigDecimal decimal(String value) {
@@ -192,5 +221,11 @@ public class RuleBasedChatIntentAnalyzer {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    private record PriceRange(BigDecimal minPrice, BigDecimal maxPrice) {
+        private boolean hasConstraint() {
+            return minPrice != null || maxPrice != null;
+        }
     }
 }
