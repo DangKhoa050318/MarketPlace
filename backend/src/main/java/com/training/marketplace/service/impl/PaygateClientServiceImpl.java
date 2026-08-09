@@ -14,16 +14,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import com.training.marketplace.service.CurrencyConversionService;
-
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Service
 @Slf4j
 public class PaygateClientServiceImpl implements PaygateClientService {
 
     private final RestTemplate restTemplate;
-    private final CurrencyConversionService currencyConversionService;
 
     @Value("${marketplace.paygate.api-url:http://localhost:8081}")
     private String apiUrl;
@@ -43,9 +41,8 @@ public class PaygateClientServiceImpl implements PaygateClientService {
     @Value("${marketplace.paygate.cancel-url:http://localhost:4200/orders/callback}")
     private String cancelUrl;
 
-    public PaygateClientServiceImpl(CurrencyConversionService currencyConversionService) {
+    public PaygateClientServiceImpl() {
         this.restTemplate = new RestTemplate();
-        this.currencyConversionService = currencyConversionService;
     }
 
     @Override
@@ -70,12 +67,11 @@ public class PaygateClientServiceImpl implements PaygateClientService {
                                                                Long merchantCustomerId, String customerName) {
         String fullEndpoint = apiUrl + "/api/v1/checkout/create";
         String orderIdStr = "ORD-" + orderId;
-        BigDecimal vndAmount = currencyConversionService.convertUsdToVnd(amount);
+        BigDecimal vndAmount = normalizeVnd(amount);
         String paymentMethodStr = (method != null && !method.isBlank()) ? method : "PAYGATE";
 
-        // Convert upfront/finance amounts to VND for BNPL sessions
-        BigDecimal vndUpfront = upfrontAmount != null ? currencyConversionService.convertUsdToVnd(upfrontAmount) : null;
-        BigDecimal vndFinance = financeAmount != null ? currencyConversionService.convertUsdToVnd(financeAmount) : null;
+        BigDecimal vndUpfront = upfrontAmount != null ? normalizeVnd(upfrontAmount) : null;
+        BigDecimal vndFinance = financeAmount != null ? normalizeVnd(financeAmount) : null;
 
         String dynamicReturnUrl;
         if (returnUrl != null && !returnUrl.isBlank()) {
@@ -221,7 +217,7 @@ public class PaygateClientServiceImpl implements PaygateClientService {
                 apiKey,
                 transactionRef,
                 "ORD-" + orderId,
-                currencyConversionService.convertUsdToVnd(amount)
+                normalizeVnd(amount)
         );
 
         log.info("Requesting PayGate merchant refund for transactionRef={}, orderId={}, amount={}, idempotencyKey={}",
@@ -230,5 +226,9 @@ public class PaygateClientServiceImpl implements PaygateClientService {
         if (!response.getStatusCode().is2xxSuccessful()) {
             throw new IllegalStateException("PayGate refund failed with status " + response.getStatusCode().value());
         }
+    }
+
+    private BigDecimal normalizeVnd(BigDecimal amount) {
+        return amount == null ? BigDecimal.ZERO : amount.setScale(0, RoundingMode.HALF_UP);
     }
 }

@@ -160,7 +160,7 @@ import { Category } from '../../../../core/models/category.model';
             <ng-container matColumnDef="price">
               <th mat-header-cell *matHeaderCellDef> Unit Price </th>
               <td mat-cell *matCellDef="let product" class="price-cell text-gradient-cyan">
-                {{ product.price | currency:'USD':'symbol':'1.2-2' }}
+                {{ product.price | currency:'VND':'symbol':'1.0-0' }}
               </td>
             </ng-container>
 

@@ -182,7 +182,7 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
                 <span class="info-label">Shipping Fee</span>
                 <p class="info-val">
                   <span *ngIf="!order.shippingFee || order.shippingFee === 0" class="free-shipping-tag">FREE</span>
-                  <span *ngIf="order.shippingFee && order.shippingFee > 0">{{ order.shippingFee | currency:'USD':'symbol':'1.2-2' }}</span>
+                  <span *ngIf="order.shippingFee && order.shippingFee > 0">{{ order.shippingFee | currency:'VND':'symbol':'1.0-0' }}</span>
                 </p>
               </div>
             </div>
@@ -191,7 +191,7 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
               <mat-icon class="info-icon">payments</mat-icon>
               <div>
                 <span class="info-label">Total Amount</span>
-                <p class="info-val total-price text-gradient-cyan">{{ order.totalAmount | currency:'USD':'symbol':'1.2-2' }}</p>
+                <p class="info-val total-price text-gradient-cyan">{{ order.totalAmount | currency:'VND':'symbol':'1.0-0' }}</p>
               </div>
             </div>
           </div>
@@ -243,7 +243,7 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
             <ng-container matColumnDef="unitPrice">
               <th mat-header-cell *matHeaderCellDef>Unit Price</th>
               <td mat-cell *matCellDef="let item">
-                {{ item.unitPrice | currency:'USD':'symbol':'1.2-2' }}
+                {{ item.unitPrice | currency:'VND':'symbol':'1.0-0' }}
               </td>
             </ng-container>
 
@@ -257,7 +257,7 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
             <ng-container matColumnDef="subtotal">
               <th mat-header-cell *matHeaderCellDef>Subtotal</th>
               <td mat-cell *matCellDef="let item" class="subtotal-cell text-gradient-cyan">
-                {{ item.subtotal | currency:'USD':'symbol':'1.2-2' }}
+                {{ item.subtotal | currency:'VND':'symbol':'1.0-0' }}
               </td>
             </ng-container>
 
@@ -698,8 +698,7 @@ export class OrderDetailComponent implements OnInit {
 
   openVietQrModal(): void {
     if (!this.order) return;
-    const usdAmount = this.order.totalAmount || 0;
-    const vndAmount = Math.round(usdAmount * 25400);
+    const vndAmount = Math.round(this.order.totalAmount || 0);
     const pg = this.order.paygatePayload;
     const timerSecs = this.remainingSessionSeconds > 0 ? this.remainingSessionSeconds : 900;
     const dialogRef = this.dialog.open(VietQrDialogComponent, {

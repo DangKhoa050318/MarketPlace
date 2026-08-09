@@ -91,7 +91,7 @@ import { ProductVariant } from '../../../core/models/product.model';
                   <mat-label>Product Variant (SKU)</mat-label>
                   <mat-select formControlName="variantId">
                     <mat-option *ngFor="let v of variants" [value]="v.id">
-                      {{ v.variantName }} ({{ v.sku }}) - {{ v.price | currency }}
+                      {{ v.variantName }} ({{ v.sku }}) - {{ v.price | currency:'VND':'symbol':'1.0-0' }}
                     </mat-option>
                   </mat-select>
                 </mat-form-field>

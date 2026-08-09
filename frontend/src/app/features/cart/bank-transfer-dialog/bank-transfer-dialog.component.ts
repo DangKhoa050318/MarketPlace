@@ -602,7 +602,7 @@ export class BankTransferDialogComponent {
   ) {}
 
   get rawAmountNum(): number {
-    return this.data.bankAccount?.amount || (this.data.totalAmount * 25000);
+    return this.data.bankAccount?.amount || this.data.totalAmount;
   }
 
   get formattedAmount(): string {

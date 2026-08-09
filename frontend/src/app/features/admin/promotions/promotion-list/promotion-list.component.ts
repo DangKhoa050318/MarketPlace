@@ -73,8 +73,8 @@ import { ConfirmDialogComponent } from '../../../../shared/components/confirm-di
             <tr *ngFor="let c of items">
               <td><strong>{{ c.code }}</strong></td>
               <td>{{ c.discountType }}</td>
-              <td>{{ c.discountType === 'PERCENT' ? c.discountValue + '%' : (c.discountValue | currency:'USD':'symbol':'1.2-2') }}
-                <span *ngIf="c.maxDiscount" class="muted"> (max {{ c.maxDiscount | currency:'USD':'symbol':'1.0-0' }})</span>
+              <td>{{ c.discountType === 'PERCENT' ? c.discountValue + '%' : (c.discountValue | currency:'VND':'symbol':'1.0-0') }}
+                <span *ngIf="c.maxDiscount" class="muted"> (max {{ c.maxDiscount | currency:'VND':'symbol':'1.0-0' }})</span>
               </td>
               <td>{{ c.scopeType }}</td>
               <td>{{ c.usedCount }} / {{ c.usageLimit ?? '∞' }}</td>

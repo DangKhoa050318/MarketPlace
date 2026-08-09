@@ -84,18 +84,18 @@ class OrderServiceTest {
 
         CartItemResponse cartItem = new CartItemResponse(
                 10L, 100L, "LAP-1", "Laptop", "Silver / 16GB",
-                BigDecimal.valueOf(100.00), 2, BigDecimal.valueOf(200.00), null);
-        cartResponse = new CartResponse(1L, List.of(cartItem), BigDecimal.valueOf(200.00), BigDecimal.ZERO, 2);
+                new BigDecimal("2500000"), 2, new BigDecimal("5000000"), null);
+        cartResponse = new CartResponse(1L, List.of(cartItem), new BigDecimal("5000000"), BigDecimal.ZERO, 2);
 
         testOrder = Order.builder()
                 .user(testUser).warehouseId(1L).status(OrderStatus.PENDING)
-                .totalAmount(BigDecimal.valueOf(200.00)).shippingAddress("123 Main St").note("Leave at door")
+                .totalAmount(new BigDecimal("5000000")).shippingAddress("123 Main St").note("Leave at door")
                 .build();
         testOrder.setId(100L);
 
         testOrderResponse = new OrderResponse(
                 100L, 1L, "testuser", "test@example.com", "123 Main St",
-                BigDecimal.valueOf(200.00), BigDecimal.ZERO, BigDecimal.ZERO, null, OrderStatus.PENDING, null, List.of(),
+                new BigDecimal("5000000"), BigDecimal.ZERO, BigDecimal.ZERO, null, OrderStatus.PENDING, null, List.of(),
                 LocalDateTime.now(), LocalDateTime.now());
     }
 
@@ -152,7 +152,7 @@ class OrderServiceTest {
     void createOrder_bnpl_savesCustomerSelectedSplit() {
         CreateOrderRequest request = new CreateOrderRequest(
                 "123 Main St", null, null, PaymentMethod.PAYGATE_BNPL,
-                new BigDecimal("0.00"), new BigDecimal("200.00"), 3);
+                BigDecimal.ZERO, new BigDecimal("5000000"), 3);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(cartService.getCart(1L)).thenReturn(cartResponse);
         when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
@@ -166,7 +166,7 @@ class OrderServiceTest {
         verify(orderRepository).save(captor.capture());
         Order saved = captor.getValue();
         assertThat(saved.getUpfrontAmount()).isEqualByComparingTo(new BigDecimal("0.00"));
-        assertThat(saved.getFinanceAmount()).isEqualByComparingTo(new BigDecimal("200.00"));
+        assertThat(saved.getFinanceAmount()).isEqualByComparingTo(new BigDecimal("5000000"));
     }
 
     @Test
@@ -178,7 +178,7 @@ class OrderServiceTest {
         when(cartService.getCart(1L)).thenReturn(cartResponse);
         when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
         when(promotionService.consume(eq("FREE100"), eq(1L), any(CartResponse.class)))
-                .thenReturn(new AppliedCoupon(500L, "FREE100", new BigDecimal("200.00")));
+                .thenReturn(new AppliedCoupon(500L, "FREE100", new BigDecimal("5000000")));
         when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
         when(orderMapper.toResponse(testOrder)).thenReturn(testOrderResponse);
         stubCurrentVariantPrice();
@@ -204,7 +204,7 @@ class OrderServiceTest {
         when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
         ProductVariant repriced = ProductVariant.builder()
                 .productId(100L).sku("LAP-1").variantName("Silver / 16GB")
-                .price(new BigDecimal("120.00")).build();
+                .price(new BigDecimal("3000000")).build();
         repriced.setId(10L);
         when(variantRepository.findAllById(any())).thenReturn(List.of(repriced));
 
@@ -255,7 +255,7 @@ class OrderServiceTest {
                 .status(OrderStatus.CONFIRMED)
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .paymentStatus(PaymentStatus.PAID)
-                .totalAmount(BigDecimal.valueOf(200.00))
+                .totalAmount(new BigDecimal("5000000"))
                 .shippingAddress("123 Main St")
                 .build();
         order.setId(100L);
@@ -266,9 +266,9 @@ class OrderServiceTest {
                 .sku("LAP-1")
                 .productName("Laptop")
                 .variantName("Silver / 16GB")
-                .unitPrice(BigDecimal.valueOf(100.00))
+                .unitPrice(new BigDecimal("2500000"))
                 .quantity(2)
-                .subtotal(BigDecimal.valueOf(200.00))
+                .subtotal(new BigDecimal("5000000"))
                 .build());
         return order;
     }
@@ -276,7 +276,7 @@ class OrderServiceTest {
     private void stubCurrentVariantPrice() {
         ProductVariant variant = ProductVariant.builder()
                 .productId(100L).sku("LAP-1").variantName("Silver / 16GB")
-                .price(BigDecimal.valueOf(100.00)).build();
+                .price(new BigDecimal("2500000")).build();
         variant.setId(10L);
         when(variantRepository.findAllById(any())).thenReturn(List.of(variant));
     }

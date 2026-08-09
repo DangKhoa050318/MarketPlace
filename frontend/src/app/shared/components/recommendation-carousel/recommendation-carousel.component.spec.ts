@@ -152,7 +152,7 @@ describe('RecommendationCarouselComponent', () => {
     expect(controls.getAttribute('role')).toBe('group');
     expect(viewport.getAttribute('aria-roledescription')).toBe('carousel');
     expect(fixture.nativeElement.textContent).toContain('Sản phẩm tương tự');
-    expect(fixture.nativeElement.textContent).toContain('$499');
+    expect(fixture.nativeElement.textContent).toContain('₫499');
   });
 
   it('tracks an impression once when a card reaches the 50 percent threshold', () => {

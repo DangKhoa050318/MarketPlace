@@ -94,7 +94,7 @@ import { VietQrDialogComponent } from '../../shared/components/vietqr-dialog/vie
                     <mat-icon class="variant-icon">lens</mat-icon>
                     {{ item.variantName }}
                   </span>
-                  <span class="item-unit-price">{{ item.unitPrice | currency:'USD':'symbol':'1.2-2' }}</span>
+                  <span class="item-unit-price">{{ item.unitPrice | currency:'VND':'symbol':'1.0-0' }}</span>
                 </div>
 
                 <!-- Quantity Picker -->
@@ -110,7 +110,7 @@ import { VietQrDialogComponent } from '../../shared/components/vietqr-dialog/vie
 
                 <!-- Subtotal -->
                 <div class="subtotal-box">
-                  <strong class="subtotal-price text-gradient-cyan">{{ item.subtotal | currency:'USD':'symbol':'1.2-2' }}</strong>
+                  <strong class="subtotal-price text-gradient-cyan">{{ item.subtotal | currency:'VND':'symbol':'1.0-0' }}</strong>
                 </div>
 
                 <!-- Delete Action -->
@@ -129,7 +129,7 @@ import { VietQrDialogComponent } from '../../shared/components/vietqr-dialog/vie
             <div *ngIf="getFreeShippingNeeded() > 0" class="shipping-progress-box">
               <div class="shipping-progress-text">
                 <mat-icon class="shipping-icon">local_shipping</mat-icon>
-                <span>Add <strong>{{ getFreeShippingNeeded() | currency:'USD':'symbol':'1.2-2' }}</strong> more for <strong>FREE Shipping</strong></span>
+                <span>Add <strong>{{ getFreeShippingNeeded() | currency:'VND':'symbol':'1.0-0' }}</strong> more for <strong>FREE Shipping</strong></span>
               </div>
               <div class="progress-track">
                 <div class="progress-bar" [style.width.%]="shippingProgressPercent()"></div>
@@ -144,7 +144,7 @@ import { VietQrDialogComponent } from '../../shared/components/vietqr-dialog/vie
             <div class="summary-body">
               <div class="summary-line">
                 <span>Subtotal</span>
-                <strong>{{ cart.totalAmount | currency:'USD':'symbol':'1.2-2' }}</strong>
+                <strong>{{ cart.totalAmount | currency:'VND':'symbol':'1.0-0' }}</strong>
               </div>
 
               <!-- Coupon -->
@@ -169,21 +169,21 @@ import { VietQrDialogComponent } from '../../shared/components/vietqr-dialog/vie
 
               <div class="summary-line discount-line" *ngIf="appliedCode">
                 <span>Discount</span>
-                <strong class="discount-val">− {{ discountAmount | currency:'USD':'symbol':'1.2-2' }}</strong>
+                <strong class="discount-val">− {{ discountAmount | currency:'VND':'symbol':'1.0-0' }}</strong>
               </div>
 
               <!-- Shipping Fee Line -->
               <div class="summary-line">
                 <span>Shipping Fee</span>
                 <strong *ngIf="getShippingFee() === 0" class="free-shipping-tag">FREE</strong>
-                <strong *ngIf="getShippingFee() > 0">{{ getShippingFee() | currency:'USD':'symbol':'1.2-2' }}</strong>
+                <strong *ngIf="getShippingFee() > 0">{{ getShippingFee() | currency:'VND':'symbol':'1.0-0' }}</strong>
               </div>
 
               <div class="summary-divider"></div>
 
               <div class="summary-line total-line">
                 <span>Total Amount</span>
-                <strong class="total-price text-gradient-cyan">{{ payableTotal() | currency:'USD':'symbol':'1.2-2' }}</strong>
+                <strong class="total-price text-gradient-cyan">{{ payableTotal() | currency:'VND':'symbol':'1.0-0' }}</strong>
               </div>
 
               <!-- Checkout Action -->
@@ -619,6 +619,8 @@ import { VietQrDialogComponent } from '../../shared/components/vietqr-dialog/vie
   `]
 })
 export class CartComponent implements OnInit {
+  private readonly freeShippingThreshold = 3750000;
+  private readonly standardShippingFee = 125000;
   cart: Cart | null = null;
   loading = false;
   actionLoading = false;
@@ -641,18 +643,18 @@ export class CartComponent implements OnInit {
 
   getShippingFee(): number {
     const subtotal = this.cart?.totalAmount ?? 0;
-    if (subtotal === 0 || subtotal >= 150) return 0;
-    return 5;
+    if (subtotal === 0 || subtotal >= this.freeShippingThreshold) return 0;
+    return this.standardShippingFee;
   }
 
   getFreeShippingNeeded(): number {
     const subtotal = this.cart?.totalAmount ?? 0;
-    return Math.max(0, 150 - subtotal);
+    return Math.max(0, this.freeShippingThreshold - subtotal);
   }
 
   shippingProgressPercent(): number {
     const subtotal = this.cart?.totalAmount ?? 0;
-    return Math.min(100, Math.round((subtotal / 150) * 100));
+    return Math.min(100, Math.round((subtotal / this.freeShippingThreshold) * 100));
   }
 
   payableTotal(): number {
@@ -849,8 +851,7 @@ export class CartComponent implements OnInit {
             } else if (result.paymentMethod === 'BANK_TRANSFER') {
               this.notification.success(`Order #${res.data?.id || ''} placed successfully! Please complete VietQR payment.`);
               this.loadCart();
-              const usdAmount = res.data?.totalAmount || 0;
-              const vndAmount = Math.round(usdAmount * 25400);
+              const vndAmount = Math.round(res.data?.totalAmount || 0);
               const pg = res.data?.paygatePayload;
               let timerSecs = 900;
               if (res.data?.paygateExpiresAt) {

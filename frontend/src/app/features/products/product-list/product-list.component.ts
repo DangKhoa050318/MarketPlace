@@ -128,7 +128,7 @@ import {
                 [alt]="item.product.name"
               />
               <span>{{ item.product.name }}</span>
-              <strong>{{ item.product.price | currency:'USD':'symbol':'1.0-0' }}</strong>
+              <strong>{{ item.product.price | currency:'VND':'symbol':'1.0-0' }}</strong>
             </a>
           }
         </div>
@@ -175,7 +175,7 @@ import {
                            class="suggest-thumb" alt="">
                       <div class="suggest-info">
                         <span class="suggest-name" [innerHTML]="highlightMatch(s.name, draftSearch)"></span>
-                        <span class="suggest-price">{{ s.minPrice | currency:'USD':'symbol':'1.0-0' }}</span>
+                        <span class="suggest-price">{{ s.minPrice | currency:'VND':'symbol':'1.0-0' }}</span>
                       </div>
                     </button>
                   }
@@ -365,7 +365,7 @@ import {
                   <div class="card-footer">
                     <div class="price">
                       <small>Giá chọn</small>
-                      <strong>{{ (getSelectedVariant(product.id)?.price || product.minPrice) | currency:'USD':'symbol':'1.0-0' }}</strong>
+                      <strong>{{ (getSelectedVariant(product.id)?.price || product.minPrice) | currency:'VND':'symbol':'1.0-0' }}</strong>
                     </div>
                     <button mat-flat-button (click)="addToCart(product)" [disabled]="product.availableStock === 0 || addingId === product.id">
                       <mat-icon>{{ addingId === product.id ? 'hourglass_top' : 'add_shopping_cart' }}</mat-icon>

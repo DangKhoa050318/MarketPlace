@@ -93,7 +93,7 @@ import { Category } from '../../../core/models/category.model';
           <!-- Price & Stock Row -->
           <div class="form-row">
             <mat-form-field appearance="outline" class="half-width">
-              <mat-label>Price ($ USD)</mat-label>
+              <mat-label>Giá (VND)</mat-label>
               <input matInput type="number" step="0.01" formControlName="price" placeholder="0.00">
               <mat-error *ngIf="form.get('price')?.hasError('required')">Price is required</mat-error>
               <mat-error *ngIf="form.get('price')?.hasError('min')">Price must be greater than 0</mat-error>

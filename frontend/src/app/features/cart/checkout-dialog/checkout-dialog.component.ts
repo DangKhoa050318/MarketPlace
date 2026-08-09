@@ -44,14 +44,14 @@ export interface CheckoutDialogData {
         <div class="checkout-summary-box glass-panel">
           <div class="summary-item">
             <span class="label">Subtotal ({{ data.cart.totalItems }} items)</span>
-            <strong class="val">{{ data.cart.totalAmount | currency:'USD':'symbol':'1.2-2' }}</strong>
+            <strong class="val">{{ data.cart.totalAmount | currency:'VND':'symbol':'1.0-0' }}</strong>
             <span class="shipping-note" *ngIf="shippingFee() === 0">Shipping: <strong>FREE</strong></span>
-            <span class="shipping-note" *ngIf="shippingFee() > 0">Shipping: <strong>{{ shippingFee() | currency:'USD':'symbol':'1.2-2' }}</strong></span>
+            <span class="shipping-note" *ngIf="shippingFee() > 0">Shipping: <strong>{{ shippingFee() | currency:'VND':'symbol':'1.0-0' }}</strong></span>
           </div>
           <div class="summary-item align-right">
             <span class="label">Total Payable</span>
-            <span *ngIf="data.couponCode" class="strike">{{ (data.cart.totalAmount + shippingFee()) | currency:'USD':'symbol':'1.2-2' }}</span>
-            <strong class="total-amount text-gradient-cyan">{{ payableTotal() | currency:'USD':'symbol':'1.2-2' }}</strong>
+            <span *ngIf="data.couponCode" class="strike">{{ (data.cart.totalAmount + shippingFee()) | currency:'VND':'symbol':'1.0-0' }}</span>
+            <strong class="total-amount text-gradient-cyan">{{ payableTotal() | currency:'VND':'symbol':'1.0-0' }}</strong>
           </div>
         </div>
 
@@ -59,7 +59,7 @@ export interface CheckoutDialogData {
         <div *ngIf="data.couponCode" class="coupon-applied-line">
           <mat-icon>local_offer</mat-icon>
           Coupon <strong>{{ data.couponCode }}</strong> applied — Savings:
-          {{ (data.discountAmount || 0) | currency:'USD':'symbol':'1.2-2' }}.
+          {{ (data.discountAmount || 0) | currency:'VND':'symbol':'1.0-0' }}.
         </div>
 
         <!-- Payment Method Options -->
@@ -127,8 +127,7 @@ export interface CheckoutDialogData {
           <div class="bnpl-term-header">
             <span>BNPL split before PayGate</span>
             <div class="amount-stack">
-              <strong>{{ payableTotal() | currency:'USD':'symbol':'1.2-2' }}</strong>
-              <small>PayGate receives {{ toVnd(payableTotal()) | currency:'VND':'symbol':'1.0-0' }}</small>
+              <strong>{{ payableTotal() | currency:'VND':'symbol':'1.0-0' }}</strong>
             </div>
           </div>
 
@@ -147,13 +146,11 @@ export interface CheckoutDialogData {
           <div class="bnpl-breakdown-grid">
             <div class="breakdown-col">
               <span class="b-label">Pay now</span>
-              <strong class="b-val text-amber">{{ upfrontAmount() | currency:'USD':'symbol':'1.2-2' }}</strong>
-              <small>{{ toVnd(upfrontAmount()) | currency:'VND':'symbol':'1.0-0' }}</small>
+              <strong class="b-val text-amber">{{ upfrontAmount() | currency:'VND':'symbol':'1.0-0' }}</strong>
             </div>
             <div class="breakdown-col">
               <span class="b-label">Borrow via PayGate</span>
-              <strong class="b-val text-cyan">{{ financeAmount() | currency:'USD':'symbol':'1.2-2' }}</strong>
-              <small>{{ toVnd(financeAmount()) | currency:'VND':'symbol':'1.0-0' }}</small>
+              <strong class="b-val text-cyan">{{ financeAmount() | currency:'VND':'symbol':'1.0-0' }}</strong>
             </div>
           </div>
         </div>
@@ -561,13 +558,14 @@ export interface CheckoutDialogData {
   `]
 })
 export class CheckoutDialogComponent {
+  private readonly freeShippingThreshold = 3750000;
+  private readonly standardShippingFee = 125000;
   form: FormGroup;
   selectedMethod: PaymentMethod = 'COD';
   selectedBnplMonths = 3;
   bnplUpfrontAmount = 0;
   showPaygateSpec = false;
   submitting = false;
-  private readonly usdToVndRate = 25000;
 
   constructor(
     private fb: FormBuilder,
@@ -589,8 +587,8 @@ export class CheckoutDialogComponent {
 
   shippingFee(): number {
     const subtotal = this.data.cart.totalAmount ?? 0;
-    if (subtotal === 0 || subtotal >= 150) return 0;
-    return 5;
+    if (subtotal === 0 || subtotal >= this.freeShippingThreshold) return 0;
+    return this.standardShippingFee;
   }
 
   payableTotal(): number {
@@ -632,10 +630,6 @@ export class CheckoutDialogComponent {
     return Math.round((financed / this.selectedBnplMonths) * 100) / 100;
   }
 
-  toVnd(amount: number): number {
-    return Math.round((amount || 0) * this.usdToVndRate);
-  }
-
   isBnplSplitInvalid(): boolean {
     if (this.selectedMethod !== 'PAYGATE_BNPL') return false;
     return this.financeAmount() <= 0 || this.upfrontAmount() + this.financeAmount() !== this.roundMoney(this.payableTotal());
@@ -648,12 +642,9 @@ export class CheckoutDialogComponent {
         orderId: 'ORD_AUTO_GEN',
         paymentMethod: 'PAYGATE_BNPL',
         paymentType: 'BNPL_FINANCING',
-        totalAmountUsd: this.payableTotal(),
-        upfrontAmountUsd: this.upfrontAmount(),
-        financeAmountUsd: this.financeAmount(),
-        amount: this.toVnd(this.payableTotal()),
-        upfrontAmount: this.toVnd(this.upfrontAmount()),
-        financeAmount: this.toVnd(this.financeAmount()),
+        amount: Math.round(this.payableTotal()),
+        upfrontAmount: Math.round(this.upfrontAmount()),
+        financeAmount: Math.round(this.financeAmount()),
         currency: 'VND',
         bnplMonths: this.selectedBnplMonths,
         monthlyPayment: this.monthlyPayment(),

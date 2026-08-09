@@ -128,7 +128,7 @@ import { RecommendationService } from '../../../core/services/recommendation.ser
                   <span class="brand">{{ item.product.brand }}</span>
                 }
                 <div class="price-row">
-                  <strong>{{ priceFor(item) | currency:'USD':'symbol':'1.0-0' }}</strong>
+                  <strong>{{ priceFor(item) | currency:'VND':'symbol':'1.0-0' }}</strong>
                   <span>Chi tiết <mat-icon>arrow_forward</mat-icon></span>
                 </div>
               </div>

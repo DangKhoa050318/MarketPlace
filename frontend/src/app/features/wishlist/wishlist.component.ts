@@ -49,7 +49,7 @@ import { WishlistService } from '../../core/services/wishlist.service';
               <div class="card-copy">
                 <span>{{ item.product.categoryName || 'Catalog' }}</span>
                 <a [routerLink]="['/products', item.product.id]">{{ item.product.name }}</a>
-                <strong>{{ item.product.price | currency:'USD':'symbol':'1.0-0' }}</strong>
+                <strong>{{ item.product.price | currency:'VND':'symbol':'1.0-0' }}</strong>
               </div>
               <div class="card-actions">
                 <button mat-flat-button type="button" (click)="moveToCart(item)" [disabled]="busyIds.has(item.id)">

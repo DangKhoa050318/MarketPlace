@@ -184,7 +184,7 @@ import {
               <span class="context">Confirmed revenue</span>
             </div>
             <span class="label">Total Gross Revenue</span>
-            <strong class="kpi-amount revenue-text">{{ data.totalRevenue | currency:'USD':'symbol':'1.2-2' }}</strong>
+            <strong class="kpi-amount revenue-text">{{ data.totalRevenue | currency:'VND':'symbol':'1.0-0' }}</strong>
             <small>Recognized across {{ data.totalOrders | number }} orders</small>
           </article>
 
@@ -204,7 +204,7 @@ import {
               <span class="context">Average per transaction</span>
             </div>
             <span class="label">Average Order Value</span>
-            <strong class="kpi-amount">{{ averageOrderValue | currency:'USD':'symbol':'1.2-2' }}</strong>
+            <strong class="kpi-amount">{{ averageOrderValue | currency:'VND':'symbol':'1.0-0' }}</strong>
             <small>Calculated from customer checkout data</small>
           </article>
 

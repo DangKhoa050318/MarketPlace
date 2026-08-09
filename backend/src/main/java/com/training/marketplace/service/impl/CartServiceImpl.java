@@ -34,6 +34,8 @@ public class CartServiceImpl implements CartService {
 
     private static final String CART_KEY_PREFIX = "cart:";
     private static final long CART_TTL_DAYS = 7;
+    private static final BigDecimal FREE_SHIPPING_THRESHOLD = new BigDecimal("3750000");
+    private static final BigDecimal STANDARD_SHIPPING_FEE = new BigDecimal("125000");
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final ProductVariantRepository variantRepository;
@@ -59,8 +61,8 @@ public class CartServiceImpl implements CartService {
         }
 
         BigDecimal shippingFee = (totalAmount.compareTo(BigDecimal.ZERO) > 0
-                && totalAmount.compareTo(new BigDecimal("150.00")) < 0)
-                ? new BigDecimal("5.00")
+                && totalAmount.compareTo(FREE_SHIPPING_THRESHOLD) < 0)
+                ? STANDARD_SHIPPING_FEE
                 : BigDecimal.ZERO;
 
         refreshTtl(key);

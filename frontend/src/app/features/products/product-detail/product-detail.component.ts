@@ -77,10 +77,10 @@ import { ProductQuestionListComponent } from '../../questions/product-question-l
 
           <div class="price-row">
             @if (selectedVariant) {
-              <span class="main-price">{{ selectedVariant.price | currency:'USD':'symbol':'1.2-2' }}</span>
+              <span class="main-price">{{ selectedVariant.price | currency:'VND':'symbol':'1.0-0' }}</span>
               <span class="sku-badge">SKU: {{ selectedVariant.sku }}</span>
             } @else {
-              <span class="main-price">{{ product.price | currency:'USD':'symbol':'1.2-2' }}</span>
+              <span class="main-price">{{ product.price | currency:'VND':'symbol':'1.0-0' }}</span>
             }
           </div>
 
@@ -96,7 +96,7 @@ import { ProductQuestionListComponent } from '../../questions/product-question-l
                           [class.active]="selectedVariantId === v.id"
                           (click)="selectVariant(v)">
                     <span>{{ v.variantName }}</span>
-                    <small>{{ v.price | currency:'USD':'symbol':'1.0-0' }}</small>
+                    <small>{{ v.price | currency:'VND':'symbol':'1.0-0' }}</small>
                   </button>
                 }
               </div>

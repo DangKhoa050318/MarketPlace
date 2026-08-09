@@ -61,6 +61,9 @@ import com.training.marketplace.repository.ProductVariantRepository;
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
+    private static final BigDecimal FREE_SHIPPING_THRESHOLD = new BigDecimal("3750000");
+    private static final BigDecimal STANDARD_SHIPPING_FEE = new BigDecimal("125000");
+
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final ProductVariantRepository variantRepository;
@@ -151,10 +154,10 @@ public class OrderServiceImpl implements OrderService {
                     .build());
         }
 
-        // 3a. Calculate shipping fee ($5.00 if item subtotal < $150.00, FREE if >= $150.00)
-        BigDecimal shippingFee = calculatedTotal.compareTo(new BigDecimal("150.00")) >= 0
+        // 3a. Charge 125,000 VND below the 3,750,000 VND free-shipping threshold.
+        BigDecimal shippingFee = calculatedTotal.compareTo(FREE_SHIPPING_THRESHOLD) >= 0
                 ? BigDecimal.ZERO
-                : new BigDecimal("5.00");
+                : STANDARD_SHIPPING_FEE;
         order.setShippingFee(shippingFee);
 
         // 3b. Apply coupon (optional). Locks the coupon row, validates against the cart, and

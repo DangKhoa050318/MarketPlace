@@ -35,14 +35,14 @@ public class NotificationConsumer {
             body.append("Thank you for your order!\n\n");
             body.append("Order ID: ").append(event.orderId()).append("\n");
             body.append("Customer Email: ").append(recipientEmail).append("\n");
-            body.append("Total Amount: $").append(event.totalAmount()).append("\n\n");
+            body.append("Total Amount: ").append(event.totalAmount()).append(" VND\n\n");
             body.append("Items Ordered:\n");
 
             if (event.items() != null) {
                 for (OrderCreatedEvent.OrderItemInfo item : event.items()) {
                     body.append("- ").append(item.productName())
                         .append(" x").append(item.quantity())
-                        .append(" ($").append(item.subtotal()).append(")\n");
+                        .append(" (").append(item.subtotal()).append(" VND)\n");
                 }
             }
 

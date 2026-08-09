@@ -144,7 +144,7 @@ import { DeliveryTimelineComponent } from '../../../../shared/components/deliver
             <ng-container matColumnDef="totalAmount">
               <th mat-header-cell *matHeaderCellDef> Total Amount </th>
               <td mat-cell *matCellDef="let order" class="amount-cell">
-                \${{ order.totalAmount | number:'1.2-2' }}
+                {{ order.totalAmount | currency:'VND':'symbol':'1.0-0' }}
               </td>
             </ng-container>
 

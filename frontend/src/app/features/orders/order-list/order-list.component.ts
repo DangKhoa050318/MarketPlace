@@ -149,7 +149,7 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
             <ng-container matColumnDef="totalAmount">
               <th mat-header-cell *matHeaderCellDef>Total Amount</th>
               <td mat-cell *matCellDef="let order" class="total-amount text-gradient-cyan">
-                {{ order.totalAmount | currency:'USD':'symbol':'1.2-2' }}
+                {{ order.totalAmount | currency:'VND':'symbol':'1.0-0' }}
               </td>
             </ng-container>
 
@@ -950,8 +950,7 @@ export class OrderListComponent implements OnInit {
   }
 
   openVietQrModal(order: Order): void {
-    const usdAmount = order.totalAmount || 0;
-    const vndAmount = Math.round(usdAmount * 25400);
+    const vndAmount = Math.round(order.totalAmount || 0);
     const pg = order.paygatePayload;
     const timerSecs = this.getRemainingSessionSeconds(order);
     const dialogRef = this.dialog.open(VietQrDialogComponent, {
