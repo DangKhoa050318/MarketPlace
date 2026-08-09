@@ -132,7 +132,7 @@ public class PaygateClientServiceImpl implements PaygateClientService {
         }
 
         // Fallback for offline local dev mode
-        String mockToken = "CHK_MOCK_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
+        String mockToken = "CHK_MOCK_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
         String fallbackPaymentUrl = checkoutUrl + "?token=" + mockToken;
 
         PaygateCreateCheckoutResponse.BankAccountData mockBankAccount = null;
