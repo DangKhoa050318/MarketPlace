@@ -10,11 +10,15 @@ import org.springframework.data.domain.Pageable;
 
 import com.training.marketplace.dto.response.PaygatePayloadResponse;
 
+import com.training.marketplace.entity.Order;
+
 public interface OrderService {
+    
+    OrderResponse enrichOrderResponse(Order order);
 
     OrderResponse createOrder(Long userId, CreateOrderRequest request);
 
-    PaygatePayloadResponse retryOrderPayment(Long userId, Long orderId);
+
 
     PageResponse<OrderResponse> getUserOrders(Long userId, Pageable pageable);
 
@@ -24,9 +28,6 @@ public interface OrderService {
 
     OrderResponse cancelUserOrder(Long userId, Long orderId);
 
-    OrderResponse cancelVietQrPayment(Long userId, Long orderId);
-
-    OrderResponse confirmVietQrPayment(Long userId, Long orderId);
 
     OrderResponse confirmReceived(Long userId, Long orderId);
 

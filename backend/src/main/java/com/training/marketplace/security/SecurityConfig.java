@@ -38,6 +38,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/payments/paygate-webhook").permitAll()
+                        .requestMatchers("/api/v1/webhooks/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/actuator/**", "/uploads/**").permitAll()
                         // Q&A, Reviews, and Content Moderation
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/products/*/reviews").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")

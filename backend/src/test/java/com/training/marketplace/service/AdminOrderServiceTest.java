@@ -14,6 +14,7 @@ import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.repository.RefundRequestRepository;
 import com.training.marketplace.repository.ReturnRequestRepository;
 import com.training.marketplace.service.impl.OrderServiceImpl;
+import com.training.marketplace.service.PaymentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,9 @@ class AdminOrderServiceTest {
 
     @Mock
     private ReturnRequestRepository returnRequestRepository;
+
+    @Mock
+    private PaymentService paymentService;
 
     @Mock
     private RefundRequestRepository refundRequestRepository;

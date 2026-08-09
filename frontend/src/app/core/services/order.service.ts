@@ -66,23 +66,6 @@ export class OrderService {
     return this.http.post<ApiResponse<Order>>(`${this.apiUrl}/${id}/cancel-vietqr`, {});
   }
 
-  confirmPaygatePayment(orderId: string, transactionRef?: string): Observable<ApiResponse<any>> {
-    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/payments/paygate-callback`, {
-      event: 'PAYMENT_COMPLETED',
-      orderId,
-      transactionRef: transactionRef || 'TXN-DIRECT-CALLBACK',
-      status: 'SUCCESS'
-    });
-  }
-
-  cancelPaygatePayment(orderId: string): Observable<ApiResponse<any>> {
-    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/payments/paygate-callback`, {
-      event: 'PAYMENT_CANCELLED',
-      orderId,
-      status: 'CANCELLED'
-    });
-  }
-
   confirmReceived(id: number): Observable<ApiResponse<Order>> {
     return this.http.put<ApiResponse<Order>>(`${this.apiUrl}/${id}/confirm-received`, {});
   }
