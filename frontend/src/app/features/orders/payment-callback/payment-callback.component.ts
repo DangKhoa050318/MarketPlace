@@ -220,9 +220,12 @@ import { OrderService } from '../../../core/services/order.service';
   `]
 })
 export class PaymentCallbackComponent implements OnInit {
+  /** Initial hint from PayGate redirect query params; may be overridden by server truth. */
   status = 'SUCCESS';
   orderId: string | null = null;
   transactionRef: string | null = null;
+  /** True while we're polling the server for the real order status. */
+  loading = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -247,20 +250,50 @@ export class PaymentCallbackComponent implements OnInit {
 
   ngOnInit(): void {
     this.route.queryParams.subscribe(params => {
-      this.status = this.getFirstString(params['status']) || 'SUCCESS';
+      this.status = this.getFirstString(params['status']) || 'CANCELLED';
       this.orderId = this.getFirstString(params['orderId']);
       this.transactionRef = this.getFirstString(params['transactionRef']);
 
-      if (this.isSuccess && this.orderId) {
-        this.orderService.confirmPaygatePayment(this.orderId, this.transactionRef || undefined).subscribe({
-          next: (res) => console.log('Payment status confirmed via callback:', res),
-          error: (err) => console.warn('Could not auto-confirm payment status via callback:', err)
-        });
-      } else if (!this.isSuccess && this.orderId) {
-        this.orderService.cancelPaygatePayment(this.orderId).subscribe({
-          next: (res) => console.log('Payment cancellation processed via callback:', res),
-          error: (err) => console.warn('Could not auto-cancel payment via callback:', err)
-        });
+      // Fetch the real order status from the server (set by webhook, not by us).
+      // The PayGate → MarketPlace webhook may arrive before or after this redirect,
+      // so we poll briefly to give it time to land.
+      if (this.orderId) {
+        this.pollOrderStatus(this.cleanOrderId(this.orderId), 0);
+      }
+    });
+  }
+
+  /**
+   * Polls the order detail GET endpoint up to 3 times (with 2-second intervals)
+   * to read the payment status that was set by the server-to-server webhook.
+   * The initial UI uses the PayGate redirect hint; once the server responds
+   * with a terminal status, the UI is updated to reflect the truth.
+   */
+  private pollOrderStatus(numericId: string, attempt: number): void {
+    const id = Number(numericId);
+    if (isNaN(id) || id <= 0) return;
+
+    this.loading = attempt === 0;
+    this.orderService.getUserOrderById(id).subscribe({
+      next: (res) => {
+        this.loading = false;
+        if (res?.data) {
+          const ps = res.data.paymentStatus?.toUpperCase();
+          if (ps === 'PAID') {
+            this.status = 'SUCCESS';
+            this.transactionRef = res.data.paygateTransactionRef || this.transactionRef;
+          } else if (ps === 'UNPAID' && res.data.status?.toUpperCase() === 'CANCELLED') {
+            this.status = 'CANCELLED';
+          } else if (attempt < 3) {
+            // Webhook may not have arrived yet — retry after a short delay
+            setTimeout(() => this.pollOrderStatus(numericId, attempt + 1), 2000);
+          }
+          // else: keep the initial hint from query params
+        }
+      },
+      error: () => {
+        this.loading = false;
+        // Keep the initial hint from query params on error
       }
     });
   }

@@ -9,6 +9,7 @@ import com.training.marketplace.dto.response.ReturnRequestResponse;
 import com.training.marketplace.service.OrderService;
 import com.training.marketplace.service.ReturnRequestService;
 import com.training.marketplace.service.UserService;
+import com.training.marketplace.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -35,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderController {
 
     private final OrderService orderService;
+    private final PaymentService paymentService;
     private final ReturnRequestService returnRequestService;
     private final UserService userService;
 
@@ -76,7 +78,7 @@ public class OrderController {
             Authentication authentication,
             @PathVariable Long id) {
         Long userId = userService.getAuthenticatedUser(authentication).getId();
-        com.training.marketplace.dto.response.PaygatePayloadResponse response = orderService.retryOrderPayment(userId, id);
+        com.training.marketplace.dto.response.PaygatePayloadResponse response = paymentService.retryOrderPayment(userId, id);
         return ApiResponse.success("Payment session created", response);
     }
 
@@ -95,7 +97,8 @@ public class OrderController {
             Authentication authentication,
             @PathVariable Long id) {
         Long userId = userService.getAuthenticatedUser(authentication).getId();
-        return ApiResponse.success("Payment confirmed successfully", orderService.confirmVietQrPayment(userId, id));
+        com.training.marketplace.entity.Order order = paymentService.confirmVietQrPayment(userId, id);
+        return ApiResponse.success("Payment confirmed successfully", orderService.enrichOrderResponse(order));
     }
 
     @PostMapping("/{id}/cancel-vietqr")
@@ -104,7 +107,8 @@ public class OrderController {
             Authentication authentication,
             @PathVariable Long id) {
         Long userId = userService.getAuthenticatedUser(authentication).getId();
-        return ApiResponse.success("Payment cancelled successfully", orderService.cancelVietQrPayment(userId, id));
+        com.training.marketplace.entity.Order order = paymentService.cancelVietQrPayment(userId, id);
+        return ApiResponse.success("Payment cancelled successfully", orderService.enrichOrderResponse(order));
     }
 
     @PutMapping("/{id}/confirm-received")

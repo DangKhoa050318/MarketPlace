@@ -578,8 +578,8 @@ export class CheckoutDialogComponent {
         bnplMonths: this.selectedBnplMonths,
         monthlyPayment: this.monthlyPayment(),
         description: `Tra gop PayGate BNPL (${this.selectedBnplMonths} thang) cho don hang Marketplace`,
-        returnUrl: `${environment.appBaseUrl}/orders/callback`,
-        cancelUrl: `${environment.appBaseUrl}/cart`
+        returnUrl: `${environment.appBaseUrl}/orders/callback?status=SUCCESS`,
+        cancelUrl: `${environment.appBaseUrl}/orders/callback?status=CANCELLED`
       }, null, 2);
     } else if (this.selectedMethod === 'CREDIT_CARD') {
       return JSON.stringify({
@@ -589,8 +589,8 @@ export class CheckoutDialogComponent {
         paymentType: 'FULL_PAYMENT',
         amount: this.payableTotal(),
         description: 'Thanh toan 100% qua PayGate E-Wallet / Card Gateway',
-        returnUrl: `${environment.appBaseUrl}/orders/callback`,
-        cancelUrl: `${environment.appBaseUrl}/cart`
+        returnUrl: `${environment.appBaseUrl}/orders/callback?status=SUCCESS`,
+        cancelUrl: `${environment.appBaseUrl}/orders/callback?status=CANCELLED`
       }, null, 2);
     } else {
       return JSON.stringify({

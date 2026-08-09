@@ -25,6 +25,8 @@ public record OrderResponse(
         BigDecimal upfrontAmount,
         BigDecimal financeAmount,
         String paygateTransactionRef,
+        String paygateToken,
+        String paygateUrl,
         PaygatePayloadResponse paygatePayload,
         LocalDateTime paygateExpiresAt,
         Long refundRequestId,
@@ -44,6 +46,6 @@ public record OrderResponse(
     ) {
         this(id, userId, username, userEmail, shippingAddress, totalAmount, discountAmount, shippingFee,
              couponCode, status, PaymentMethod.COD, PaymentStatus.UNPAID, totalAmount != null ? totalAmount : BigDecimal.ZERO,
-             BigDecimal.ZERO, null, null, null, null, null, null, null, note, items, createdAt, updatedAt);
+             BigDecimal.ZERO, null, null, null, null, null, null, null, null, null, note, items, createdAt, updatedAt);
     }
 }

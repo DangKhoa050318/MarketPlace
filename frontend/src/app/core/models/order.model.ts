@@ -13,6 +13,7 @@ export interface PaygatePayload {
   financeAmount: number;
   paymentChannel: string;
   paymentUrl: string;
+  vietQrUrl?: string;
   bankAccount?: {
     bankName?: string;
     accountNumber?: string;
@@ -52,6 +53,8 @@ export interface Order {
   upfrontAmount?: number;
   financeAmount?: number;
   paygateTransactionRef?: string;
+  paygateToken?: string;
+  paygateUrl?: string;
   refundRequestId?: number;
   refundRequestStatus?: RefundRequestStatus;
   returnRequestId?: number;

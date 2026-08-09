@@ -191,7 +191,7 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
                     <mat-icon>qr_code_2</mat-icon>
                   </button>
                   <button 
-                    *ngIf="order.status === 'PENDING' && order.paymentStatus === 'PENDING_PAYGATE' && !isSessionExpired(order) && order.paymentMethod !== 'BANK_TRANSFER'" 
+                    *ngIf="order.status === 'PENDING' && (order.paymentStatus === 'UNPAID' || order.paymentStatus === 'PENDING_PAYGATE') && !isSessionExpired(order) && order.paymentMethod !== 'BANK_TRANSFER'" 
                     mat-icon-button 
                     class="icon-btn-action btn-paygate" 
                     (click)="continuePaygatePayment(order)"
@@ -938,7 +938,10 @@ export class OrderListComponent implements OnInit {
   }
 
   continuePaygatePayment(order: Order): void {
-    const url = order.paygatePayload?.paymentUrl;
+    const url = order.paygatePayload?.paymentUrl
+      || order.paygateUrl
+      || (order.paygateToken ? `http://localhost:4201/checkout?token=${order.paygateToken}` : null)
+      || (order.id ? `http://localhost:4201/checkout?orderId=ORD-${order.id}` : null);
     if (url) {
       window.location.href = url;
     } else {
@@ -958,7 +961,8 @@ export class OrderListComponent implements OnInit {
       data: {
         orderId: order.id,
         amountVnd: vndAmount,
-        description: pg?.transferContent || `ORD-${order.id}`,
+        description: pg?.transferContent || `PAYGATE ORD-${order.id}`,
+        vietQrUrl: pg?.vietQrUrl,
         qrPayload: pg?.qrPayload,
         bankName: pg?.bankAccount?.bankName,
         accountNo: pg?.bankAccount?.accountNumber,

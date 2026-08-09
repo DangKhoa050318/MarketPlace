@@ -1,8 +1,10 @@
 import { Component, Inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule, CurrencyPipe } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { catchError, finalize, of } from 'rxjs';
 import { VietQrService } from '../../../core/services/vietqr.service';
 import { BankData } from '../../../core/services/banks-data';
 
@@ -10,6 +12,8 @@ export interface VietQrDialogData {
   orderId: string | number;
   amountVnd: number;
   description?: string;
+  transferContent?: string;
+  vietQrUrl?: string;
   bankBin?: string;
   bankName?: string;
   accountNo?: string;
@@ -48,11 +52,18 @@ export interface VietQrDialogData {
           <div class="qr-display-box">
             <!-- Image Frame -->
             <div class="qr-image-wrapper" [class.loading]="loadingQr">
-              <img *ngIf="qrDataUrl" [src]="qrDataUrl" alt="VietQR Payment Code" class="vqr-img" />
+              <img *ngIf="displayQrUrl" [src]="displayQrUrl" (error)="onQrImageError()" alt="Official VietQR Payment Code" class="vqr-img" />
               <div *ngIf="loadingQr" class="qr-loader">
                 <span class="spinner-icon">⚡</span>
-                <span>Generating VietQR code...</span>
+                <span>Generating official VietQR code...</span>
               </div>
+            </div>
+
+            <!-- Template Selector Pills -->
+            <div class="tpl-selector-pills">
+              <button type="button" [class.active]="selectedTemplate === 'compact2'" (click)="selectTemplate('compact2')">Card compact2</button>
+              <button type="button" [class.active]="selectedTemplate === 'compact'" (click)="selectTemplate('compact')">Compact</button>
+              <button type="button" [class.active]="selectedTemplate === 'qr_only'" (click)="selectTemplate('qr_only')">QR Only</button>
             </div>
 
             <!-- Timer Pill -->
@@ -485,6 +496,29 @@ export interface VietQrDialogData {
       to { opacity: 1; transform: translateY(0); }
     }
 
+    .tpl-selector-pills {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      justify-content: center;
+    }
+    .tpl-selector-pills button {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tpl-selector-pills button.active {
+      background: #c20067;
+      color: #ffffff;
+      border-color: #c20067;
+    }
+
     /* Footer */
     .modal-footer-vqr {
       padding: 16px 28px;
@@ -601,8 +635,11 @@ export class VietQrDialogComponent implements OnInit, OnDestroy {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
+  submittingPaid = false;
+
   constructor(
     private vietQrService: VietQrService,
+    private http: HttpClient,
     public dialogRef: MatDialogRef<VietQrDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: VietQrDialogData
   ) {}
@@ -623,7 +660,13 @@ export class VietQrDialogComponent implements OnInit, OnDestroy {
     this.amountVnd = this.data.amountVnd || 0;
 
     const rawId = String(this.data.orderId || '').replace(/^ORD-/, '');
-    this.transferContent = this.data.description || `PAYGATE MOCK_MERCHANT ORD-${rawId}`;
+    if (this.data.transferContent) {
+      this.transferContent = this.data.transferContent;
+    } else if (this.data.description && this.data.description.startsWith('PAYGATE ')) {
+      this.transferContent = this.data.description;
+    } else {
+      this.transferContent = `PAYGATE ORD-${rawId}`;
+    }
 
     if (this.data.qrPayload) {
       this.emvCoPayload = this.data.qrPayload;
@@ -663,6 +706,21 @@ export class VietQrDialogComponent implements OnInit, OnDestroy {
     }
   }
 
+  vietQrQuickLinkUrl: string | null = null;
+  useFallback = false;
+
+  get displayQrUrl(): string | null {
+    if (this.useFallback) {
+      return this.qrDataUrl;
+    }
+    return this.vietQrQuickLinkUrl || this.qrDataUrl;
+  }
+
+  onQrImageError(): void {
+    console.warn('VietQR QuickLink image failed to load, switching to raw EMVCo QR code canvas');
+    this.useFallback = true;
+  }
+
   selectTemplate(tpl: 'compact2' | 'compact' | 'qr_only'): void {
     this.selectedTemplate = tpl;
     this.renderQrCode();
@@ -670,7 +728,19 @@ export class VietQrDialogComponent implements OnInit, OnDestroy {
 
   async renderQrCode(): Promise<void> {
     this.loadingQr = true;
+    this.useFallback = false;
     try {
+      if (this.data.vietQrUrl && this.selectedTemplate === 'compact2') {
+        this.vietQrQuickLinkUrl = this.data.vietQrUrl;
+      } else {
+        const bin = this.selectedBankBin || '970422';
+        const acc = this.accountNo || 'SYS0000000000000001';
+        const amt = this.amountVnd || 0;
+        const addInfo = encodeURIComponent(this.transferContent || '');
+        const accName = encodeURIComponent(this.accountName || '');
+        this.vietQrQuickLinkUrl = `https://img.vietqr.io/image/${bin}-${acc}-${this.selectedTemplate}.png?amount=${amt}&addInfo=${addInfo}&accountName=${accName}`;
+      }
+
       if (this.emvCoPayload) {
         this.qrDataUrl = await this.vietQrService.renderRawQrDataUrl(this.emvCoPayload);
       } else {
@@ -714,5 +784,28 @@ export class VietQrDialogComponent implements OnInit, OnDestroy {
 
   onConfirmPaid(): void {
     this.dialogRef.close(true);
+  }
+
+  simulateBankTransfer(): void {
+    if (this.submittingPaid) return;
+    this.submittingPaid = true;
+    const rawId = String(this.data.orderId || '').replace(/^ORD-/, '');
+    const cleanOrderId = 'ORD-' + rawId;
+    const payload = {
+      bankRef: 'TXN_BANK_' + Date.now(),
+      amount: this.amountVnd,
+      transferContent: 'PAYGATE ' + cleanOrderId
+    };
+
+    this.http.post('http://localhost:8081/api/v1/integration/bank-webhook', payload).pipe(
+      catchError(err => {
+        console.warn('Bank webhook simulation notification:', err);
+        return of(null);
+      }),
+      finalize(() => {
+        this.submittingPaid = false;
+        this.dialogRef.close(true);
+      })
+    ).subscribe();
   }
 }

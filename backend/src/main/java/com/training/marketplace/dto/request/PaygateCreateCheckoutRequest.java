@@ -7,11 +7,11 @@ public record PaygateCreateCheckoutRequest(
         String orderId,
         BigDecimal amount,
         String description,
-        String method,
+        String paymentMethod,
         String returnUrl,
         String cancelUrl
 ) {
     public PaygateCreateCheckoutRequest(String apiKey, String orderId, BigDecimal amount, String description, String returnUrl, String cancelUrl) {
-        this(apiKey, orderId, amount, description, "WALLET", returnUrl, cancelUrl);
+        this(apiKey, orderId, amount, description, "PAYGATE", returnUrl, cancelUrl);
     }
 }

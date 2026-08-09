@@ -35,6 +35,7 @@ import com.training.marketplace.service.DeliveryService;
 import com.training.marketplace.service.InventoryFacade;
 import com.training.marketplace.service.MerchandisingEventService;
 import com.training.marketplace.service.OrderService;
+import com.training.marketplace.service.PaymentService;
 import com.training.marketplace.service.PromotionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,7 +70,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final OrderEventPublisher orderEventPublisher;
     private final PromotionService promotionService;
-    private final com.training.marketplace.service.PaygateClientService paygateClientService;
+    private final PaymentService paymentService;
     private final MerchandisingEventService merchandisingEventService;
     private final DeliveryService deliveryService;
     private final RefundRequestRepository refundRequestRepository;
@@ -255,39 +256,7 @@ public class OrderServiceImpl implements OrderService {
                 savedOrder.getId(), userId, paymentMethod, savedOrder.getStatus(), grandTotal);
 
         OrderResponse baseResponse = orderMapper.toResponse(savedOrder);
-        PaygatePayloadResponse paygatePayload = null;
-        if (paymentMethod != PaymentMethod.COD && !zeroTotal) {
-            String methodStr = paymentMethod == PaymentMethod.BANK_TRANSFER ? "BANK_TRANSFER" : "WALLET";
-            var pgSession = paygateClientService.createCheckoutSession(
-                    savedOrder.getId(),
-                    savedOrder.getTotalAmount(),
-                    "Thanh toan don hang #" + savedOrder.getId() + " tren Marketplace",
-                    methodStr
-            );
-            var sessionData = (pgSession != null) ? pgSession.data() : null;
-            String targetPaymentUrl = (sessionData != null) ? sessionData.paymentUrl() : null;
-
-            if (sessionData != null) {
-                savedOrder.setPaygateToken(sessionData.token());
-                savedOrder.setPaygateUrl(sessionData.paymentUrl());
-                savedOrder.setPaygateExpiresAt(parseExpiresAt(sessionData.expiresAt()));
-                orderRepository.save(savedOrder);
-            }
-
-            paygatePayload = new PaygatePayloadResponse(
-                    savedOrder.getId(),
-                    userId,
-                    "mock-merchant-api-key-123456",
-                    savedOrder.getTotalAmount(),
-                    savedOrder.getUpfrontAmount(),
-                    savedOrder.getFinanceAmount(),
-                    paymentMethod.name(),
-                    targetPaymentUrl,
-                    sessionData != null ? sessionData.bankAccount() : null,
-                    sessionData != null ? sessionData.transferContent() : null,
-                    sessionData != null ? sessionData.qrPayload() : null
-            );
-        }
+        PaygatePayloadResponse paygatePayload = paymentService.createPaymentSession(savedOrder, paymentMethod);
 
         return new OrderResponse(
                 baseResponse.id(),
@@ -305,6 +274,8 @@ public class OrderServiceImpl implements OrderService {
                 baseResponse.upfrontAmount(),
                 baseResponse.financeAmount(),
                 baseResponse.paygateTransactionRef(),
+                savedOrder.getPaygateToken(),
+                savedOrder.getPaygateUrl(),
                 paygatePayload,
                 savedOrder.getPaygateExpiresAt(),
                 baseResponse.refundRequestId(),
@@ -318,78 +289,7 @@ public class OrderServiceImpl implements OrderService {
         );
     }
 
-    @Override
-    @Transactional
-    public PaygatePayloadResponse retryOrderPayment(Long userId, Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
-        if (!order.getUser().getId().equals(userId)) {
-            throw new BadRequestException("You are not authorized to pay for this order");
-        }
-        if (order.getStatus() == OrderStatus.CANCELLED) {
-            throw new BadRequestException("Cannot pay for a cancelled order");
-        }
-        if (order.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new BadRequestException("Order is already paid");
-        }
-        if (order.getPaymentMethod() == PaymentMethod.COD) {
-            throw new BadRequestException("COD orders do not require online payment");
-        }
-
-        PaymentMethod paymentMethod = order.getPaymentMethod() != null ? order.getPaymentMethod() : PaymentMethod.CREDIT_CARD;
-
-        // Check if an active PayGate session exists on the order and is still valid (< 15 minutes)
-        if (order.getPaygateExpiresAt() != null && LocalDateTime.now().isBefore(order.getPaygateExpiresAt()) && order.getPaygateUrl() != null) {
-            log.info("Reusing active PayGate session for order {}: expiresAt={}", order.getId(), order.getPaygateExpiresAt());
-            return new PaygatePayloadResponse(
-                    order.getId(),
-                    userId,
-                    "mock-merchant-api-key-123456",
-                    order.getTotalAmount(),
-                    order.getUpfrontAmount(),
-                    order.getFinanceAmount(),
-                    paymentMethod.name(),
-                    order.getPaygateUrl(),
-                    null, null, null
-            );
-        }
-
-        String methodStr = paymentMethod == PaymentMethod.BANK_TRANSFER ? "BANK_TRANSFER" : "WALLET";
-
-        var pgSession = paygateClientService.createCheckoutSession(
-                order.getId(),
-                order.getTotalAmount(),
-                "Thanh toan lai don hang #" + order.getId() + " tren Marketplace",
-                methodStr
-        );
-
-        var sessionData = (pgSession != null) ? pgSession.data() : null;
-        String targetPaymentUrl = (sessionData != null) ? sessionData.paymentUrl() : null;
-
-        if (sessionData != null) {
-            order.setPaygateToken(sessionData.token());
-            order.setPaygateUrl(sessionData.paymentUrl());
-            order.setPaygateExpiresAt(parseExpiresAt(sessionData.expiresAt()));
-        }
-
-        order.setPaymentStatus(PaymentStatus.PENDING_PAYGATE);
-        orderRepository.save(order);
-
-        return new PaygatePayloadResponse(
-                order.getId(),
-                userId,
-                "mock-merchant-api-key-123456",
-                order.getTotalAmount(),
-                order.getUpfrontAmount(),
-                order.getFinanceAmount(),
-                paymentMethod.name(),
-                targetPaymentUrl,
-                sessionData != null ? sessionData.bankAccount() : null,
-                sessionData != null ? sessionData.transferContent() : null,
-                sessionData != null ? sessionData.qrPayload() : null
-        );
-    }
 
     @Override
     @Transactional
@@ -418,7 +318,8 @@ public class OrderServiceImpl implements OrderService {
         return enrichOrderResponse(order);
     }
 
-    private OrderResponse enrichOrderResponse(Order order) {
+    @Override
+    public OrderResponse enrichOrderResponse(Order order) {
         if (order.getStatus() == OrderStatus.PENDING
                 && order.getPaygateExpiresAt() != null
                 && LocalDateTime.now().isAfter(order.getPaygateExpiresAt())) {
@@ -427,8 +328,16 @@ public class OrderServiceImpl implements OrderService {
 
         OrderResponse resp = orderMapper.toResponse(order);
 
+        String effectivePaygateUrl = order.getPaygateUrl();
+        if ((effectivePaygateUrl == null || effectivePaygateUrl.isBlank()) && order.getPaygateToken() != null) {
+            effectivePaygateUrl = "http://localhost:4201/checkout?token=" + order.getPaygateToken();
+        }
+        if ((effectivePaygateUrl == null || effectivePaygateUrl.isBlank()) && order.getPaymentMethod() != PaymentMethod.COD) {
+            effectivePaygateUrl = "http://localhost:4201/checkout?orderId=ORD-" + order.getId();
+        }
+
         PaygatePayloadResponse payload = resp.paygatePayload();
-        if (payload == null && order.getPaygateUrl() != null && order.getPaymentStatus() == PaymentStatus.PENDING_PAYGATE) {
+        if (payload == null && order.getStatus() == OrderStatus.PENDING && order.getPaymentStatus() != PaymentStatus.PAID && order.getPaymentMethod() != PaymentMethod.COD) {
             String channel = order.getPaymentMethod() != null ? order.getPaymentMethod().name() : "BANK_TRANSFER";
             payload = new PaygatePayloadResponse(
                     order.getId(),
@@ -438,9 +347,10 @@ public class OrderServiceImpl implements OrderService {
                     order.getUpfrontAmount(),
                     order.getFinanceAmount(),
                     channel,
-                    order.getPaygateUrl(),
-                    new com.training.marketplace.dto.response.PaygateCreateCheckoutResponse.BankAccountData("MBBank - Ngân hàng TMCP Quân Đội", "8888999988", "PAYGATE GATEWAY SYSTEM", order.getTotalAmount()),
-                    "ORD-" + order.getId(),
+                    effectivePaygateUrl,
+                    null,
+                    new com.training.marketplace.dto.response.PaygateCreateCheckoutResponse.BankAccountData("MBBank - Ngân hàng TMCP Quân Đội", "SYS0000000000000001", "PAYGATE GATEWAY SYSTEM", order.getTotalAmount()),
+                    "PAYGATE ORD-" + order.getId(),
                     null
             );
         }
@@ -449,7 +359,8 @@ public class OrderServiceImpl implements OrderService {
                 resp.id(), resp.userId(), resp.username(), resp.userEmail(), resp.shippingAddress(),
                 resp.totalAmount(), resp.discountAmount(), resp.shippingFee(), resp.couponCode(),
                 resp.status(), resp.paymentMethod(), resp.paymentStatus(), resp.upfrontAmount(),
-                resp.financeAmount(), resp.paygateTransactionRef(), payload, order.getPaygateExpiresAt(),
+                resp.financeAmount(), resp.paygateTransactionRef(), order.getPaygateToken(), effectivePaygateUrl,
+                payload, order.getPaygateExpiresAt(),
                 resp.refundRequestId(), resp.refundRequestStatus(), resp.returnRequestId(), resp.returnRequestStatus(),
                 resp.note(), resp.items(), resp.createdAt(), resp.updatedAt()
         );
@@ -485,13 +396,7 @@ public class OrderServiceImpl implements OrderService {
             return toOrderResponse(order);
         }
 
-        boolean paidOnline = order.getPaymentStatus() == PaymentStatus.PAID
-                && order.getPaymentMethod() != PaymentMethod.COD;
-        if (paidOnline) {
-            requestPaygateRefund(order, "Customer cancelled before shipment");
-        } else if (order.getPaymentStatus() == PaymentStatus.PENDING_PAYGATE) {
-            order.setPaymentStatus(PaymentStatus.UNPAID);
-        }
+        paymentService.cancelPayment(order, "Customer cancelled before shipment");
 
         order.setStatus(OrderStatus.CANCELLED);
 
@@ -508,74 +413,7 @@ public class OrderServiceImpl implements OrderService {
         return toOrderResponse(savedOrder);
     }
 
-    @Override
-    @Transactional
-    public OrderResponse cancelVietQrPayment(Long userId, Long orderId) {
-        Order order = orderRepository.findByIdForUpdate(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
-        if (!order.getUser().getId().equals(userId)) {
-            throw new BadRequestException("You are not authorized to cancel this order");
-        }
-
-        // Idempotency check: if order is already CANCELLED, return current state
-        if (order.getStatus() == OrderStatus.CANCELLED) {
-            log.info("Order #{} is already cancelled. Idempotent skip.", orderId);
-            return enrichOrderResponse(order);
-        }
-
-        if (order.getStatus() != OrderStatus.PENDING) {
-            throw new BadRequestException("Cannot cancel payment for order in status " + order.getStatus());
-        }
-
-        order.setStatus(OrderStatus.CANCELLED);
-        order.setPaymentStatus(PaymentStatus.UNPAID);
-
-        // Release the reservation held while the order was PENDING.
-        if (order.getWarehouseId() != null) {
-            inventoryFacade.release(order.getWarehouseId(), quantitiesByVariant(order));
-        }
-
-        // Refund the coupon redemption held for this order (frees a usage slot; idempotent).
-        promotionService.refundIfPresent(order.getPromotionCodeId(), order.getId());
-
-        Order savedOrder = orderRepository.save(order);
-        log.info("User cancelled VietQR payment for order {}: reservation released, coupon refunded", orderId);
-        return enrichOrderResponse(savedOrder);
-    }
-
-    @Override
-    @Transactional
-    public OrderResponse confirmVietQrPayment(Long userId, Long orderId) {
-        Order order = orderRepository.findByIdForUpdate(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
-
-        if (!order.getUser().getId().equals(userId)) {
-            throw new BadRequestException("You are not authorized to perform payment for this order");
-        }
-
-        // Idempotency check: if order is already PAID or CONFIRMED, return current state without double fulfillment
-        if (order.getPaymentStatus() == PaymentStatus.PAID || order.getStatus() == OrderStatus.CONFIRMED) {
-            log.info("Order #{} is already confirmed and paid. Idempotent skip.", orderId);
-            return enrichOrderResponse(order);
-        }
-
-        if (order.getStatus() == OrderStatus.CANCELLED) {
-            throw new BadRequestException("Order is cancelled and cannot be paid");
-        }
-
-        order.setStatus(OrderStatus.CONFIRMED);
-        order.setPaymentStatus(PaymentStatus.PAID);
-        Order savedOrder = orderRepository.save(order);
-
-        // Fulfill stock (convert reservation to actual stock decrement)
-        if (savedOrder.getWarehouseId() != null && savedOrder.getItems() != null && !savedOrder.getItems().isEmpty()) {
-            inventoryFacade.fulfill(savedOrder.getWarehouseId(), quantitiesByVariant(savedOrder));
-        }
-
-        log.info("User confirmed VietQR transfer for Order #{}: updated to CONFIRMED & PAID, stock fulfilled.", orderId);
-        return enrichOrderResponse(savedOrder);
-    }
 
     @Override
     @Transactional
@@ -655,13 +493,7 @@ public class OrderServiceImpl implements OrderService {
         // When an admin cancels, restore stock and refund any coupon (mirrors cancelUserOrder).
         // Guard against a CANCELLED -> CANCELLED no-op double release.
         if (request.status() == OrderStatus.CANCELLED && previousStatus != OrderStatus.CANCELLED) {
-            boolean paidOnline = order.getPaymentStatus() == PaymentStatus.PAID
-                    && order.getPaymentMethod() != PaymentMethod.COD;
-            if (paidOnline) {
-                requestPaygateRefund(order, "Admin cancelled before shipment");
-            } else if (order.getPaymentStatus() == PaymentStatus.PENDING_PAYGATE) {
-                order.setPaymentStatus(PaymentStatus.UNPAID);
-            }
+            paymentService.cancelPayment(order, "Admin cancelled before shipment");
             if (order.getWarehouseId() != null) {
                 if (previousStatus == OrderStatus.SHIPPED) {
                     // Failed / refused delivery ("bom hàng"): the stock was already decremented at ship,
@@ -714,6 +546,8 @@ public class OrderServiceImpl implements OrderService {
                 base.upfrontAmount(),
                 base.financeAmount(),
                 base.paygateTransactionRef(),
+                base.paygateToken(),
+                base.paygateUrl(),
                 base.paygatePayload(),
                 order.getPaygateExpiresAt(),
                 latestRefund != null ? latestRefund.getId() : null,
@@ -727,51 +561,7 @@ public class OrderServiceImpl implements OrderService {
         );
     }
 
-    private void requestPaygateRefund(Order order, String reason) {
-        String idempotencyKey = "PAYGATE_REFUND:ORDER:" + order.getId() + ":FULL";
-        RefundRequest refundRequest = refundRequestRepository.findByIdempotencyKey(idempotencyKey)
-                .orElseGet(() -> refundRequestRepository.save(RefundRequest.builder()
-                        .order(order)
-                        .idempotencyKey(idempotencyKey)
-                        .transactionRef(order.getPaygateTransactionRef())
-                        .amount(order.getTotalAmount())
-                        .reason(reason)
-                        .status(RefundRequestStatus.PENDING)
-                        .build()));
 
-        if (refundRequest.getStatus() == RefundRequestStatus.SUCCEEDED) {
-            order.setPaymentStatus(PaymentStatus.REFUNDED);
-            return;
-        }
-
-        if (order.getPaygateTransactionRef() == null || order.getPaygateTransactionRef().isBlank()) {
-            refundRequest.setStatus(RefundRequestStatus.FAILED);
-            refundRequest.setFailureReason("PayGate transaction reference is missing");
-            refundRequestRepository.save(refundRequest);
-            order.setPaymentStatus(PaymentStatus.REFUND_PENDING);
-            log.warn("Order {} refund pending because PayGate transaction reference is missing", order.getId());
-            return;
-        }
-        try {
-            paygateClientService.refund(
-                    order.getPaygateTransactionRef(),
-                    order.getId(),
-                    order.getTotalAmount(),
-                    idempotencyKey);
-            refundRequest.setTransactionRef(order.getPaygateTransactionRef());
-            refundRequest.setStatus(RefundRequestStatus.SUCCEEDED);
-            refundRequest.setFailureReason(null);
-            refundRequestRepository.save(refundRequest);
-            order.setPaymentStatus(PaymentStatus.REFUNDED);
-        } catch (Exception ex) {
-            refundRequest.setTransactionRef(order.getPaygateTransactionRef());
-            refundRequest.setStatus(RefundRequestStatus.FAILED);
-            refundRequest.setFailureReason(ex.getMessage());
-            refundRequestRepository.save(refundRequest);
-            order.setPaymentStatus(PaymentStatus.REFUND_PENDING);
-            log.warn("Order {} refund pending because PayGate refund call failed: {}", order.getId(), ex.getMessage());
-        }
-    }
 
     /** Aggregate an order's line items into {@code variantId -> total quantity} for inventory calls. */
     private static Map<Long, Integer> quantitiesByVariant(Order order) {
@@ -799,14 +589,5 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    private LocalDateTime parseExpiresAt(String expiresAtStr) {
-        if (expiresAtStr == null || expiresAtStr.isBlank()) {
-            return LocalDateTime.now().plusMinutes(15);
-        }
-        try {
-            return LocalDateTime.parse(expiresAtStr);
-        } catch (Exception e) {
-            return LocalDateTime.now().plusMinutes(15);
-        }
-    }
+
 }

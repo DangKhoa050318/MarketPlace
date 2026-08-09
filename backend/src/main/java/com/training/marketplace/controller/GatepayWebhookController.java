@@ -11,23 +11,27 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * Secondary webhook endpoint matching the URL configured in PayGate's merchant seed
+ * ({@code /api/v1/webhooks/gatepay}). Delegates to the same service as
+ * {@link PaymentWebhookController}.
+ */
 @RestController
-@RequestMapping("/api/v1/payments")
+@RequestMapping("/api/v1/webhooks")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Payment Webhook", description = "Server-to-server webhook endpoint for PayGate IPN notifications")
-public class PaymentWebhookController {
+@Tag(name = "Payment Webhook", description = "Alternative webhook endpoint matching PayGate merchant configuration")
+public class GatepayWebhookController {
 
     private final PaymentWebhookService paymentWebhookService;
 
-    @PostMapping("/paygate-webhook")
-    @Operation(summary = "Receive Webhook IPN notification from PayGate microservice (server-to-server only)")
-    public ApiResponse<Map<String, Object>> handlePaygateWebhook(
+    @PostMapping("/gatepay")
+    @Operation(summary = "Receive IPN webhook from PayGate (merchant-configured URL)")
+    public ApiResponse<Map<String, Object>> handleGatepayWebhook(
             @RequestHeader(value = "X-Paygate-Signature", required = false) String signature,
             @RequestBody PaygateWebhookRequest payload) {
-        log.info("Received PayGate Webhook request on endpoint /paygate-webhook");
+        log.info("Received PayGate webhook on /api/v1/webhooks/gatepay endpoint");
         Map<String, Object> result = paymentWebhookService.processPaygateWebhook(payload, signature);
         return ApiResponse.success("PayGate Webhook processed successfully", result);
     }
 }
-
