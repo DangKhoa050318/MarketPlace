@@ -501,3 +501,21 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
 - **Fail-fast prod:** `WebhookSignatureConfigGuard` từ chối khởi động app nếu profile `prod` mà `require-signature=false` → không thể lên air với webhook không xác thực.
 - **Gộp của Hoàng:** nhận diện hủy qua `event` (`PAYMENT_CANCELLED`/`PAYMENT_FAILED`), không chỉ `status`.
 - ✅ Verify: backend unit **309/309 PASS**.
+
+### Shopping chat assistant MVP — 2026-08-09
+
+- ✅ Spring Boot orchestration với Gemini `LlmGateway`-style adapter và deterministic fallback; không
+  khôi phục Python microservice cũ.
+- ✅ Hỗ trợ best seller, tư vấn theo query/category/budget/brand/attributes và campaign voucher; chỉ
+  trả sản phẩm/SKU active còn tồn khả dụng.
+- ✅ Campaign offer kiểm tra đồng thời campaign, promotion window, global usage, per-user usage và
+  PRODUCT/CATEGORY/CART scope trước khi hiển thị.
+- ✅ Anonymous conversation owner-bound qua `X-Session-Id`, authenticated qua JWT; lưu Redis TTL 24h.
+- ✅ Angular widget trả product/voucher card, quick replies, điều hướng product detail và copy voucher;
+  không tự thêm giỏ hoặc tự áp voucher.
+- ✅ Analytics: `CHAT_MESSAGE`, `CHAT_PRODUCT_IMPRESSION`, `CHAT_PRODUCT_CLICK`,
+  `CHAT_VOUCHER_CLICK`; không lưu raw chat text.
+- ✅ Contract và cấu hình: `docs/chat-assistant.md`, `backend/.env.example`.
+- ✅ Verify: backend unit **322/322 PASS**; focused chat **7/7 PASS**; frontend **55/55 PASS**;
+  Angular production build **SUCCESS**. `ChatDataFoundationIntegrationTest` đã compile nhưng bị
+  **SKIP** vì máy kiểm thử không có Docker daemon khả dụng.

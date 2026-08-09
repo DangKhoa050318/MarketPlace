@@ -1,0 +1,82 @@
+<button
+  class="chat-launcher"
+  mat-fab
+  type="button"
+  [attr.aria-label]="open ? 'Đóng trợ lý mua sắm' : 'Mở trợ lý mua sắm'"
+  [attr.aria-expanded]="open"
+  (click)="toggle()">
+  <mat-icon>{{ open ? 'close' : 'forum' }}</mat-icon>
+</button>
+
+<section *ngIf="open" class="chat-panel" aria-label="Trợ lý mua sắm">
+  <header class="chat-header">
+    <div class="assistant-mark"><mat-icon>auto_awesome</mat-icon></div>
+    <div>
+      <strong>Trợ lý mua sắm</strong>
+      <span>Sản phẩm thật · Voucher đang hiệu lực</span>
+    </div>
+    <button mat-icon-button type="button" aria-label="Bắt đầu hội thoại mới" (click)="reset()">
+      <mat-icon>refresh</mat-icon>
+    </button>
+  </header>
+
+  <div #messageViewport class="message-viewport" aria-live="polite">
+    <article *ngFor="let message of messages" class="message" [class.user-message]="message.role === 'user'">
+      <div class="bubble">{{ message.text }}</div>
+
+      <div *ngIf="message.response?.products?.length" class="product-list">
+        <a
+          *ngFor="let product of message.response!.products"
+          class="product-card"
+          [routerLink]="['/products', product.productId]"
+          (click)="trackProduct(product, message.response!)">
+          <img *ngIf="product.imageUrl; else imagePlaceholder" [src]="product.imageUrl" [alt]="product.name">
+          <ng-template #imagePlaceholder>
+            <div class="product-image-placeholder" aria-hidden="true"><mat-icon>inventory_2</mat-icon></div>
+          </ng-template>
+          <div class="product-copy">
+            <strong>{{ product.name }}</strong>
+            <span class="category">{{ product.categoryName }}<ng-container *ngIf="product.brand"> · {{ product.brand }}</ng-container></span>
+            <span class="price">Từ {{ formatPrice(product.minPrice) }}</span>
+            <span class="reason">{{ product.reason }}</span>
+            <button
+              *ngIf="product.voucher"
+              type="button"
+              class="voucher"
+              (click)="copyVoucher(product, message.response!, $event)">
+              <mat-icon>confirmation_number</mat-icon>
+              <span><b>{{ product.voucher.code }}</b> · {{ product.voucher.discountText }}</span>
+              <mat-icon>content_copy</mat-icon>
+            </button>
+          </div>
+        </a>
+      </div>
+
+      <div *ngIf="message.response?.quickReplies?.length" class="quick-replies">
+        <button
+          *ngFor="let reply of message.response!.quickReplies"
+          type="button"
+          (click)="send(reply)">
+          {{ reply }}
+        </button>
+      </div>
+    </article>
+
+    <div *ngIf="loading" class="typing" aria-label="Trợ lý đang trả lời">
+      <span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <footer class="chat-composer">
+    <textarea
+      [(ngModel)]="draft"
+      maxlength="500"
+      rows="1"
+      placeholder="Ví dụ: Laptop dưới 20 triệu có voucher..."
+      aria-label="Câu hỏi mua sắm"
+      (keydown)="onKeydown($event)"></textarea>
+    <button mat-mini-fab type="button" aria-label="Gửi câu hỏi" [disabled]="loading || !draft.trim()" (click)="send()">
+      <mat-icon>send</mat-icon>
+    </button>
+  </footer>
+</section>

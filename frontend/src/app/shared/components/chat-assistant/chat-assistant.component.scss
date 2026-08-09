@@ -1,0 +1,257 @@
+:host {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1200;
+}
+
+.chat-launcher {
+  background: var(--primary) !important;
+  color: #fff !important;
+  box-shadow: 0 14px 35px rgba(79, 70, 229, 0.32) !important;
+}
+
+.chat-panel {
+  position: absolute;
+  right: 0;
+  bottom: 72px;
+  width: min(410px, calc(100vw - 32px));
+  height: min(650px, calc(100vh - 120px));
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  box-shadow: 0 25px 65px rgba(15, 23, 42, 0.22);
+}
+
+.chat-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #4338ca, #6366f1);
+}
+
+.assistant-mark {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.chat-header strong,
+.chat-header span {
+  display: block;
+}
+
+.chat-header span {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: #e0e7ff;
+}
+
+.chat-header button { color: #fff; }
+
+.message-viewport {
+  overflow-y: auto;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.message {
+  margin-bottom: 14px;
+}
+
+.bubble {
+  width: fit-content;
+  max-width: 88%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px 14px 14px 4px;
+  background: #fff;
+  color: #334155;
+  font-size: 0.87rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.user-message .bubble {
+  margin-left: auto;
+  border-color: #4f46e5;
+  border-radius: 14px 14px 4px 14px;
+  background: #4f46e5;
+  color: #fff;
+}
+
+.product-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.product-card {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 10px;
+  padding: 9px;
+  color: inherit;
+  text-decoration: none;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.product-card:hover {
+  border-color: #818cf8;
+  transform: translateY(-1px);
+}
+
+.product-card img,
+.product-image-placeholder {
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #f1f5f9;
+}
+
+.product-image-placeholder {
+  display: grid;
+  place-items: center;
+  color: #94a3b8;
+}
+
+.product-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.product-copy strong {
+  color: #0f172a;
+  font-size: 0.84rem;
+}
+
+.category,
+.reason {
+  color: #64748b;
+  font-size: 0.69rem;
+  line-height: 1.35;
+}
+
+.price {
+  color: #4338ca;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.voucher {
+  margin-top: 4px;
+  padding: 5px 7px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 5px;
+  border: 1px dashed #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font: inherit;
+  font-size: 0.64rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.voucher mat-icon {
+  width: 15px;
+  height: 15px;
+  font-size: 15px;
+}
+
+.quick-replies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.quick-replies button {
+  padding: 6px 9px;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.typing {
+  width: 54px;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #818cf8;
+  animation: pulse 1s infinite alternate;
+}
+
+.typing span:nth-child(2) { animation-delay: 0.2s; }
+.typing span:nth-child(3) { animation-delay: 0.4s; }
+
+.chat-composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.chat-composer textarea {
+  min-height: 40px;
+  max-height: 90px;
+  resize: vertical;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  outline: none;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.chat-composer textarea:focus { border-color: #6366f1; }
+.chat-composer button { background: var(--primary) !important; color: #fff !important; }
+
+@keyframes pulse {
+  from { opacity: 0.35; transform: translateY(1px); }
+  to { opacity: 1; transform: translateY(-1px); }
+}
+
+@media (max-width: 600px) {
+  :host { right: 16px; bottom: 16px; }
+  .chat-panel { bottom: 68px; height: calc(100vh - 105px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing span { animation: none; }
+  .product-card { transition: none; }
+}

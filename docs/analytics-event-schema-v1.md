@@ -42,6 +42,10 @@ request body.
 | `RECOMMENDATION_CLICK` | R | optional | `RECOMMENDATION` | R | - | - |
 | `ADD_TO_CART` | R | R | R | C: required when source is `RECOMMENDATION` | R | - |
 | `PURCHASE` | R | R | `ORDER_SERVICE` | optional attribution context | R | R |
+| `CHAT_MESSAGE` | optional | optional | `CHAT_ASSISTANT` | - | - | - |
+| `CHAT_PRODUCT_IMPRESSION` | R | optional | `CHAT_ASSISTANT` | - | - | - |
+| `CHAT_PRODUCT_CLICK` | R | optional | `CHAT_ASSISTANT` | - | - | - |
+| `CHAT_VOUCHER_CLICK` | R | optional | `CHAT_ASSISTANT` | - | - | - |
 
 ## Purchase trust boundary
 

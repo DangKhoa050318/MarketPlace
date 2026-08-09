@@ -50,6 +50,11 @@ Refresh token được lưu server-side trong Redis, rotate sau mỗi lần refr
 đơn chưa thanh toán; cần cài adapter `PaymentGateway` thật và đặt `PAYMENT_PROVIDER` sau khi chọn
 nhà cung cấp.
 
+Shopping chat assistant chạy trong Spring Boot tại `POST /api/v1/chat/messages`. Khi có
+`GEMINI_API_KEY`, Gemini được dùng để phân tích nhu cầu; nếu chưa cấu hình hoặc provider lỗi, hệ
+thống tự chuyển sang parser rule-based. Sản phẩm, tồn kho và voucher luôn lấy từ backend. Xem
+[`docs/chat-assistant.md`](docs/chat-assistant.md).
+
 > ℹ️ Backend/frontend đã compile & boot được (xem [`MERGE-STATUS.md`](MERGE-STATUS.md)).
 > Chạy `docker compose down -v` một lần khi khởi tạo DB lần đầu.
 

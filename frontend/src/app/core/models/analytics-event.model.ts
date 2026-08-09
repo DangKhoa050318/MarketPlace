@@ -8,6 +8,10 @@ export enum AnalyticsEventType {
   OrderCreated = 'ORDER_CREATED',
   RecommendationImpression = 'RECOMMENDATION_IMPRESSION',
   RecommendationClick = 'RECOMMENDATION_CLICK',
+  ChatMessage = 'CHAT_MESSAGE',
+  ChatProductImpression = 'CHAT_PRODUCT_IMPRESSION',
+  ChatProductClick = 'CHAT_PRODUCT_CLICK',
+  ChatVoucherClick = 'CHAT_VOUCHER_CLICK',
   Purchase = 'PURCHASE'
 }
 
@@ -19,6 +23,7 @@ export enum AnalyticsEventSource {
   Recommendation = 'RECOMMENDATION',
   Cart = 'CART',
   Checkout = 'CHECKOUT',
+  ChatAssistant = 'CHAT_ASSISTANT',
   OrderService = 'ORDER_SERVICE'
 }
 

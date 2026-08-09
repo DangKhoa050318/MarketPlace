@@ -117,6 +117,18 @@ marketplace:
     min-co-viewed-occurrences: ${RECOMMENDATION_MIN_CO_VIEWED_OCCURRENCES:2}
     co-purchased-lookback: ${RECOMMENDATION_CO_PURCHASED_LOOKBACK:90d}
     min-co-purchased-occurrences: ${RECOMMENDATION_MIN_CO_PURCHASED_OCCURRENCES:2}
+  chat:
+    enabled: ${FEATURE_CHAT_ASSISTANT_ENABLED:true}
+    conversation-ttl: ${CHAT_CONVERSATION_TTL:24h}
+    max-products: ${CHAT_MAX_PRODUCTS:6}
+    max-history-messages: ${CHAT_MAX_HISTORY_MESSAGES:12}
+    ai:
+      enabled: ${CHAT_AI_ENABLED:true}
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
+      base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+      connect-timeout: ${GEMINI_CONNECT_TIMEOUT:3s}
+      read-timeout: ${GEMINI_READ_TIMEOUT:8s}
 
 management:
   endpoints:

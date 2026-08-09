@@ -31,7 +31,10 @@ public class AnalyticsEventValidator {
             AnalyticsEventType.ADD_TO_WISHLIST,
             AnalyticsEventType.ADD_TO_CART,
             AnalyticsEventType.RECOMMENDATION_IMPRESSION,
-            AnalyticsEventType.RECOMMENDATION_CLICK);
+            AnalyticsEventType.RECOMMENDATION_CLICK,
+            AnalyticsEventType.CHAT_PRODUCT_IMPRESSION,
+            AnalyticsEventType.CHAT_PRODUCT_CLICK,
+            AnalyticsEventType.CHAT_VOUCHER_CLICK);
 
     private static final Set<AnalyticsEventType> RECOMMENDATION_EVENTS = EnumSet.of(
             AnalyticsEventType.RECOMMENDATION_IMPRESSION,

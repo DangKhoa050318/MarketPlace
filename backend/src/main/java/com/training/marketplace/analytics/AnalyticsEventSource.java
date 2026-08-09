@@ -15,5 +15,6 @@ public enum AnalyticsEventSource {
     RECOMMENDATION,
     CART,
     CHECKOUT,
+    CHAT_ASSISTANT,
     ORDER_SERVICE
 }
