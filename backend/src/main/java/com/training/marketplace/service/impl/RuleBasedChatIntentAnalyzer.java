@@ -30,11 +30,35 @@ public class RuleBasedChatIntentAnalyzer {
             "(?i)(?:duoi|tren|tu|toi da|toi thieu|khong qua|khoang|tam)?\\s*"
                     + "\\d+(?:[.,]\\d+)?\\s*(?:trieu|tr|m|nghin|ngan|k)(?:\\s*(?:-|den|toi)\\s*"
                     + "\\d+(?:[.,]\\d+)?\\s*(?:trieu|tr|m|nghin|ngan|k)?)?");
+    private static final Pattern GREETING = Pattern.compile(
+            "\\b(?:xin chao|chao ban|chao|hello|hi|hey|alo)\\b");
+    private static final Pattern THANKS = Pattern.compile(
+            "\\b(?:cam on|thank you|thanks|thank|tks)\\b");
+    private static final Pattern HELP = Pattern.compile(
+            "\\b(?:ban co the giup gi|ban giup duoc gi|ban lam duoc gi|giup toi voi|"
+                    + "giup minh voi|tro giup|help)\\b");
+    private static final Pattern CONVERSATION_FILLERS = Pattern.compile(
+            "\\b(?:ban|shop|nhe|nha|a|oi|minh|toi|em|anh|chi|rat|nhieu|xin|vui long|"
+                    + "voi|duoc|co|the|gi|lam|me)\\b");
 
     public ChatIntentAnalysis analyze(
             String message,
             List<ChatHistoryMessage> history,
             ChatPageContext pageContext) {
+        ChatIntent conversationalIntent = conversationalIntent(normalize(message));
+        if (conversationalIntent != null) {
+            return new ChatIntentAnalysis(
+                    List.of(conversationalIntent),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    Map.of(),
+                    false,
+                    null);
+        }
+
         String combined = recentUserContext(history) + " " + message;
         String normalized = normalize(combined);
         Set<ChatIntent> intents = new LinkedHashSet<>();
@@ -118,9 +142,32 @@ public class RuleBasedChatIntentAnalyzer {
     private String cleanupQuery(String message) {
         String cleaned = PRICE_PHRASE.matcher(normalize(message)).replaceAll(" ");
         cleaned = cleaned.replaceAll("(?i)\\b(toi|minh|em|can|muon|mua|tim|goi y|tu van|cho|giup|hay|san pham|"
-                + "ban chay|pho bien|voucher|coupon|ma giam gia|giam gia|khuyen mai|campaign|uu dai|dang|co|voi|va)\\b", " ");
+                + "ban chay|pho bien|voucher|coupon|ma giam gia|giam gia|khuyen mai|campaign|uu dai|dang|co|voi|va|"
+                + "xin chao|chao ban|chao|hello|hi|hey|alo|cam on|thank you|thanks|tks)\\b", " ");
         cleaned = cleaned.replaceAll("[?,.!]+", " ").replaceAll("\\s+", " ").trim();
         return cleaned.length() < 2 ? null : cleaned;
+    }
+
+    private ChatIntent conversationalIntent(String normalizedMessage) {
+        if (isConversationalOnly(normalizedMessage, GREETING)) {
+            return ChatIntent.GREETING;
+        }
+        if (isConversationalOnly(normalizedMessage, THANKS)) {
+            return ChatIntent.THANKS;
+        }
+        if (isConversationalOnly(normalizedMessage, HELP)) {
+            return ChatIntent.HELP;
+        }
+        return null;
+    }
+
+    private boolean isConversationalOnly(String message, Pattern intentPattern) {
+        if (!intentPattern.matcher(message).find()) {
+            return false;
+        }
+        String remainder = intentPattern.matcher(message).replaceAll(" ");
+        remainder = CONVERSATION_FILLERS.matcher(remainder).replaceAll(" ");
+        return remainder.replaceAll("[^a-z0-9]+", " ").isBlank();
     }
 
     private String normalize(String value) {
@@ -133,7 +180,10 @@ public class RuleBasedChatIntentAnalyzer {
 
     private boolean containsAny(String value, String... needles) {
         for (String needle : needles) {
-            if (value.contains(needle)) {
+            String term = needle.trim();
+            Pattern wholeTerm = Pattern.compile(
+                    "(?<![a-z0-9])" + Pattern.quote(term) + "(?![a-z0-9])");
+            if (wholeTerm.matcher(value).find()) {
                 return true;
             }
         }

@@ -1,4 +1,10 @@
-export type ChatIntent = 'BEST_SELLER' | 'PRODUCT_DISCOVERY' | 'CAMPAIGN_OFFERS';
+export type ChatIntent =
+  | 'GREETING'
+  | 'THANKS'
+  | 'HELP'
+  | 'BEST_SELLER'
+  | 'PRODUCT_DISCOVERY'
+  | 'CAMPAIGN_OFFERS';
 
 export interface ChatPageContext {
   productId?: number;

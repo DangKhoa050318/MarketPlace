@@ -73,13 +73,24 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
 
         ChatIntentAnalysis fallback = fallbackAnalyzer.analyze(
                 request.message(), conversation.messages(), request.pageContext());
+        UUID messageId = UUID.randomUUID();
+        UUID traceId = UUID.randomUUID();
+        if (isConversational(fallback)) {
+            return conversationalReply(
+                    userId,
+                    normalizedSessionId,
+                    request.message(),
+                    conversation,
+                    ownerKey,
+                    fallback,
+                    messageId,
+                    traceId);
+        }
         ChatIntentAnalysis analysis = merge(
                 aiGateway.analyze(request.message(), conversation.messages(), request.pageContext())
                         .orElse(fallback),
                 fallback);
 
-        UUID messageId = UUID.randomUUID();
-        UUID traceId = UUID.randomUUID();
         if (analysis.needsClarification()) {
             String question = analysis.clarificationQuestion() == null
                     ? "Bạn đang tìm dòng sản phẩm nào và ngân sách dự kiến là bao nhiêu?"
@@ -139,6 +150,49 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
                 analysis.intents(),
                 productCards,
                 quickReplies(analysis.intents(), productCards.isEmpty()),
+                traceId);
+    }
+
+    private boolean isConversational(ChatIntentAnalysis analysis) {
+        return analysis.intents().size() == 1
+                && (analysis.intents().contains(ChatIntent.GREETING)
+                || analysis.intents().contains(ChatIntent.THANKS)
+                || analysis.intents().contains(ChatIntent.HELP));
+    }
+
+    private ChatMessageResponse conversationalReply(
+            Long userId,
+            String sessionId,
+            String userMessage,
+            ChatConversationSnapshot conversation,
+            String ownerKey,
+            ChatIntentAnalysis analysis,
+            UUID messageId,
+            UUID traceId) {
+        ChatIntent intent = analysis.intents().get(0);
+        String answer = switch (intent) {
+            case GREETING -> "Xin chào! Mình là trợ lý mua sắm của Marketplace. "
+                    + "Mình có thể giúp bạn tìm sản phẩm bán chạy, tư vấn theo nhu cầu và ngân sách, "
+                    + "hoặc tìm sản phẩm đang có voucher. Bạn muốn bắt đầu từ đâu?";
+            case THANKS -> "Rất vui vì đã hỗ trợ được bạn! Nếu cần thêm, mình có thể tiếp tục tư vấn "
+                    + "sản phẩm hoặc kiểm tra các voucher đang có.";
+            case HELP -> "Mình có thể giúp bạn xem sản phẩm bán chạy, tìm sản phẩm theo nhu cầu, "
+                    + "ngân sách và thương hiệu, hoặc gợi ý sản phẩm có voucher campaign đang hiệu lực.";
+            default -> throw new IllegalStateException("Unsupported conversational intent: " + intent);
+        };
+        List<String> quickReplies = List.of(
+                "Sản phẩm bán chạy",
+                "Tư vấn theo nhu cầu",
+                "Sản phẩm đang có voucher");
+        saveExchange(conversation, ownerKey, userMessage, answer);
+        trackChatEvent(userId, sessionId, analysis, 0, false);
+        return new ChatMessageResponse(
+                conversation.conversationId(),
+                messageId,
+                answer,
+                analysis.intents(),
+                List.of(),
+                quickReplies,
                 traceId);
     }
 

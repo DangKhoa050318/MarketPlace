@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -89,6 +90,26 @@ class ChatAssistantServiceTest {
         assertThat(criteriaCaptor.getValue().productScopeIds()).containsExactly(10L);
         verify(conversationStore).save(any(ChatConversationSnapshot.class));
         verify(analyticsEventService).track(eq(null), eq("session-1"), any());
+    }
+
+    @Test
+    void answersGreetingWithoutCallingAiOrProductDiscovery() {
+        when(conversationStore.find(any())).thenReturn(Optional.empty());
+
+        var response = service.reply(
+                null,
+                "session-1",
+                new ChatMessageRequest(null, "Xin chào bạn", null));
+
+        assertThat(response.intents()).containsExactly(ChatIntent.GREETING);
+        assertThat(response.answer()).contains("Xin chào").contains("trợ lý mua sắm");
+        assertThat(response.products()).isEmpty();
+        assertThat(response.quickReplies()).containsExactly(
+                "Sản phẩm bán chạy",
+                "Tư vấn theo nhu cầu",
+                "Sản phẩm đang có voucher");
+        verifyNoInteractions(aiGateway, campaignOfferService, discoveryService);
+        verify(conversationStore).save(any(ChatConversationSnapshot.class));
     }
 
     @Test
