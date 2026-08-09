@@ -117,8 +117,6 @@ marketplace:
     min-co-viewed-occurrences: ${RECOMMENDATION_MIN_CO_VIEWED_OCCURRENCES:2}
     co-purchased-lookback: ${RECOMMENDATION_CO_PURCHASED_LOOKBACK:90d}
     min-co-purchased-occurrences: ${RECOMMENDATION_MIN_CO_PURCHASED_OCCURRENCES:2}
-  ai-service:
-    url: ${AI_SERVICE_URL:http://localhost:8000}
 
 management:
   endpoints:

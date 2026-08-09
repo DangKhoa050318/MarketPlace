@@ -10,7 +10,6 @@ import { MatDividerModule } from '@angular/material/divider';
 import { AuthService } from '../../core/services/auth.service';
 import { CartService } from '../../core/services/cart.service';
 import { ThreeBgComponent } from '../../shared/components/three-bg/three-bg.component';
-import { ChatbotWidgetComponent } from '../../shared/components/chatbot-widget/chatbot-widget.component';
 import { Observable } from 'rxjs';
 
 @Component({
@@ -26,8 +25,7 @@ import { Observable } from 'rxjs';
     MatBadgeModule,
     MatMenuModule,
     MatDividerModule,
-    ThreeBgComponent,
-    ChatbotWidgetComponent
+    ThreeBgComponent
   ],
   template: `
     <div class="user-layout-wrapper">
@@ -131,8 +129,6 @@ import { Observable } from 'rxjs';
       <main class="page-content">
         <router-outlet></router-outlet>
       </main>
-
-      <app-chatbot-widget></app-chatbot-widget>
 
       <!-- Professional Footer -->
       <footer class="main-footer">
