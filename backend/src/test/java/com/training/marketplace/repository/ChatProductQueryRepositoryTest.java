@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
@@ -25,7 +26,7 @@ class ChatProductQueryRepositoryTest {
     @Mock private JdbcTemplate jdbcTemplate;
 
     @Test
-    void separatesWhereKeywordFromFirstProductClause() {
+    void separatesDynamicClausesFromSurroundingSqlKeywords() {
         when(jdbcTemplate.query(
                 anyString(),
                 org.mockito.ArgumentMatchers.<RowMapper<ChatProductCandidate>>any(),
@@ -34,7 +35,7 @@ class ChatProductQueryRepositoryTest {
         ChatProductQueryRepository repository = new ChatProductQueryRepository(jdbcTemplate);
 
         repository.search(new ChatSearchCriteria(
-                null, null, null, null, null, null,
+                "laptop", null, null, null, new BigDecimal("20000000"), null,
                 Set.of(), Set.of(), false, false, 6));
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
@@ -44,6 +45,8 @@ class ChatProductQueryRepositoryTest {
                 any(Object[].class));
         assertThat(sqlCaptor.getValue())
                 .containsPattern("WHERE\\s+p\\.active = TRUE")
-                .doesNotContain("WHEREp.active");
+                .containsPattern("v\\.price <= \\?\\s+GROUP BY")
+                .doesNotContain("WHEREp.active")
+                .doesNotContain("?GROUP BY");
     }
 }
