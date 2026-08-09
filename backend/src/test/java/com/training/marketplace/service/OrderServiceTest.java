@@ -62,7 +62,7 @@ class OrderServiceTest {
     @Mock private OrderMapper orderMapper;
     @Mock private OrderEventPublisher orderEventPublisher;
     @Mock private PromotionService promotionService;
-    @Mock private PaygateClientService paygateClientService;
+    @Mock private PaymentService paymentService;
     @Mock private MerchandisingEventService merchandisingEventService;
     @Mock private DeliveryService deliveryService;
     @Mock private RefundRequestRepository refundRequestRepository;
@@ -192,7 +192,7 @@ class OrderServiceTest {
         assertThat(saved.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
         assertThat(saved.getTotalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         verify(inventoryFacade).fulfill(eq(1L), anyMap());
-        verifyNoInteractions(paygateClientService);
+        verify(paymentService).createPaymentSession(any(), any());
     }
 
     @Test
@@ -221,22 +221,14 @@ class OrderServiceTest {
     void cancelUserOrder_paidOnlineBeforeShip_refundsAndReleasesReservation() {
         Order order = paidOnlineOrder("TXN_123");
         when(orderRepository.findById(100L)).thenReturn(Optional.of(order));
-        when(refundRequestRepository.findByIdempotencyKey("PAYGATE_REFUND:ORDER:100:FULL"))
-                .thenReturn(Optional.empty());
-        when(refundRequestRepository.save(any(RefundRequest.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+
         when(orderRepository.save(order)).thenReturn(order);
         when(orderMapper.toResponse(order)).thenReturn(testOrderResponse);
 
         orderService.cancelUserOrder(1L, 100L);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
-        verify(paygateClientService).refund(
-                "TXN_123",
-                100L,
-                BigDecimal.valueOf(200.00),
-                "PAYGATE_REFUND:ORDER:100:FULL");
+        verify(paymentService).cancelPayment(order, "Customer cancelled before shipment");
         verify(inventoryFacade).release(eq(1L), eq(Map.of(10L, 2)));
     }
 
@@ -245,18 +237,14 @@ class OrderServiceTest {
     void cancelUserOrder_paidOnlineMissingTransactionRef_setsRefundPending() {
         Order order = paidOnlineOrder(null);
         when(orderRepository.findById(100L)).thenReturn(Optional.of(order));
-        when(refundRequestRepository.findByIdempotencyKey("PAYGATE_REFUND:ORDER:100:FULL"))
-                .thenReturn(Optional.empty());
-        when(refundRequestRepository.save(any(RefundRequest.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+
         when(orderRepository.save(order)).thenReturn(order);
         when(orderMapper.toResponse(order)).thenReturn(testOrderResponse);
 
         orderService.cancelUserOrder(1L, 100L);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_PENDING);
-        verify(paygateClientService, never()).refund(any(), any(), any(), any());
+        verify(paymentService).cancelPayment(order, "Customer cancelled before shipment");
         verify(inventoryFacade).release(eq(1L), eq(Map.of(10L, 2)));
     }
 

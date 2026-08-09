@@ -50,7 +50,7 @@ public class PaygateClientServiceImpl implements PaygateClientService {
 
     @Override
     public PaygateCreateCheckoutResponse createCheckoutSession(Long orderId, BigDecimal amount, String description) {
-        return createCheckoutSession(orderId, amount, description, "WALLET", null, null);
+        return createCheckoutSession(orderId, amount, description, "PAYGATE");
     }
 
     @Override
@@ -71,14 +71,32 @@ public class PaygateClientServiceImpl implements PaygateClientService {
         String fullEndpoint = apiUrl + "/api/v1/checkout/create";
         String orderIdStr = "ORD-" + orderId;
         BigDecimal vndAmount = currencyConversionService.convertUsdToVnd(amount);
-        String paymentMethodStr = (method != null && !method.isBlank()) ? method : "WALLET";
+        String paymentMethodStr = (method != null && !method.isBlank()) ? method : "PAYGATE";
 
         // Convert upfront/finance amounts to VND for BNPL sessions
         BigDecimal vndUpfront = upfrontAmount != null ? currencyConversionService.convertUsdToVnd(upfrontAmount) : null;
         BigDecimal vndFinance = financeAmount != null ? currencyConversionService.convertUsdToVnd(financeAmount) : null;
 
-        String dynamicReturnUrl = returnUrl;
-        String dynamicCancelUrl = cancelUrl != null && !cancelUrl.isBlank() ? cancelUrl : returnUrl + "?status=CANCELLED";
+        String dynamicReturnUrl;
+        if (returnUrl != null && !returnUrl.isBlank()) {
+            dynamicReturnUrl = returnUrl.contains("status=") ? returnUrl : (returnUrl + (returnUrl.contains("?") ? "&" : "?") + "status=SUCCESS");
+        } else {
+            dynamicReturnUrl = "http://localhost:4200/orders/callback?status=SUCCESS";
+        }
+
+        String dynamicCancelUrl;
+        if (cancelUrl != null && !cancelUrl.isBlank()) {
+            dynamicCancelUrl = cancelUrl.contains("status=") ? cancelUrl : (cancelUrl + (cancelUrl.contains("?") ? "&" : "?") + "status=CANCELLED");
+        } else {
+            dynamicCancelUrl = returnUrl + (returnUrl.contains("?") ? "&" : "?") + "status=CANCELLED";
+        }
+
+        if (!dynamicReturnUrl.contains("orderId=")) {
+            dynamicReturnUrl += (dynamicReturnUrl.contains("?") ? "&" : "?") + "orderId=" + orderIdStr;
+        }
+        if (!dynamicCancelUrl.contains("orderId=")) {
+            dynamicCancelUrl += (dynamicCancelUrl.contains("?") ? "&" : "?") + "orderId=" + orderIdStr;
+        }
 
         PaygateCreateCheckoutRequest requestBody = new PaygateCreateCheckoutRequest(
                 orderIdStr,
@@ -123,7 +141,7 @@ public class PaygateClientServiceImpl implements PaygateClientService {
 
             if (isSuccess) {
                 log.info("Successfully created PayGate session: token={}, paymentUrl={}, method={}",
-                        response.data().token(), response.data().paymentUrl(), response.data().method());
+                        response.data().token(), response.data().paymentUrl(), response.data().paymentMethod());
                 return response;
             }
             log.warn("PayGate returned non-success response: {}", response);
@@ -135,33 +153,41 @@ public class PaygateClientServiceImpl implements PaygateClientService {
         String mockToken = "CHK_MOCK_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase();
         String fallbackPaymentUrl = checkoutUrl + "?token=" + mockToken;
 
-        PaygateCreateCheckoutResponse.BankAccountData mockBankAccount = null;
         String transferContent = null;
-        String qrPayload = null;
+        String qrCodePayload = null;
+        String vietQrUrl = null;
+        String mockBankCode = null;
+        String mockAccountNumber = null;
+        String mockAccountName = null;
 
-        if ("BANK_TRANSFER".equalsIgnoreCase(paymentMethodStr)) {
-            mockBankAccount = new PaygateCreateCheckoutResponse.BankAccountData(
-                    "MBBank - Ngân hàng TMCP Quân Đội",
-                    "8888999988",
-                    "PAYGATE GATEWAY SYSTEM",
-                    vndAmount
-            );
+        if ("VIETQR".equalsIgnoreCase(paymentMethodStr)) {
             transferContent = "PAYGATE MOCK_MERCHANT " + orderIdStr;
-            qrPayload = "PAYGATE|MOCK_MERCHANT|" + orderIdStr + "|" + vndAmount;
+            qrCodePayload = "PAYGATE|MOCK_MERCHANT|" + orderIdStr + "|" + vndAmount;
+            mockBankCode = "MB";
+            mockAccountNumber = "8888999988";
+            mockAccountName = "PAYGATE GATEWAY SYSTEM";
+            try {
+                vietQrUrl = "https://img.vietqr.io/image/970422-" + mockAccountNumber + "-compact2.png?amount=" + vndAmount + "&addInfo=" + java.net.URLEncoder.encode(transferContent, java.nio.charset.StandardCharsets.UTF_8) + "&accountName=PAYGATE%20GATEWAY%20SYSTEM";
+            } catch (Exception ignored) {
+                vietQrUrl = null;
+            }
         }
 
         return new PaygateCreateCheckoutResponse(
                 200,
                 true,
                 "SUCCESS",
-                "PayGate Session Created",
+                "PayGate Session Created (fallback)",
                 new PaygateCreateCheckoutResponse.PaygateCheckoutData(
                         mockToken,
                         fallbackPaymentUrl,
+                        vietQrUrl,
                         paymentMethodStr,
-                        mockBankAccount,
+                        qrCodePayload,
                         transferContent,
-                        qrPayload,
+                        mockBankCode,
+                        mockAccountNumber,
+                        mockAccountName,
                         null
                 )
         );

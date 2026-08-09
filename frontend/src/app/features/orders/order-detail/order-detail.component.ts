@@ -60,7 +60,7 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
               <span class="badge-pill" [ngClass]="getStatusBadgeClass(order.status)">
                 {{ order.status }}
               </span>
-              <ng-container *ngIf="order.status === 'PENDING' && order.paymentStatus === 'PENDING_PAYGATE'">
+              <ng-container *ngIf="order.status === 'PENDING' && (order.paymentStatus === 'UNPAID' || order.paymentStatus === 'PENDING_PAYGATE')">
                 <button *ngIf="!isSessionExpired && order.paymentMethod === 'BANK_TRANSFER'" mat-raised-button class="vietqr-btn" (click)="openVietQrModal()">
                   <mat-icon>qr_code_2</mat-icon> VietQR
                 </button>
@@ -685,7 +685,10 @@ export class OrderDetailComponent implements OnInit {
 
   continuePaygatePayment(): void {
     if (!this.order) return;
-    const url = this.order.paygatePayload?.paymentUrl;
+    const url = this.order.paygatePayload?.paymentUrl
+      || this.order.paygateUrl
+      || (this.order.paygateToken ? `http://localhost:4201/checkout?token=${this.order.paygateToken}` : null)
+      || (this.order.id ? `http://localhost:4201/checkout?orderId=ORD-${this.order.id}` : null);
     if (url) {
       window.location.href = url;
     } else {
@@ -706,7 +709,8 @@ export class OrderDetailComponent implements OnInit {
       data: {
         orderId: this.order.id,
         amountVnd: vndAmount,
-        description: pg?.transferContent || `ORD-${this.order.id}`,
+        description: pg?.transferContent || `PAYGATE ORD-${this.order.id}`,
+        vietQrUrl: pg?.vietQrUrl,
         qrPayload: pg?.qrPayload,
         bankName: pg?.bankAccount?.bankName,
         accountNo: pg?.bankAccount?.accountNumber,
