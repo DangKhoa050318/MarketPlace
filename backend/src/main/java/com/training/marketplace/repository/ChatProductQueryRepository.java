@@ -101,7 +101,8 @@ public class ChatProductQueryRepository {
                   JOIN categories c ON c.id = p.category_id
                   JOIN product_variants v ON v.product_id = p.id AND v.active = TRUE
              LEFT JOIN stock_levels sl ON sl.variant_id = v.id
-                 WHERE """ + String.join(" AND ", clauses) + """
+                 WHERE
+                """ + String.join(" AND ", clauses) + """
               GROUP BY p.id, c.name
                 HAVING COALESCE(SUM(sl.quantity - sl.reserved_quantity), 0) > 0
               ORDER BY available_stock DESC, p.created_at DESC, p.id ASC
