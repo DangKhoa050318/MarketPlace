@@ -6,6 +6,7 @@ import com.training.marketplace.enums.OrderStatus;
 import com.training.marketplace.enums.PaymentStatus;
 import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.service.InventoryFacade;
+import com.training.marketplace.service.PromotionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,6 +25,7 @@ public class OrderExpiryJob {
 
     private final OrderRepository orderRepository;
     private final InventoryFacade inventoryFacade;
+    private final PromotionService promotionService;
 
     /**
      * Runs every 1 minute to scan and auto-cancel PENDING orders whose payment session has expired.
@@ -72,6 +74,9 @@ public class OrderExpiryJob {
                 log.error("Failed to release stock for expired order id={}: {}", order.getId(), ex.getMessage(), ex);
             }
         }
+
+        // Refund coupon usage slot (idempotent)
+        promotionService.refundIfPresent(order.getPromotionCodeId(), order.getId());
 
         orderRepository.save(order);
         log.info("Order id={} has been automatically CANCELLED due to payment session expiration", order.getId());

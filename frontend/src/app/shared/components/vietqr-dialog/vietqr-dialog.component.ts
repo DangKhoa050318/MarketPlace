@@ -7,6 +7,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { catchError, finalize, of } from 'rxjs';
 import { VietQrService } from '../../../core/services/vietqr.service';
 import { BankData } from '../../../core/services/banks-data';
+import { environment } from '../../../../environments/environment';
 
 export interface VietQrDialogData {
   orderId: string | number;
@@ -797,15 +798,30 @@ export class VietQrDialogComponent implements OnInit, OnDestroy {
       transferContent: 'PAYGATE ' + cleanOrderId
     };
 
-    this.http.post('http://localhost:8081/api/v1/integration/bank-webhook', payload).pipe(
-      catchError(err => {
-        console.warn('Bank webhook simulation notification:', err);
-        return of(null);
-      }),
-      finalize(() => {
-        this.submittingPaid = false;
-        this.dialogRef.close(true);
-      })
-    ).subscribe();
+    // Dev-mode HMAC signature (matches paygate.bank-webhook.hmac-secret default)
+    const devSecret = 'dev-bank-webhook-secret-key-change-in-production';
+    const bodyStr = JSON.stringify(payload);
+    this.computeHmacSha256(bodyStr, devSecret).then(signature => {
+      const headers = { 'X-Bank-Signature': signature };
+      this.http.post(`${environment.paygateApiUrl}/api/v1/integration/bank-webhook`, payload, { headers }).pipe(
+        catchError(err => {
+          console.warn('Bank webhook simulation notification:', err);
+          return of(null);
+        }),
+        finalize(() => {
+          this.submittingPaid = false;
+          this.dialogRef.close(true);
+        })
+      ).subscribe();
+    });
+  }
+
+  private async computeHmacSha256(message: string, secret: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+    );
+    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
+    return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 }
