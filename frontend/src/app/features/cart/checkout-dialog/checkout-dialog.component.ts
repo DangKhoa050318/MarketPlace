@@ -102,7 +102,7 @@ export interface CheckoutDialogData {
               <mat-icon class="method-icon bnpl-icon">event_repeat</mat-icon>
               <div class="method-details">
                 <span class="method-title">Buy Now Pay Later</span>
-                <span class="method-desc">Pay 30% upfront today, split the rest into 0% interest installments via PayGate.</span>
+                <span class="method-desc">Choose upfront amount here, borrow the remaining amount through PayGate.</span>
               </div>
               <span class="badge-promo">0% Interest</span>
             </div>
@@ -119,6 +119,41 @@ export interface CheckoutDialogData {
                 <span class="method-desc">Transfer directly via VietQR / Mobile Banking to PayGate master account.</span>
               </div>
               <span class="badge-promo">No Fee</span>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="selectedMethod === 'PAYGATE_BNPL'" class="bnpl-details-box fade-in">
+          <div class="bnpl-term-header">
+            <span>BNPL split before PayGate</span>
+            <div class="amount-stack">
+              <strong>{{ payableTotal() | currency:'USD':'symbol':'1.2-2' }}</strong>
+              <small>PayGate receives {{ toVnd(payableTotal()) | currency:'VND':'symbol':'1.0-0' }}</small>
+            </div>
+          </div>
+
+          <div class="bnpl-input-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Upfront amount</mat-label>
+              <input matInput type="number" min="0" [max]="payableTotal()" step="0.01" [value]="bnplUpfrontAmount" (input)="onBnplUpfrontInput($event)" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Finance amount</mat-label>
+              <input matInput type="number" min="0.01" [max]="payableTotal()" step="0.01" [value]="financeAmount()" (input)="onBnplFinanceInput($event)" />
+            </mat-form-field>
+          </div>
+
+          <div class="bnpl-breakdown-grid">
+            <div class="breakdown-col">
+              <span class="b-label">Pay now</span>
+              <strong class="b-val text-amber">{{ upfrontAmount() | currency:'USD':'symbol':'1.2-2' }}</strong>
+              <small>{{ toVnd(upfrontAmount()) | currency:'VND':'symbol':'1.0-0' }}</small>
+            </div>
+            <div class="breakdown-col">
+              <span class="b-label">Borrow via PayGate</span>
+              <strong class="b-val text-cyan">{{ financeAmount() | currency:'USD':'symbol':'1.2-2' }}</strong>
+              <small>{{ toVnd(financeAmount()) | currency:'VND':'symbol':'1.0-0' }}</small>
             </div>
           </div>
         </div>
@@ -151,7 +186,7 @@ export interface CheckoutDialogData {
           mat-raised-button
           class="btn-glowing"
           (click)="onSubmit()"
-          [disabled]="form.invalid || submitting">
+          [disabled]="form.invalid || submitting || isBnplSplitInvalid()">
           <mat-icon>{{ selectedMethod === 'COD' ? 'shopping_bag' : 'open_in_new' }}</mat-icon>
           {{ submitting ? 'Processing...' : (selectedMethod === 'COD' ? 'Confirm COD Order' : 'Proceed to PayGate Portal') }}
         </button>
@@ -382,6 +417,20 @@ export interface CheckoutDialogData {
       margin-bottom: 10px;
     }
 
+    .amount-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+
+    .amount-stack small,
+    .breakdown-col small {
+      color: #64748b;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
     .term-pills {
       display: flex;
       gap: 6px;
@@ -411,6 +460,12 @@ export interface CheckoutDialogData {
       padding: 10px 14px;
       border-radius: 10px;
       border: 1px solid #e2e8f0;
+    }
+
+    .bnpl-input-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
     }
 
     .breakdown-col {
@@ -509,9 +564,10 @@ export class CheckoutDialogComponent {
   form: FormGroup;
   selectedMethod: PaymentMethod = 'COD';
   selectedBnplMonths = 3;
-  paygateCreditLimit = 150.00; // PayGate Approved Credit Limit
+  bnplUpfrontAmount = 0;
   showPaygateSpec = false;
   submitting = false;
+  private readonly usdToVndRate = 25000;
 
   constructor(
     private fb: FormBuilder,
@@ -526,6 +582,9 @@ export class CheckoutDialogComponent {
 
   selectMethod(method: PaymentMethod): void {
     this.selectedMethod = method;
+    if (method === 'PAYGATE_BNPL') {
+      this.bnplUpfrontAmount = this.upfrontAmount();
+    }
   }
 
   shippingFee(): number {
@@ -546,8 +605,7 @@ export class CheckoutDialogComponent {
     if (this.selectedMethod !== 'PAYGATE_BNPL') {
       return 0;
     }
-    const financed = Math.min(total, this.paygateCreditLimit);
-    return Math.round(financed * 100) / 100;
+    return this.roundMoney(total - this.upfrontAmount());
   }
 
   upfrontAmount(): number {
@@ -555,14 +613,32 @@ export class CheckoutDialogComponent {
     if (this.selectedMethod !== 'PAYGATE_BNPL') {
       return total;
     }
-    const upfront = Math.max(0, total - this.financeAmount());
-    return Math.round(upfront * 100) / 100;
+    return this.roundMoney(Math.min(Math.max(this.bnplUpfrontAmount || 0, 0), total));
+  }
+
+  onBnplUpfrontInput(event: Event): void {
+    this.bnplUpfrontAmount = this.clampMoney(Number((event.target as HTMLInputElement).value || 0));
+  }
+
+  onBnplFinanceInput(event: Event): void {
+    const total = this.payableTotal();
+    const finance = this.clampMoney(Number((event.target as HTMLInputElement).value || 0));
+    this.bnplUpfrontAmount = this.roundMoney(total - finance);
   }
 
   monthlyPayment(): number {
     const financed = this.financeAmount();
     if (this.selectedBnplMonths <= 0 || financed <= 0) return 0;
     return Math.round((financed / this.selectedBnplMonths) * 100) / 100;
+  }
+
+  toVnd(amount: number): number {
+    return Math.round((amount || 0) * this.usdToVndRate);
+  }
+
+  isBnplSplitInvalid(): boolean {
+    if (this.selectedMethod !== 'PAYGATE_BNPL') return false;
+    return this.financeAmount() <= 0 || this.upfrontAmount() + this.financeAmount() !== this.roundMoney(this.payableTotal());
   }
 
   getPayloadPreviewJson(): string {
@@ -572,9 +648,13 @@ export class CheckoutDialogComponent {
         orderId: 'ORD_AUTO_GEN',
         paymentMethod: 'PAYGATE_BNPL',
         paymentType: 'BNPL_FINANCING',
-        totalAmount: this.payableTotal(),
-        upfrontAmount: this.upfrontAmount(),
-        financeAmount: this.financeAmount(),
+        totalAmountUsd: this.payableTotal(),
+        upfrontAmountUsd: this.upfrontAmount(),
+        financeAmountUsd: this.financeAmount(),
+        amount: this.toVnd(this.payableTotal()),
+        upfrontAmount: this.toVnd(this.upfrontAmount()),
+        financeAmount: this.toVnd(this.financeAmount()),
+        currency: 'VND',
         bnplMonths: this.selectedBnplMonths,
         monthlyPayment: this.monthlyPayment(),
         description: `Tra gop PayGate BNPL (${this.selectedBnplMonths} thang) cho don hang Marketplace`,
@@ -618,5 +698,13 @@ export class CheckoutDialogComponent {
         bnplMonths: this.selectedMethod === 'PAYGATE_BNPL' ? this.selectedBnplMonths : undefined
       });
     }
+  }
+
+  private clampMoney(amount: number): number {
+    return this.roundMoney(Math.min(Math.max(amount, 0), this.payableTotal()));
+  }
+
+  private roundMoney(amount: number): number {
+    return Math.round(amount * 100) / 100;
   }
 }

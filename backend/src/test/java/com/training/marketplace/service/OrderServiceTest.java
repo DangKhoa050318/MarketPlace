@@ -136,12 +136,11 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("createOrder BNPL: upfront is server-computed 30%, client-tampered amount ignored")
-    void createOrder_bnpl_upfrontComputedServerSide_ignoresClientValue() {
-        // Attacker intercepts the request and sends a near-zero upfront to pay almost nothing now.
+    @DisplayName("createOrder BNPL: saves customer-selected upfront and finance split")
+    void createOrder_bnpl_savesCustomerSelectedSplit() {
         CreateOrderRequest request = new CreateOrderRequest(
                 "123 Main St", null, null, PaymentMethod.PAYGATE_BNPL,
-                new BigDecimal("0.01"), new BigDecimal("199.99"), 3);
+                new BigDecimal("0.00"), new BigDecimal("200.00"), 3);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(cartService.getCart(1L)).thenReturn(cartResponse);
         when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
@@ -155,8 +154,8 @@ class OrderServiceTest {
         ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
         verify(orderRepository).save(captor.capture());
         Order saved = captor.getValue();
-        assertThat(saved.getUpfrontAmount()).isEqualByComparingTo(new BigDecimal("60.00"));
-        assertThat(saved.getFinanceAmount()).isEqualByComparingTo(new BigDecimal("140.00"));
+        assertThat(saved.getUpfrontAmount()).isEqualByComparingTo(new BigDecimal("0.00"));
+        assertThat(saved.getFinanceAmount()).isEqualByComparingTo(new BigDecimal("200.00"));
     }
 
     @Test
