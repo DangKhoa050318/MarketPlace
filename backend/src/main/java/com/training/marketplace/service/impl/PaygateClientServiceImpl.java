@@ -42,7 +42,10 @@ public class PaygateClientServiceImpl implements PaygateClientService {
     private String cancelUrl;
 
     public PaygateClientServiceImpl() {
-        this.restTemplate = new RestTemplate();
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5_000);   // 5 seconds
+        factory.setReadTimeout(10_000);     // 10 seconds
+        this.restTemplate = new RestTemplate(factory);
     }
 
     @Override
