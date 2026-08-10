@@ -74,19 +74,26 @@ export function setup() {
 
   // Lấy danh sách sản phẩm/variant hợp lệ từ API thay vì hardcode
   const catalogRes = http.get(`${baseUrl}/api/v1/products/catalog?page=0&size=50`);
-  let variantIds = [1, 2, 3]; // fallback
+  let variantIds = [];
   if (catalogRes.status === 200) {
     try {
       const body = JSON.parse(catalogRes.body);
       if (body.data && body.data.content && body.data.content.length > 0) {
-        variantIds = [];
         body.data.content.forEach(product => {
           if (product.variants && product.variants.length > 0) {
             product.variants.forEach(v => variantIds.push(v.id));
           }
         });
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to parse catalog response:', e);
+    }
+  }
+
+  if (variantIds.length === 0) {
+    console.error('CRITICAL: No variant IDs found in catalog! The test cannot proceed.');
+    // Fail-fast if no products are found in the catalog
+    throw new Error('No variants found in /api/v1/products/catalog');
   }
 
   // Truyền data này xuống cho mọi VU
