@@ -22,6 +22,10 @@ public interface CampaignService {
 
     void delete(Long id); // soft delete (active=false)
 
+    CampaignResponse restore(Long id); // undo soft delete (active=true)
+
+    void hardDelete(Long id); // permanent delete; 409 if linked to a coupon or has event history
+
     CampaignResponse publish(Long id);
 
     CampaignResponse archive(Long id);

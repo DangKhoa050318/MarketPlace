@@ -10,11 +10,14 @@ import com.training.marketplace.dto.response.CollectionResponse;
 import com.training.marketplace.entity.Product;
 import com.training.marketplace.entity.ProductCollection;
 import com.training.marketplace.entity.ProductCollectionItem;
+import com.training.marketplace.enums.MerchandisingTargetType;
 import com.training.marketplace.enums.PublishStatus;
 import com.training.marketplace.exception.BadRequestException;
+import com.training.marketplace.exception.ConflictException;
 import com.training.marketplace.exception.DuplicateResourceException;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.mapper.CollectionMapper;
+import com.training.marketplace.repository.MerchandisingEventRepository;
 import com.training.marketplace.repository.ProductCollectionItemRepository;
 import com.training.marketplace.repository.ProductCollectionRepository;
 import com.training.marketplace.repository.ProductRepository;
@@ -39,6 +42,7 @@ public class CollectionServiceImpl implements CollectionService {
     private final ProductCollectionRepository collectionRepository;
     private final ProductCollectionItemRepository itemRepository;
     private final ProductRepository productRepository;
+    private final MerchandisingEventRepository eventRepository;
     private final CollectionMapper collectionMapper;
 
     @Override
@@ -83,6 +87,31 @@ public class CollectionServiceImpl implements CollectionService {
         collection.setActive(false);
         collectionRepository.save(collection);
         log.info("Collection soft-deleted: id={}", id);
+    }
+
+    @Override
+    @Transactional
+    public CollectionResponse restore(Long id) {
+        ProductCollection collection = findOr404(id);
+        collection.setActive(true);
+        log.info("Collection restored (active=true): id={}", id);
+        return detailResponse(collectionRepository.save(collection));
+    }
+
+    @Override
+    @Transactional
+    public void hardDelete(Long id) {
+        ProductCollection collection = findOr404(id);
+        if (itemRepository.existsByCollectionId(id)) {
+            throw new ConflictException(
+                    "Collection still has products; remove them before permanently deleting");
+        }
+        if (eventRepository.existsByTargetTypeAndTargetId(MerchandisingTargetType.COLLECTION, id)) {
+            throw new ConflictException(
+                    "Collection has recorded impression/click history and can only be deactivated, not permanently deleted");
+        }
+        collectionRepository.delete(collection);
+        log.info("Collection hard-deleted: id={}", id);
     }
 
     @Override

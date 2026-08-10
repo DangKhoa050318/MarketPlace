@@ -89,12 +89,26 @@ public class AdminCampaignController {
         return ApiResponse.success("Campaign archived", result);
     }
 
+    @PostMapping("/{id}/restore")
+    @Operation(summary = "Restore a soft-deleted campaign (ADMIN)")
+    public ApiResponse<CampaignResponse> restore(Authentication authentication, @PathVariable Long id) {
+        CampaignResponse result = campaignService.restore(id);
+        auditService.record(actor(authentication), "CAMPAIGN_RESTORE", "Campaign", id, "active=true");
+        return ApiResponse.success("Campaign restored", result);
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Soft-delete a campaign (ADMIN)")
-    public void delete(Authentication authentication, @PathVariable Long id) {
-        campaignService.delete(id);
-        auditService.record(actor(authentication), "CAMPAIGN_DELETE", "Campaign", id, "soft delete (active=false)");
+    @Operation(summary = "Delete a campaign: soft (active=false) by default, permanent with ?hard=true (ADMIN)")
+    public void delete(Authentication authentication, @PathVariable Long id,
+                       @RequestParam(defaultValue = "false") boolean hard) {
+        if (hard) {
+            campaignService.hardDelete(id);
+            auditService.record(actor(authentication), "CAMPAIGN_HARD_DELETE", "Campaign", id, "permanent delete");
+        } else {
+            campaignService.delete(id);
+            auditService.record(actor(authentication), "CAMPAIGN_DELETE", "Campaign", id, "soft delete (active=false)");
+        }
     }
 
     private String actor(Authentication authentication) {

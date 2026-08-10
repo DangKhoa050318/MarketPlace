@@ -46,7 +46,15 @@ export class CampaignService {
     return this.http.post<ApiResponse<CampaignResponse>>(`${this.apiUrl}/${id}/archive`, {});
   }
 
+  restore(id: number): Observable<ApiResponse<CampaignResponse>> {
+    return this.http.post<ApiResponse<CampaignResponse>>(`${this.apiUrl}/${id}/restore`, {});
+  }
+
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+
+  hardDelete(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${id}?hard=true`);
   }
 }

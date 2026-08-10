@@ -5,11 +5,14 @@ import com.training.marketplace.dto.request.CreateBannerRequest;
 import com.training.marketplace.dto.request.UpdateBannerRequest;
 import com.training.marketplace.dto.response.BannerResponse;
 import com.training.marketplace.entity.MerchandisingBanner;
+import com.training.marketplace.enums.MerchandisingTargetType;
 import com.training.marketplace.enums.PublishStatus;
 import com.training.marketplace.exception.BadRequestException;
+import com.training.marketplace.exception.ConflictException;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.mapper.BannerMapper;
 import com.training.marketplace.repository.MerchandisingBannerRepository;
+import com.training.marketplace.repository.MerchandisingEventRepository;
 import com.training.marketplace.service.BannerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +29,7 @@ import java.util.List;
 public class BannerServiceImpl implements BannerService {
 
     private final MerchandisingBannerRepository bannerRepository;
+    private final MerchandisingEventRepository eventRepository;
     private final BannerMapper bannerMapper;
 
     @Override
@@ -66,6 +70,27 @@ public class BannerServiceImpl implements BannerService {
         banner.setActive(false);
         bannerRepository.save(banner);
         log.info("Banner soft-deleted: id={}", id);
+    }
+
+    @Override
+    @Transactional
+    public BannerResponse restore(Long id) {
+        MerchandisingBanner banner = findOr404(id);
+        banner.setActive(true);
+        log.info("Banner restored (active=true): id={}", id);
+        return bannerMapper.toResponse(bannerRepository.save(banner));
+    }
+
+    @Override
+    @Transactional
+    public void hardDelete(Long id) {
+        MerchandisingBanner banner = findOr404(id);
+        if (eventRepository.existsByTargetTypeAndTargetId(MerchandisingTargetType.BANNER, id)) {
+            throw new ConflictException(
+                    "Banner has recorded impression/click history and can only be deactivated, not permanently deleted");
+        }
+        bannerRepository.delete(banner);
+        log.info("Banner hard-deleted: id={}", id);
     }
 
     @Override

@@ -18,6 +18,9 @@ public interface MerchandisingEventRepository extends JpaRepository<Merchandisin
     /** Idempotent dedup: an event whose client eventId already exists is a duplicate (B-407). */
     boolean existsByEventId(UUID eventId);
 
+    /** Any recorded impression/click history for a target — used to guard hard delete. */
+    boolean existsByTargetTypeAndTargetId(MerchandisingTargetType targetType, Long targetId);
+
     /** Count impressions/clicks for one target within [from, to) — used by the summary (B-408). */
     @Query("""
             SELECT COUNT(e) FROM MerchandisingEvent e

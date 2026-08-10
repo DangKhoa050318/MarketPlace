@@ -24,6 +24,10 @@ public interface CollectionService {
 
     void delete(Long id); // soft delete (active=false)
 
+    CollectionResponse restore(Long id); // undo soft delete (active=true)
+
+    void hardDelete(Long id); // permanent delete; 409 if it still has items or event history
+
     CollectionResponse publish(Long id);
 
     CollectionResponse unpublish(Long id);

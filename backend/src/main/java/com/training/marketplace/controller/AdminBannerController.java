@@ -90,13 +90,28 @@ public class AdminBannerController {
         return ApiResponse.success("Banner unpublished", result);
     }
 
+    @PostMapping("/{id}/restore")
+    @Operation(summary = "Restore a soft-deleted banner (ADMIN)")
+    public ApiResponse<BannerResponse> restore(Authentication authentication, @PathVariable Long id) {
+        BannerResponse result = bannerService.restore(id);
+        auditService.record(actor(authentication), "BANNER_RESTORE", "MerchandisingBanner", id, "active=true");
+        return ApiResponse.success("Banner restored", result);
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Soft-delete a banner (ADMIN)")
-    public void delete(Authentication authentication, @PathVariable Long id) {
-        bannerService.delete(id);
-        auditService.record(actor(authentication), "BANNER_DELETE", "MerchandisingBanner", id,
-                "soft delete (active=false)");
+    @Operation(summary = "Delete a banner: soft (active=false) by default, permanent with ?hard=true (ADMIN)")
+    public void delete(Authentication authentication, @PathVariable Long id,
+                       @RequestParam(defaultValue = "false") boolean hard) {
+        if (hard) {
+            bannerService.hardDelete(id);
+            auditService.record(actor(authentication), "BANNER_HARD_DELETE", "MerchandisingBanner", id,
+                    "permanent delete");
+        } else {
+            bannerService.delete(id);
+            auditService.record(actor(authentication), "BANNER_DELETE", "MerchandisingBanner", id,
+                    "soft delete (active=false)");
+        }
     }
 
     private String actor(Authentication authentication) {

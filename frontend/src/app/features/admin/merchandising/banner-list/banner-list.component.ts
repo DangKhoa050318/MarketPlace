@@ -59,20 +59,27 @@ import { ConfirmDialogComponent } from '../../../../shared/components/confirm-di
             <tr><th>Preview</th><th>Title</th><th>Position</th><th>Order</th><th>Status</th><th>Window</th><th class="right">Actions</th></tr>
           </thead>
           <tbody>
-            <tr *ngFor="let b of items">
+            <tr *ngFor="let b of items" [class.row-inactive]="!b.active">
               <td><img *ngIf="b.imageUrlDesktop" [src]="b.imageUrlDesktop" [alt]="b.altText" class="thumb" /></td>
               <td><strong>{{ b.title }}</strong></td>
               <td><code>{{ b.position }}</code></td>
               <td>{{ b.displayOrder }}</td>
-              <td><span class="badge" [ngClass]="b.status.toLowerCase()">{{ b.status }}</span></td>
+              <td>
+                <span class="badge" [ngClass]="b.status.toLowerCase()">{{ b.status }}</span>
+                <span class="badge inactive" *ngIf="!b.active">Inactive</span>
+              </td>
               <td class="muted small">
                 {{ b.startsAt ? (b.startsAt | date:'short') : '—' }}<br>{{ b.endsAt ? (b.endsAt | date:'short') : '—' }}
               </td>
               <td class="right">
                 <button mat-icon-button (click)="edit(b)" matTooltip="Edit"><mat-icon>edit</mat-icon></button>
-                <button mat-icon-button *ngIf="b.status !== 'PUBLISHED'" (click)="publish(b)" matTooltip="Publish"><mat-icon>publish</mat-icon></button>
-                <button mat-icon-button *ngIf="b.status === 'PUBLISHED'" (click)="unpublish(b)" matTooltip="Unpublish"><mat-icon>unpublished</mat-icon></button>
-                <button mat-icon-button color="warn" (click)="remove(b)" matTooltip="Deactivate"><mat-icon>delete_outline</mat-icon></button>
+                <ng-container *ngIf="b.active">
+                  <button mat-icon-button *ngIf="b.status !== 'PUBLISHED'" (click)="publish(b)" matTooltip="Publish"><mat-icon>publish</mat-icon></button>
+                  <button mat-icon-button *ngIf="b.status === 'PUBLISHED'" (click)="unpublish(b)" matTooltip="Unpublish"><mat-icon>unpublished</mat-icon></button>
+                  <button mat-icon-button color="warn" (click)="remove(b)" matTooltip="Deactivate"><mat-icon>delete_outline</mat-icon></button>
+                </ng-container>
+                <button mat-icon-button *ngIf="!b.active" color="primary" (click)="activate(b)" matTooltip="Activate"><mat-icon>restore_from_trash</mat-icon></button>
+                <button mat-icon-button *ngIf="!b.active" color="warn" (click)="hardRemove(b)" matTooltip="Delete permanently"><mat-icon>delete_forever</mat-icon></button>
               </td>
             </tr>
             <tr *ngIf="items.length === 0"><td colspan="7" class="empty">No banners found</td></tr>
@@ -110,6 +117,9 @@ import { ConfirmDialogComponent } from '../../../../shared/components/confirm-di
     .badge { padding: 2px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; text-transform: capitalize; }
     .badge.published { background: rgba(22,163,74,.12); color: #16a34a; }
     .badge.draft { background: rgba(234,179,8,.15); color: #b45309; }
+    .badge.inactive { background: rgba(148,163,184,.18); color: #64748b; margin-left: 6px; }
+    tr.row-inactive { opacity: .55; }
+    tr.row-inactive .thumb { filter: grayscale(1); }
     .pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding-top: 12px; }
   `]
 })
@@ -171,6 +181,26 @@ export class BannerListComponent implements OnInit {
       this.bannerService.delete(b.id).subscribe({
         next: () => { this.notification.success('Banner deactivated'); this.reload(); },
         error: () => this.notification.error('Failed to deactivate banner')
+      });
+    });
+  }
+
+  activate(b: BannerResponse): void {
+    this.bannerService.restore(b.id).subscribe({
+      next: () => { this.notification.success('Banner activated'); this.reload(); },
+      error: () => this.notification.error('Failed to activate banner')
+    });
+  }
+
+  hardRemove(b: BannerResponse): void {
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      data: { title: 'Delete Banner Permanently', message: `Permanently delete "${b.title}"? This cannot be undone.` }
+    });
+    ref.afterClosed().subscribe((ok: boolean) => {
+      if (!ok) return;
+      this.bannerService.hardDelete(b.id).subscribe({
+        next: () => { this.notification.success('Banner permanently deleted'); this.reload(); },
+        error: (err) => this.notification.error(err?.error?.message || 'Cannot delete: banner still has links')
       });
     });
   }

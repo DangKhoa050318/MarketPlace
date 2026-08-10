@@ -46,7 +46,15 @@ export class BannerService {
     return this.http.post<ApiResponse<BannerResponse>>(`${this.apiUrl}/${id}/unpublish`, {});
   }
 
+  restore(id: number): Observable<ApiResponse<BannerResponse>> {
+    return this.http.post<ApiResponse<BannerResponse>>(`${this.apiUrl}/${id}/restore`, {});
+  }
+
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+
+  hardDelete(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${id}?hard=true`);
   }
 }

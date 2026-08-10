@@ -59,16 +59,23 @@ import { ConfirmDialogComponent } from '../../../../shared/components/confirm-di
             <tr><th>Name</th><th>Slug</th><th>Items</th><th>Status</th><th class="right">Actions</th></tr>
           </thead>
           <tbody>
-            <tr *ngFor="let c of items">
+            <tr *ngFor="let c of items" [class.row-inactive]="!c.active">
               <td><strong>{{ c.name }}</strong></td>
               <td><code>{{ c.slug }}</code></td>
               <td>{{ c.items.length }}</td>
-              <td><span class="badge" [ngClass]="c.status.toLowerCase()">{{ c.status }}</span></td>
+              <td>
+                <span class="badge" [ngClass]="c.status.toLowerCase()">{{ c.status }}</span>
+                <span class="badge inactive" *ngIf="!c.active">Inactive</span>
+              </td>
               <td class="right">
                 <button mat-icon-button (click)="edit(c)" matTooltip="Edit / manage items"><mat-icon>edit</mat-icon></button>
-                <button mat-icon-button *ngIf="c.status !== 'PUBLISHED'" (click)="publish(c)" matTooltip="Publish"><mat-icon>publish</mat-icon></button>
-                <button mat-icon-button *ngIf="c.status === 'PUBLISHED'" (click)="unpublish(c)" matTooltip="Unpublish"><mat-icon>unpublished</mat-icon></button>
-                <button mat-icon-button color="warn" (click)="remove(c)" matTooltip="Deactivate"><mat-icon>delete_outline</mat-icon></button>
+                <ng-container *ngIf="c.active">
+                  <button mat-icon-button *ngIf="c.status !== 'PUBLISHED'" (click)="publish(c)" matTooltip="Publish"><mat-icon>publish</mat-icon></button>
+                  <button mat-icon-button *ngIf="c.status === 'PUBLISHED'" (click)="unpublish(c)" matTooltip="Unpublish"><mat-icon>unpublished</mat-icon></button>
+                  <button mat-icon-button color="warn" (click)="remove(c)" matTooltip="Deactivate"><mat-icon>delete_outline</mat-icon></button>
+                </ng-container>
+                <button mat-icon-button *ngIf="!c.active" color="primary" (click)="activate(c)" matTooltip="Activate"><mat-icon>restore_from_trash</mat-icon></button>
+                <button mat-icon-button *ngIf="!c.active" color="warn" (click)="hardRemove(c)" matTooltip="Delete permanently"><mat-icon>delete_forever</mat-icon></button>
               </td>
             </tr>
             <tr *ngIf="items.length === 0"><td colspan="5" class="empty">No collections found</td></tr>
@@ -103,6 +110,8 @@ import { ConfirmDialogComponent } from '../../../../shared/components/confirm-di
     .badge { padding: 2px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; text-transform: capitalize; }
     .badge.published { background: rgba(22,163,74,.12); color: #16a34a; }
     .badge.draft { background: rgba(234,179,8,.15); color: #b45309; }
+    .badge.inactive { background: rgba(148,163,184,.18); color: #64748b; margin-left: 6px; }
+    tr.row-inactive { opacity: .55; }
     .pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding-top: 12px; }
   `]
 })
@@ -164,6 +173,26 @@ export class CollectionListComponent implements OnInit {
       this.collectionService.delete(c.id).subscribe({
         next: () => { this.notification.success('Collection deactivated'); this.reload(); },
         error: () => this.notification.error('Failed to deactivate collection')
+      });
+    });
+  }
+
+  activate(c: CollectionResponse): void {
+    this.collectionService.restore(c.id).subscribe({
+      next: () => { this.notification.success('Collection activated'); this.reload(); },
+      error: () => this.notification.error('Failed to activate collection')
+    });
+  }
+
+  hardRemove(c: CollectionResponse): void {
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      data: { title: 'Delete Collection Permanently', message: `Permanently delete "${c.name}"? This cannot be undone.` }
+    });
+    ref.afterClosed().subscribe((ok: boolean) => {
+      if (!ok) return;
+      this.collectionService.hardDelete(c.id).subscribe({
+        next: () => { this.notification.success('Collection permanently deleted'); this.reload(); },
+        error: (err) => this.notification.error(err?.error?.message || 'Cannot delete: collection still has links')
       });
     });
   }

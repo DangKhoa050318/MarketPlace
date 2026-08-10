@@ -22,6 +22,10 @@ public interface BannerService {
 
     void delete(Long id); // soft delete (active=false)
 
+    BannerResponse restore(Long id); // undo soft delete (active=true)
+
+    void hardDelete(Long id); // permanent delete; 409 if the banner still has event history
+
     BannerResponse publish(Long id);
 
     BannerResponse unpublish(Long id);
