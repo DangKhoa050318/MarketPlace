@@ -45,12 +45,13 @@ export function setup() {
 
   // Login cho 5 user khác nhau để test (Limit 5 req/min theo RateLimitingFilter)
   // Không dùng X-Forwarded-For spoofing vì đó là anti-pattern che giấu lỗ hổng security
+  const testPassword = __ENV.TEST_PASSWORD || 'admin123';
   for (let i = 1; i <= 5; i++) {
     const userStr = i < 10 ? `0${i}` : `${i}`;
     const username = `demo_customer_${userStr}`;
     const loginPayload = JSON.stringify({
       username: username,
-      password: 'admin123'
+      password: testPassword
     });
     
     const loginRes = http.post(`${baseUrl}/api/v1/auth/login`, loginPayload, {
