@@ -15,6 +15,7 @@ import com.training.marketplace.dto.response.OrderResponse;
 import com.training.marketplace.enums.ChatIntent;
 import com.training.marketplace.enums.DiscountType;
 import com.training.marketplace.enums.PaymentMethod;
+import com.training.marketplace.enums.PaymentStatus;
 import com.training.marketplace.enums.PromotionScopeType;
 import com.training.marketplace.enums.ScopeRefType;
 import com.training.marketplace.exception.BadRequestException;
@@ -249,7 +250,9 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
             UUID traceId) {
         ChatCheckoutState state = conversation.checkoutState();
         String normalized = normalizeText(request.message());
-        if (state == null && !isCheckoutStart(normalized)) {
+        if (state == null
+                && !isCheckoutStart(normalized)
+                && selectedChatPaymentMethod(normalized) == null) {
             return null;
         }
         if (isCheckoutCancellation(normalized)) {
@@ -259,9 +262,11 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
                     List.of("Sản phẩm bán chạy", "Tiếp tục mua sắm"), null, null, messageId, traceId);
         }
         if (state == null) {
-            if (isCodSelection(normalized)) {
-                return selectCod(
+            PaymentMethod selectedPaymentMethod = selectedChatPaymentMethod(normalized);
+            if (selectedPaymentMethod != null) {
+                return selectPaymentMethod(
                         userId, sessionId, ownerKey, conversation, request,
+                        selectedPaymentMethod,
                         messageId, traceId);
             }
             return checkoutResponse(
@@ -271,7 +276,8 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
                     new ChatCheckoutState(
                             ChatCheckoutStage.AWAITING_PAYMENT_METHOD,
                             null,
-                            normalizedCoupon(request.couponCode())),
+                            normalizedCoupon(request.couponCode()),
+                            null),
                     null,
                     messageId,
                     traceId);
@@ -299,12 +305,14 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
             UUID messageId,
             UUID traceId) {
         String normalized = normalizeText(request.message());
-        if (isCodSelection(normalized)) {
-            return selectCod(
+        PaymentMethod selectedPaymentMethod = selectedChatPaymentMethod(normalized);
+        if (selectedPaymentMethod != null) {
+            return selectPaymentMethod(
                     userId, sessionId, ownerKey, conversation,
                     new ChatMessageRequest(
                             request.conversationId(), request.message(), request.pageContext(),
                             first(request.couponCode(), state.couponCode())),
+                    selectedPaymentMethod,
                     messageId, traceId);
         }
         if (isOtherPaymentSelection(normalized)) {
@@ -324,35 +332,41 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
                 paymentMethodReplies(), state, null, messageId, traceId);
     }
 
-    private ChatMessageResponse selectCod(
+    private ChatMessageResponse selectPaymentMethod(
             Long userId,
             String sessionId,
             String ownerKey,
             ChatConversationSnapshot conversation,
             ChatMessageRequest request,
+            PaymentMethod paymentMethod,
             UUID messageId,
             UUID traceId) {
+        String paymentLabel = paymentMethod == PaymentMethod.CREDIT_CARD
+                ? "PayGate E-Wallet / Card Gateway"
+                : "Cash on Delivery (COD)";
         if (userId == null) {
             return checkoutResponse(
                     null, sessionId, ownerKey, conversation, request.message(),
-                    "Bạn cần đăng nhập để đặt đơn COD. Sau khi đăng nhập, hãy chọn lại Cash on Delivery (COD).",
-                    List.of("Cash on Delivery (COD)", "Hủy thanh toán"),
+                    "Bạn cần đăng nhập để thanh toán. Sau khi đăng nhập, hãy chọn lại " + paymentLabel + ".",
+                    paymentMethodReplies(),
                     new ChatCheckoutState(
                             ChatCheckoutStage.AWAITING_PAYMENT_METHOD,
                             null,
-                            normalizedCoupon(request.couponCode())),
+                            normalizedCoupon(request.couponCode()),
+                            null),
                     null,
                     messageId,
                     traceId);
         }
         return checkoutResponse(
                 userId, sessionId, ownerKey, conversation, request.message(),
-                "Bạn đã chọn Cash on Delivery (COD). Vui lòng nhập đầy đủ địa chỉ giao hàng.",
+                "Bạn đã chọn " + paymentLabel + ". Vui lòng nhập đầy đủ địa chỉ giao hàng.",
                 List.of("Hủy thanh toán"),
                 new ChatCheckoutState(
                         ChatCheckoutStage.AWAITING_ADDRESS,
                         null,
-                        normalizedCoupon(request.couponCode())),
+                        normalizedCoupon(request.couponCode()),
+                        paymentMethod),
                 null,
                 messageId,
                 traceId);
@@ -388,7 +402,8 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
                 new ChatCheckoutState(
                         ChatCheckoutStage.AWAITING_NOTE,
                         address,
-                        first(normalizedCoupon(request.couponCode()), state.couponCode())),
+                        first(normalizedCoupon(request.couponCode()), state.couponCode()),
+                        state.paymentMethod()),
                 null,
                 messageId,
                 traceId);
@@ -414,13 +429,15 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
         String historyMessage = note == null
                 ? "Bỏ qua ghi chú" : "[Ghi chú giao hàng đã được cung cấp]";
         String couponCode = first(normalizedCoupon(request.couponCode()), state.couponCode());
+        PaymentMethod paymentMethod = state.paymentMethod() == null
+                ? PaymentMethod.COD : state.paymentMethod();
         try {
             OrderResponse order = orderService.createOrder(
                     userId,
-                    new CreateOrderRequest(state.shippingAddress(), note, couponCode));
-            String answer = "Đặt hàng COD thành công. Mã đơn hàng #" + order.id()
-                    + ", tổng thanh toán " + money(order.totalAmount()) + ". "
-                    + "Đơn đã được xác nhận và bạn sẽ thanh toán khi nhận hàng tại địa chỉ đã cung cấp.";
+                    new CreateOrderRequest(
+                            state.shippingAddress(), note, couponCode, paymentMethod,
+                            null, null, null));
+            String answer = checkoutCompletionAnswer(order);
             return checkoutResponse(
                     userId, sessionId, ownerKey, conversation, historyMessage, answer,
                     List.of("Sản phẩm bán chạy", "Tiếp tục mua sắm"),
@@ -469,16 +486,34 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
         int itemCount = order.items() == null ? 0 : order.items().stream()
                 .mapToInt(item -> item.quantity())
                 .sum();
+        String paymentUrl = order.paygatePayload() != null
+                ? order.paygatePayload().paymentUrl() : order.paygateUrl();
         return new ChatOrderSummaryResponse(
                 order.id(), order.status(), order.paymentMethod(), order.paymentStatus(),
                 order.totalAmount(), order.discountAmount(), order.shippingFee(), order.couponCode(),
-                order.shippingAddress(), order.note(), itemCount, order.createdAt());
+                order.shippingAddress(), order.note(), itemCount, paymentUrl,
+                order.paygateExpiresAt(), order.createdAt());
+    }
+
+    private String checkoutCompletionAnswer(OrderResponse order) {
+        if (order.paymentStatus() == PaymentStatus.PAID) {
+            return "Đơn hàng #" + order.id() + " đã được tạo và thanh toán thành công, tổng tiền "
+                    + money(order.totalAmount()) + ".";
+        }
+        if (order.paymentMethod() == PaymentMethod.CREDIT_CARD) {
+            return "Đã tạo đơn hàng #" + order.id() + ", tổng thanh toán "
+                    + money(order.totalAmount()) + ". Hãy nhấn “Thanh toán qua PayGate” bên dưới. "
+                    + "Mình sẽ thông báo ngay trong chat khi PayGate xác nhận thành công hoặc thất bại.";
+        }
+        return "Đặt hàng COD thành công. Mã đơn hàng #" + order.id()
+                + ", tổng thanh toán " + money(order.totalAmount()) + ". "
+                + "Đơn đã được xác nhận và bạn sẽ thanh toán khi nhận hàng tại địa chỉ đã cung cấp.";
     }
 
     private String paymentMethodMessage() {
         return "Các phương thức thanh toán hiện có:\n"
                 + "1. Cash on Delivery (COD) — được hỗ trợ trực tiếp trong chat\n"
-                + "2. Credit Card\n"
+                + "2. PayGate E-Wallet / Card Gateway — được hỗ trợ trực tiếp trong chat\n"
                 + "3. Bank Transfer\n"
                 + "4. PayGate BNPL\n"
                 + "Bạn muốn chọn phương thức nào?";
@@ -487,7 +522,7 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
     private List<String> paymentMethodReplies() {
         return List.of(
                 "Cash on Delivery (COD)",
-                "Credit Card",
+                "PayGate E-Wallet / Card Gateway",
                 "Bank Transfer",
                 "PayGate BNPL",
                 "Hủy thanh toán");
@@ -501,8 +536,23 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
         return normalized.matches(".*\\b(cod|cash on delivery|thanh toan khi nhan hang|tra tien khi nhan hang)\\b.*");
     }
 
+    private boolean isCreditCardSelection(String normalized) {
+        return normalized.matches(
+                ".*\\b(credit card|the tin dung|the ghi no|e wallet|vi dien tu|card gateway|paygate card)\\b.*");
+    }
+
+    private PaymentMethod selectedChatPaymentMethod(String normalized) {
+        if (isCodSelection(normalized)) {
+            return PaymentMethod.COD;
+        }
+        if (isCreditCardSelection(normalized)) {
+            return PaymentMethod.CREDIT_CARD;
+        }
+        return null;
+    }
+
     private boolean isOtherPaymentSelection(String normalized) {
-        return normalized.matches(".*\\b(credit card|the tin dung|bank transfer|chuyen khoan|paygate|bnpl)\\b.*");
+        return normalized.matches(".*\\b(bank transfer|chuyen khoan|paygate bnpl|bnpl)\\b.*");
     }
 
     private boolean isCheckoutCancellation(String normalized) {

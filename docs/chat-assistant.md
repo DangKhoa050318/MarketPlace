@@ -25,8 +25,28 @@ Content-Type: application/json
 ```
 
 The response contains a Vietnamese answer plus structured product cards, voucher conditions, quick
-replies, and correlation identifiers. The browser must render product/voucher fields from the
+replies, optional order/payment details, and correlation identifiers. The browser must render product/voucher fields from the
 structured response instead of parsing the answer text.
+
+## Cart, coupon and checkout commands
+
+- The storefront recognizes Vietnamese add-to-cart commands against the latest recommendation and
+  adds the recommended `variantId` through the existing cart API.
+- Voucher commands preview the code against the authoritative backend cart. The code is only
+  consumed and its usage recorded when `OrderService` creates the order.
+- Stateful checkout supports both `COD` and `CREDIT_CARD` (`PayGate E-Wallet / Card Gateway`). The
+  assistant collects payment method, shipping address and optional delivery note before calling the
+  existing order service.
+- A credit-card order returns the PayGate `paymentUrl` in the structured order summary. The
+  storefront opens it in a new tab so the original chat remains active.
+- After the user starts PayGate payment, the storefront polls the authenticated order endpoint every
+  two seconds. It writes success into chat only when the server reports `paymentStatus=PAID`, and
+  writes failure/cancellation only when the server reports `status=CANCELLED`. These terminal states
+  are set by the signed PayGate webhook; redirect query parameters are not trusted as payment truth.
+- The pending order ID is retained in browser storage so status tracking resumes after a reload or
+  after PayGate redirects its tab back to the Marketplace callback page.
+- Bank transfer and PayGate BNPL remain available through the regular checkout page, not directly
+  through the chat state machine.
 
 ## Trust boundaries
 
@@ -73,3 +93,6 @@ The assistant emits `CHAT_MESSAGE` without raw message text. The storefront emit
 - `ChatAssistantServiceTest`: offer validity behavior, product cards, ownership, anonymous session.
 - `ChatDataFoundationIntegrationTest`: PostgreSQL campaign/promotion/scope/time and in-stock query.
 - `chat-assistant.service.spec.ts`: anonymous header and conversation persistence.
+- `ChatAssistantServiceTest`: COD and PayGate card state machines, including returned payment URL.
+- `chat-payment-status.service.spec.ts`: paid/cancelled server truth and pending-payment resume.
+- `chat-assistant.component.spec.ts`: add-to-cart, voucher apply and chat payment notification.

@@ -5,6 +5,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
 import { ChatAssistantService } from '../../../core/services/chat-assistant.service';
 import { ChatCartCommandService } from '../../../core/services/chat-cart-command.service';
+import { ChatPaymentStatusService } from '../../../core/services/chat-payment-status.service';
 import { ChatVoucherCommandService } from '../../../core/services/chat-voucher-command.service';
 import { PromotionService } from '../../../core/services/promotion.service';
 import { ChatAssistantComponent } from './chat-assistant.component';
@@ -15,6 +16,7 @@ describe('ChatAssistantComponent cart commands', () => {
   let authService: jasmine.SpyObj<AuthService>;
   let cartService: jasmine.SpyObj<CartService>;
   let promotionService: jasmine.SpyObj<PromotionService>;
+  let paymentStatusService: jasmine.SpyObj<ChatPaymentStatusService>;
 
   beforeEach(() => {
     chatService = jasmine.createSpyObj<ChatAssistantService>(
@@ -25,7 +27,10 @@ describe('ChatAssistantComponent cart commands', () => {
       'CartService', ['addToCart', 'markCheckoutComplete']);
     promotionService = jasmine.createSpyObj<PromotionService>(
       'PromotionService', ['apply', 'appliedCouponCode']);
+    paymentStatusService = jasmine.createSpyObj<ChatPaymentStatusService>(
+      'ChatPaymentStatusService', ['watch', 'resume']);
     promotionService.appliedCouponCode.and.returnValue(undefined);
+    paymentStatusService.resume.and.returnValue(null);
     const router = { url: '/products' };
 
     component = new ChatAssistantComponent(
@@ -36,6 +41,7 @@ describe('ChatAssistantComponent cart commands', () => {
       new ChatCartCommandService(),
       new ChatVoucherCommandService(),
       promotionService,
+      paymentStatusService,
       router as never
     );
     component.messages.push({
@@ -133,6 +139,47 @@ describe('ChatAssistantComponent cart commands', () => {
       'Bỏ qua ghi chú', undefined, 'SCHOOL10');
     expect(cartService.markCheckoutComplete).toHaveBeenCalled();
     expect(component.messages[component.messages.length - 1].response?.order?.id).toBe(88);
+  });
+
+  it('writes successful PayGate confirmation back into the chat', () => {
+    paymentStatusService.watch.and.returnValue(of({
+      status: 'SUCCESS',
+      orderId: 89,
+      order: {
+        id: 89,
+        userId: 1,
+        userEmail: 'customer@example.com',
+        totalAmount: 16300000,
+        status: 'CONFIRMED',
+        paymentMethod: 'CREDIT_CARD',
+        paymentStatus: 'PAID',
+        paygateTransactionRef: 'TXN-CARD-89',
+        items: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    }));
+
+    component.watchPaygatePayment({
+      id: 89,
+      status: 'PENDING',
+      paymentMethod: 'CREDIT_CARD',
+      paymentStatus: 'PENDING_PAYGATE',
+      totalAmount: 16300000,
+      discountAmount: 1800000,
+      shippingFee: 100000,
+      shippingAddress: '123 Nguyễn Trãi, Quận 5, TP.HCM',
+      itemCount: 1,
+      paymentUrl: 'http://localhost:4201/checkout?token=CHK_CARD',
+      createdAt: new Date().toISOString()
+    });
+
+    expect(paymentStatusService.watch).toHaveBeenCalledOnceWith(89);
+    expect(component.open).toBeTrue();
+    expect(component.messages[component.messages.length - 1].text)
+      .withContext('payment result should be visible in chat')
+      .toContain('đã thành công');
+    expect(component.messages[component.messages.length - 1].text).toContain('TXN-CARD-89');
   });
 });
 

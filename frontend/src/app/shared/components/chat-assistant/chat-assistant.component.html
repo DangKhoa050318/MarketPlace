@@ -53,25 +53,40 @@
         </a>
       </div>
 
-      <a
+      <div
         *ngIf="message.response?.order as order"
-        class="order-card"
-        [routerLink]="['/orders', order.id]">
+        class="order-card">
         <div class="order-card__header">
           <mat-icon>receipt_long</mat-icon>
           <strong>Đơn hàng #{{ order.id }}</strong>
           <span>{{ order.status }}</span>
         </div>
         <dl>
-          <div><dt>Thanh toán</dt><dd>COD · Thanh toán khi nhận hàng</dd></div>
+          <div>
+            <dt>Thanh toán</dt>
+            <dd>{{ order.paymentMethod === 'CREDIT_CARD' ? 'PayGate E-Wallet / Card Gateway' : (order.paymentMethod === 'COD' ? 'COD · Thanh toán khi nhận hàng' : order.paymentMethod) }}</dd>
+          </div>
+          <div><dt>Trạng thái</dt><dd>{{ order.paymentStatus }}</dd></div>
           <div><dt>Số sản phẩm</dt><dd>{{ order.itemCount }}</dd></div>
           <div *ngIf="order.couponCode"><dt>Voucher</dt><dd>{{ order.couponCode }}</dd></div>
           <div><dt>Phí vận chuyển</dt><dd>{{ formatPrice(order.shippingFee) }}</dd></div>
           <div><dt>Tổng tiền</dt><dd>{{ formatPrice(order.totalAmount) }}</dd></div>
         </dl>
         <p><mat-icon>location_on</mat-icon>{{ order.shippingAddress }}</p>
-        <span class="order-card__link">Xem chi tiết đơn hàng <mat-icon>arrow_forward</mat-icon></span>
-      </a>
+        <a
+          *ngIf="order.paymentMethod === 'CREDIT_CARD' && order.paymentUrl && order.paymentStatus !== 'PAID' && order.status !== 'CANCELLED'"
+          class="order-card__payment"
+          [href]="order.paymentUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          (click)="watchPaygatePayment(order)">
+          <mat-icon>open_in_new</mat-icon>
+          Thanh toán qua PayGate
+        </a>
+        <a class="order-card__link" [routerLink]="['/orders', order.id]">
+          Xem chi tiết đơn hàng <mat-icon>arrow_forward</mat-icon>
+        </a>
+      </div>
 
       <div *ngIf="message.response?.quickReplies?.length" class="quick-replies">
         <button

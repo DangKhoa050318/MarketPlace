@@ -19,6 +19,8 @@ public record ChatOrderSummaryResponse(
         String shippingAddress,
         String note,
         int itemCount,
+        String paymentUrl,
+        LocalDateTime paymentExpiresAt,
         LocalDateTime createdAt
 ) {
 }

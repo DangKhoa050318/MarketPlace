@@ -519,3 +519,13 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
 - ✅ Verify: backend unit **322/322 PASS**; focused chat **7/7 PASS**; frontend **55/55 PASS**;
   Angular production build **SUCCESS**. `ChatDataFoundationIntegrationTest` đã compile nhưng bị
   **SKIP** vì máy kiểm thử không có Docker daemon khả dụng.
+
+### Shopping chat PayGate card checkout — 2026-08-10
+
+- ✅ Chat checkout hỗ trợ thêm `CREDIT_CARD` với nhãn **PayGate E-Wallet / Card Gateway** bên cạnh COD.
+- ✅ Tái sử dụng `OrderService` và PayGate checkout session hiện hữu: chatbot trả payment URL trong
+  order card, mở PayGate ở tab mới và giữ hội thoại ở tab Marketplace.
+- ✅ Kết quả chat không tin redirect query parameter; frontend poll order thuộc user và chỉ báo thành
+  công khi webhook đã cập nhật `paymentStatus=PAID`, hoặc thất bại/hủy khi order thành `CANCELLED`.
+- ✅ Pending payment được lưu local để tự theo dõi lại sau reload/callback; PayGate/MarketPlace vẫn nối
+  qua API + signed webhook, không thêm coupling hoặc schema mới bên GatePay.
