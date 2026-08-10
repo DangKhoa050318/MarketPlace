@@ -148,14 +148,12 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
 
         try {
             if (rawPayload == null || rawPayload.isBlank()) {
-                if (constantTimeEquals(signature, merchantApiKey)) {
-                    return;
-                }
+                log.warn("Rejected PayGate webhook: missing raw payload for HMAC signature calculation");
                 throw new ForbiddenException("Invalid webhook signature / unauthorized request");
             }
 
             String expectedSignature = com.training.marketplace.utils.HmacUtils.generateSignature(rawPayload, merchantApiKey);
-            if (!constantTimeEquals(signature, expectedSignature) && !constantTimeEquals(signature, merchantApiKey)) {
+            if (!constantTimeEquals(signature, expectedSignature)) {
                 log.warn("Rejected PayGate webhook: invalid X-Signature. Expected {}, got {}", expectedSignature, signature);
                 throw new ForbiddenException("Invalid webhook signature / unauthorized request");
             }

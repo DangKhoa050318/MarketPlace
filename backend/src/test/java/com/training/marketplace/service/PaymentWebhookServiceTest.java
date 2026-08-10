@@ -60,6 +60,9 @@ class PaymentWebhookServiceTest {
 
         when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
 
+        String rawPayload = "{\"event\":\"PAYMENT_COMPLETED\",\"transactionRef\":\"TXN_998877\",\"merchantId\":1,\"orderId\":\"ORD-100\",\"amount\":150000.00,\"status\":\"SUCCESS\"}";
+        String signature = com.training.marketplace.utils.HmacUtils.generateSignature(rawPayload, "mock-merchant-api-key-123456");
+
         PaygateWebhookRequest request = new PaygateWebhookRequest(
                 "PAYMENT_COMPLETED",
                 "TXN_998877",
@@ -70,7 +73,7 @@ class PaymentWebhookServiceTest {
         );
 
         // when
-        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(request, "mock-merchant-api-key-123456", null);
+        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(request, signature, rawPayload);
 
         // then
         assertThat(result.get("orderId")).isEqualTo(orderId);
@@ -149,10 +152,45 @@ class PaymentWebhookServiceTest {
         );
 
         // when & then — a wrong secret is an auth failure (403), and never touches the order/stock
-        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(request, "invalid-bad-signature", null))
+        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(request, "invalid-bad-signature", "rawBody"))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Invalid webhook signature");
         verifyNoInteractions(orderRepository, inventoryFacade);
+    }
+
+    @Test
+    void processPaygateWebhook_RawApiKeyAsSignature_IsRejected() {
+        // MP-C1 fix: Passing the raw merchant API key directly as X-Signature without HMAC hashing must be rejected.
+        ReflectionTestUtils.setField(paymentWebhookService, "requireSignature", true);
+        PaygateWebhookRequest request = new PaygateWebhookRequest(
+                "PAYMENT_COMPLETED", "TXN_1", 1L, "ORD-100", new BigDecimal("100.00"), "SUCCESS");
+        String rawPayload = "{\"event\":\"PAYMENT_COMPLETED\",\"orderId\":\"ORD-100\"}";
+
+        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(
+                request,
+                "mock-merchant-api-key-123456",
+                rawPayload
+        ))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Invalid webhook signature");
+        verifyNoInteractions(orderRepository, inventoryFacade);
+    }
+
+    @Test
+    void verifySignature_withApiKeyAsSignature_shouldNotPass() {
+        // Mentor code-review test case requirement:
+        // Passing raw merchant API key as X-Signature must return false / throw ForbiddenException
+        ReflectionTestUtils.setField(paymentWebhookService, "requireSignature", true);
+        PaygateWebhookRequest request = new PaygateWebhookRequest(
+                "PAYMENT_COMPLETED", "TXN_1", 1L, "ORD-100", new BigDecimal("100.00"), "SUCCESS");
+        String rawPayload = "{\"event\":\"PAYMENT_COMPLETED\",\"orderId\":\"ORD-100\"}";
+
+        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(
+                request,
+                "mock-merchant-api-key-123456",
+                rawPayload
+        ))
+                .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
@@ -178,7 +216,7 @@ class PaymentWebhookServiceTest {
         assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(
                 request,
                 "some-junk" + "mock-merchant-api-key-123456" + "more-junk",
-                null
+                "rawPayload"
         ))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Invalid webhook signature");
@@ -187,7 +225,7 @@ class PaymentWebhookServiceTest {
 
     @Test
     void processPaygateWebhook_ValidSignature_WhenEnforced_Processes() {
-        // Enforcement on + the exact shared secret -> the webhook is authenticated and marks payment paid.
+        // Enforcement on + valid HMAC signature -> the webhook is authenticated and marks payment paid.
         ReflectionTestUtils.setField(paymentWebhookService, "requireSignature", true);
         Long orderId = 200L;
         Order order = new Order();
@@ -201,13 +239,16 @@ class PaymentWebhookServiceTest {
         order.setItems(List.of(item));
         when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
 
+        String rawPayload = "{\"event\":\"PAYMENT_COMPLETED\",\"transactionRef\":\"TXN_1\",\"merchantId\":1,\"orderId\":\"ORD-200\",\"amount\":100.00,\"status\":\"SUCCESS\"}";
+        String signature = com.training.marketplace.utils.HmacUtils.generateSignature(rawPayload, "mock-merchant-api-key-123456");
+
         PaygateWebhookRequest request = new PaygateWebhookRequest(
                 "PAYMENT_COMPLETED", "TXN_1", 1L, "ORD-200", new BigDecimal("100.00"), "SUCCESS");
 
         Map<String, Object> result = paymentWebhookService.processPaygateWebhook(
                 request,
-                "mock-merchant-api-key-123456",
-                null
+                signature,
+                rawPayload
         );
         assertThat(result.get("status")).isEqualTo("CONFIRMED");
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
