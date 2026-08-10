@@ -70,7 +70,7 @@ export default function () {
   sleep(1);
 
   // GĐ1: Lấy danh sách sản phẩm gợi ý (Recommendations)
-  const recRes = http.get(`${baseUrl}/api/v1/recommendations?limit=10`);
+  const recRes = http.get(`${baseUrl}/api/v1/recommendations?placement=HOME_BEST_SELLERS&limit=10`);
   check(recRes, {
     'GET /recommendations status is 200': (r) => r.status === 200,
   });
