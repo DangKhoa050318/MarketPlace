@@ -224,7 +224,7 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
                 ? fallback.intents() : primary.intents();
         return new ChatIntentAnalysis(
                 intents,
-                first(primary.query(), fallback.query()),
+                mergedQuery(primary, fallback, intents),
                 first(primary.category(), fallback.category()),
                 fallback.minPrice() == null ? primary.minPrice() : fallback.minPrice(),
                 fallback.maxPrice() == null ? primary.maxPrice() : fallback.maxPrice(),
@@ -232,6 +232,33 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
                 primary.attributes().isEmpty() ? fallback.attributes() : primary.attributes(),
                 primary.needsClarification() && fallback.needsClarification(),
                 first(primary.clarificationQuestion(), fallback.clarificationQuestion()));
+    }
+
+    private String mergedQuery(
+            ChatIntentAnalysis primary,
+            ChatIntentAnalysis fallback,
+            List<ChatIntent> intents) {
+        if (intents.contains(ChatIntent.CAMPAIGN_OFFERS)
+                && fallback.query() != null
+                && containsVoucherQueryNoise(primary.query())) {
+            return fallback.query();
+        }
+        return first(primary.query(), fallback.query());
+    }
+
+    private boolean containsVoucherQueryNoise(String query) {
+        if (query == null || query.isBlank()) {
+            return false;
+        }
+        String normalized = java.text.Normalizer.normalize(query, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace('đ', 'd')
+                .replace('Đ', 'D')
+                .toLowerCase(java.util.Locale.ROOT);
+        return normalized.matches(".*\\b(voucher|coupon|campaign|khuyen mai|giam gia|uu dai)\\b.*")
+                || normalized.matches(".*\\bap\\s+dung\\b.*")
+                || normalized.matches(".*\\b(san pham|mat hang)\\s+(o\\s+)?(ben\\s+)?tren\\b.*")
+                || normalized.matches(".*\\btrong\\s+cac\\b.*");
     }
 
     private String combinedQuery(ChatIntentAnalysis analysis) {
