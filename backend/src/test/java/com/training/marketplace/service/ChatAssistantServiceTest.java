@@ -192,6 +192,40 @@ class ChatAssistantServiceTest {
     }
 
     @Test
+    void treatsNeedAttributesAsSoftSignalsInsteadOfMandatorySearchTerms() {
+        when(conversationStore.find(any())).thenReturn(Optional.empty());
+        when(aiGateway.analyze(any(), any(), any())).thenReturn(Optional.of(
+                new ChatIntentAnalysis(
+                        List.of(ChatIntent.PRODUCT_DISCOVERY),
+                        "laptop",
+                        "laptop",
+                        null,
+                        new BigDecimal("20000000"),
+                        null,
+                        Map.of("purpose", "học tập", "battery", "pin tốt"),
+                        false,
+                        null)));
+        when(discoveryService.discover(any(), eq(false), eq(null), eq("session-1")))
+                .thenReturn(List.of(candidate()));
+
+        service.reply(
+                null,
+                "session-1",
+                new ChatMessageRequest(
+                        null,
+                        "Tôi cần laptop để học tập, pin tốt, dưới 20 triệu",
+                        null));
+
+        ArgumentCaptor<ChatSearchCriteria> criteriaCaptor =
+                ArgumentCaptor.forClass(ChatSearchCriteria.class);
+        verify(discoveryService).discover(
+                criteriaCaptor.capture(), eq(false), eq(null), eq("session-1"));
+        assertThat(criteriaCaptor.getValue().query()).isEqualTo("laptop");
+        assertThat(criteriaCaptor.getValue().maxPrice())
+                .isEqualByComparingTo(new BigDecimal("20000000"));
+    }
+
+    @Test
     void doesNotSuggestProductsWhenNoCampaignOfferIsEffective() {
         when(conversationStore.find(any())).thenReturn(Optional.empty());
         when(aiGateway.analyze(any(), any(), any())).thenReturn(Optional.empty());

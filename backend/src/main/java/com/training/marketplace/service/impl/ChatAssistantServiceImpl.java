@@ -262,14 +262,8 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
     }
 
     private String combinedQuery(ChatIntentAnalysis analysis) {
-        List<String> parts = new ArrayList<>();
-        if (analysis.query() != null && !analysis.query().isBlank()) {
-            parts.add(analysis.query());
-        }
-        analysis.attributes().values().stream()
-                .filter(value -> value != null && !value.isBlank())
-                .forEach(parts::add);
-        return parts.isEmpty() ? null : String.join(" ", parts);
+        return analysis.query() == null || analysis.query().isBlank()
+                ? null : analysis.query();
     }
 
     private BigDecimal lowerPrice(ChatIntentAnalysis analysis) {
