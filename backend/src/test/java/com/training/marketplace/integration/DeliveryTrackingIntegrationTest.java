@@ -60,9 +60,9 @@ class DeliveryTrackingIntegrationTest extends BaseIntegrationTest {
                 .createdBy(customer.getId())
                 .build());
 
-        assertThat(deliveryRepository.findByNormalizedTracking(
-                "gHn", "aBc-" + suffix))
-                .contains(delivery);
+        Delivery found = deliveryRepository.findByNormalizedTracking(
+                "gHn", "aBc-" + suffix).orElseThrow();
+        assertThat(found.getId()).isEqualTo(delivery.getId());
     }
 
     @Test

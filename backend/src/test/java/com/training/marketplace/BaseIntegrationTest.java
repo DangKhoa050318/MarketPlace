@@ -1,8 +1,15 @@
 package com.training.marketplace;
 
+import com.training.marketplace.common.ApiResponse;
+import com.training.marketplace.dto.response.AuthResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -16,6 +23,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 // version mismatch or Docker not running. Integration tests still run wherever Docker is available.
 @Testcontainers(disabledWithoutDocker = true)
 @org.springframework.test.context.ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class BaseIntegrationTest {
 
     @Container
@@ -46,4 +54,19 @@ public abstract class BaseIntegrationTest {
 
     @Autowired
     protected TestRestTemplate restTemplate;
+
+    protected AuthResponse postForAuthResponse(String path, Object request) {
+        ResponseEntity<ApiResponse<AuthResponse>> response = restTemplate.exchange(
+                path,
+                HttpMethod.POST,
+                new HttpEntity<>(request),
+                new ParameterizedTypeReference<>() {
+                });
+        ApiResponse<AuthResponse> body = response.getBody();
+        if (!response.getStatusCode().is2xxSuccessful() || body == null || body.getData() == null) {
+            throw new AssertionError("Authentication request failed with status "
+                    + response.getStatusCode() + " and body " + body);
+        }
+        return body.getData();
+    }
 }

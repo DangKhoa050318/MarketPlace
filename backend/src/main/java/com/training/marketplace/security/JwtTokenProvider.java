@@ -5,6 +5,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +26,19 @@ public class JwtTokenProvider {
 
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpiration;
+
+    @PostConstruct
+    void validateJwtSecret() {
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            throw new IllegalStateException("JWT_SECRET must be configured; refusing to start with an empty JWT signing secret");
+        }
+        try {
+            getSigningKey();
+        } catch (RuntimeException ex) {
+            throw new IllegalStateException(
+                    "JWT_SECRET must be a Base64-encoded HMAC key of at least 256 bits", ex);
+        }
+    }
 
     public String generateAccessToken(String username) {
         return generateToken(username, "access", accessTokenExpiration);

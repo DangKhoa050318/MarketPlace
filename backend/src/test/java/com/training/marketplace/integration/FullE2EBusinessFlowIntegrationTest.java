@@ -1,5 +1,7 @@
 package com.training.marketplace.integration;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.training.marketplace.BaseIntegrationTest;
 import com.training.marketplace.dto.request.AddToCartRequest;
 import com.training.marketplace.dto.request.LoginRequest;
@@ -15,13 +17,17 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FullE2EBusinessFlowIntegrationTest extends BaseIntegrationTest {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @Test
     @DisplayName("Should execute complete E2E lifecycle: Register -> Cart -> Redis Eviction -> Admin Status Transition -> Access Control")
-    void testCompleteE2EBusinessLifecycle() {
+    void testCompleteE2EBusinessLifecycle() throws Exception {
         // Step 1: Register customer user
         RegisterRequest registerReq = new RegisterRequest(
                 "full_e2e_user",
@@ -29,24 +35,13 @@ class FullE2EBusinessFlowIntegrationTest extends BaseIntegrationTest {
                 "Password123!",
                 "Full E2E User"
         );
-        ResponseEntity<AuthResponse> registerResp = restTemplate.postForEntity(
-                "/api/v1/auth/register",
-                registerReq,
-                AuthResponse.class
-        );
-        assertThat(registerResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(registerResp.getBody()).isNotNull();
+        AuthResponse registerResp = postForAuthResponse("/api/v1/auth/register", registerReq);
+        assertThat(registerResp.accessToken()).isNotNull();
 
         // Step 2: Login as Customer
         LoginRequest loginReq = new LoginRequest("fulle2e@example.com", "Password123!");
-        ResponseEntity<AuthResponse> loginResp = restTemplate.postForEntity(
-                "/api/v1/auth/login",
-                loginReq,
-                AuthResponse.class
-        );
-        assertThat(loginResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(loginResp.getBody()).isNotNull();
-        String customerToken = loginResp.getBody().accessToken();
+        AuthResponse loginResp = postForAuthResponse("/api/v1/auth/login", loginReq);
+        String customerToken = loginResp.accessToken();
 
         HttpHeaders customerHeaders = new HttpHeaders();
         customerHeaders.setBearerAuth(customerToken);
@@ -75,7 +70,24 @@ class FullE2EBusinessFlowIntegrationTest extends BaseIntegrationTest {
         assertThat(getCartResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(getCartResp.getBody()).contains("\"items\":[");
 
-        // Step 5: Verify Admin Authorization & Access Control (Customer attempting admin endpoint receives 403)
+        // Step 5: Checkout the cart and keep the actual order id for subsequent transitions.
+        HttpEntity<Map<String, Object>> createOrderEntity = new HttpEntity<>(
+                Map.of(
+                        "shippingAddress", "123 Full E2E Street",
+                        "paymentMethod", "BANK_TRANSFER"),
+                customerHeaders);
+        ResponseEntity<String> createOrderResp = restTemplate.exchange(
+                "/api/v1/orders",
+                HttpMethod.POST,
+                createOrderEntity,
+                String.class
+        );
+        assertThat(createOrderResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        JsonNode createdOrder = objectMapper.readTree(createOrderResp.getBody()).path("data");
+        long orderId = createdOrder.path("id").asLong();
+        assertThat(orderId).isPositive();
+
+        // Step 6: Verify Admin Authorization & Access Control (Customer attempting admin endpoint receives 403)
         ResponseEntity<String> unauthorizedAdminResp = restTemplate.exchange(
                 "/api/v1/admin/orders",
                 HttpMethod.GET,
@@ -84,22 +96,16 @@ class FullE2EBusinessFlowIntegrationTest extends BaseIntegrationTest {
         );
         assertThat(unauthorizedAdminResp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
 
-        // Step 6: Login as Admin
+        // Step 7: Login as Admin
         LoginRequest adminLoginReq = new LoginRequest("admin@marketplace.com", "admin123");
-        ResponseEntity<AuthResponse> adminLoginResp = restTemplate.postForEntity(
-                "/api/v1/auth/login",
-                adminLoginReq,
-                AuthResponse.class
-        );
-        assertThat(adminLoginResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(adminLoginResp.getBody()).isNotNull();
-        String adminToken = adminLoginResp.getBody().accessToken();
+        AuthResponse adminLoginResp = postForAuthResponse("/api/v1/auth/login", adminLoginReq);
+        String adminToken = adminLoginResp.accessToken();
 
         HttpHeaders adminHeaders = new HttpHeaders();
         adminHeaders.setBearerAuth(adminToken);
         HttpEntity<Void> adminVoidEntity = new HttpEntity<>(adminHeaders);
 
-        // Step 7: Admin fetches customer orders
+        // Step 8: Admin fetches customer orders
         ResponseEntity<String> adminGetOrdersResp = restTemplate.exchange(
                 "/api/v1/admin/orders?page=0&size=10",
                 HttpMethod.GET,
@@ -109,12 +115,12 @@ class FullE2EBusinessFlowIntegrationTest extends BaseIntegrationTest {
         assertThat(adminGetOrdersResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(adminGetOrdersResp.getBody()).contains("\"success\":true");
 
-        // Step 8: Admin updates Order Status to CONFIRMED
+        // Step 9: Admin updates Order Status to CONFIRMED
         UpdateOrderStatusRequest updateStatusReq = new UpdateOrderStatusRequest(OrderStatus.CONFIRMED, "Order confirmed by admin");
         HttpEntity<UpdateOrderStatusRequest> updateStatusEntity = new HttpEntity<>(updateStatusReq, adminHeaders);
 
         ResponseEntity<String> updateStatusResp = restTemplate.exchange(
-                "/api/v1/admin/orders/1/status",
+                "/api/v1/admin/orders/" + orderId + "/status",
                 HttpMethod.PUT,
                 updateStatusEntity,
                 String.class
@@ -122,12 +128,12 @@ class FullE2EBusinessFlowIntegrationTest extends BaseIntegrationTest {
         assertThat(updateStatusResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(updateStatusResp.getBody()).contains("\"status\":\"CONFIRMED\"");
 
-        // Step 9: Edge Case - Invalid Status Transition (CONFIRMED -> PENDING) rejected with 400 Bad Request
+        // Step 10: Edge Case - Invalid Status Transition (CONFIRMED -> PENDING) rejected with 400 Bad Request
         UpdateOrderStatusRequest invalidStatusReq = new UpdateOrderStatusRequest(OrderStatus.PENDING, "Reverting to pending");
         HttpEntity<UpdateOrderStatusRequest> invalidStatusEntity = new HttpEntity<>(invalidStatusReq, adminHeaders);
 
         ResponseEntity<String> invalidStatusResp = restTemplate.exchange(
-                "/api/v1/admin/orders/1/status",
+                "/api/v1/admin/orders/" + orderId + "/status",
                 HttpMethod.PUT,
                 invalidStatusEntity,
                 String.class

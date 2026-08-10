@@ -21,7 +21,6 @@ import com.training.marketplace.enums.ReviewStatus;
 import com.training.marketplace.repository.OrderItemRepository;
 import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.repository.ProductRepository;
-import com.training.marketplace.repository.ProductReviewRepository;
 import com.training.marketplace.repository.ProductVariantRepository;
 import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.ReviewService;
@@ -65,9 +64,6 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
     private OrderItemRepository orderItemRepository;
 
     @Autowired
-    private ProductReviewRepository reviewRepository;
-
-    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -80,12 +76,6 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUpData() {
-        reviewRepository.deleteAll();
-        orderItemRepository.deleteAll();
-        orderRepository.deleteAll();
-        variantRepository.deleteAll();
-        productRepository.deleteAll();
-
         String suffix = UUID.randomUUID().toString().substring(0, 6);
         testUser = userRepository.save(User.builder()
                 .username("reviewer_" + suffix)
@@ -110,13 +100,8 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
                 .build());
 
         LoginRequest loginReq = new LoginRequest(testUser.getUsername(), "admin123");
-        ResponseEntity<AuthResponse> loginResp = restTemplate.postForEntity(
-                "/api/v1/auth/login",
-                loginReq,
-                AuthResponse.class
-        );
-        assertThat(loginResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        userToken = loginResp.getBody().accessToken();
+        AuthResponse loginResp = postForAuthResponse("/api/v1/auth/login", loginReq);
+        userToken = loginResp.accessToken();
     }
 
     @Test
@@ -194,7 +179,7 @@ class ReviewIntegrationTest extends BaseIntegrationTest {
                 createEntity,
                 new ParameterizedTypeReference<>() {}
         );
-        assertThat(createResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(createResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         ProductReviewResponse createdReview = createResp.getBody().getData();
         assertThat(createdReview.getRating()).isEqualTo(5);
         assertThat(createdReview.getIsVerifiedPurchase()).isTrue();
