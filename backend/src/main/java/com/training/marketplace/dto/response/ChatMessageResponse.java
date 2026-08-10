@@ -12,11 +12,23 @@ public record ChatMessageResponse(
         List<ChatIntent> intents,
         List<ChatProductCardResponse> products,
         List<String> quickReplies,
+        ChatOrderSummaryResponse order,
         UUID traceId
 ) {
     public ChatMessageResponse {
         intents = intents == null ? List.of() : List.copyOf(intents);
         products = products == null ? List.of() : List.copyOf(products);
         quickReplies = quickReplies == null ? List.of() : List.copyOf(quickReplies);
+    }
+
+    public ChatMessageResponse(
+            UUID conversationId,
+            UUID messageId,
+            String answer,
+            List<ChatIntent> intents,
+            List<ChatProductCardResponse> products,
+            List<String> quickReplies,
+            UUID traceId) {
+        this(conversationId, messageId, answer, intents, products, quickReplies, null, traceId);
     }
 }

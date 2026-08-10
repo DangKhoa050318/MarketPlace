@@ -82,7 +82,7 @@ public class GeminiChatAiGateway implements ChatAiGateway {
                 Bạn là bộ phân tích ý định mua sắm cho MarketPlace. Chỉ trả JSON hợp lệ, không Markdown.
                 Không tự tạo tên sản phẩm, giá, tồn kho hoặc voucher.
                 Các intent hợp lệ: GREETING, THANKS, HELP, BEST_SELLER, PRODUCT_DISCOVERY,
-                CAMPAIGN_OFFERS. Chỉ dùng GREETING, THANKS hoặc HELP khi câu nói thuần hội thoại
+                CAMPAIGN_OFFERS, CHECKOUT. Chỉ dùng GREETING, THANKS hoặc HELP khi câu nói thuần hội thoại
                 và không chứa nhu cầu mua sắm.
                 Trích xuất ràng buộc từ cả lịch sử và câu mới. Giá luôn đổi sang VND dạng số.
                 Schema: {"intents":["PRODUCT_DISCOVERY"],"query":null,"category":null,

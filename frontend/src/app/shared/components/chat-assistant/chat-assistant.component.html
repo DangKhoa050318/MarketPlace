@@ -13,7 +13,7 @@
     <div class="assistant-mark"><mat-icon>auto_awesome</mat-icon></div>
     <div>
       <strong>Trợ lý mua sắm</strong>
-      <span>Sản phẩm thật · Voucher đang hiệu lực</span>
+      <span>Sản phẩm · Voucher · Checkout COD</span>
     </div>
     <button mat-icon-button type="button" aria-label="Bắt đầu hội thoại mới" (click)="reset()">
       <mat-icon>refresh</mat-icon>
@@ -53,6 +53,26 @@
         </a>
       </div>
 
+      <a
+        *ngIf="message.response?.order as order"
+        class="order-card"
+        [routerLink]="['/orders', order.id]">
+        <div class="order-card__header">
+          <mat-icon>receipt_long</mat-icon>
+          <strong>Đơn hàng #{{ order.id }}</strong>
+          <span>{{ order.status }}</span>
+        </div>
+        <dl>
+          <div><dt>Thanh toán</dt><dd>COD · Thanh toán khi nhận hàng</dd></div>
+          <div><dt>Số sản phẩm</dt><dd>{{ order.itemCount }}</dd></div>
+          <div *ngIf="order.couponCode"><dt>Voucher</dt><dd>{{ order.couponCode }}</dd></div>
+          <div><dt>Phí vận chuyển</dt><dd>{{ formatPrice(order.shippingFee) }}</dd></div>
+          <div><dt>Tổng tiền</dt><dd>{{ formatPrice(order.totalAmount) }}</dd></div>
+        </dl>
+        <p><mat-icon>location_on</mat-icon>{{ order.shippingAddress }}</p>
+        <span class="order-card__link">Xem chi tiết đơn hàng <mat-icon>arrow_forward</mat-icon></span>
+      </a>
+
       <div *ngIf="message.response?.quickReplies?.length" class="quick-replies">
         <button
           *ngFor="let reply of message.response!.quickReplies"
@@ -73,7 +93,7 @@
       [(ngModel)]="draft"
       maxlength="500"
       rows="1"
-      placeholder="Ví dụ: Laptop dưới 20 triệu có voucher..."
+      placeholder="Hỏi sản phẩm hoặc nhập: Tôi muốn thanh toán..."
       aria-label="Câu hỏi mua sắm"
       (keydown)="onKeydown($event)"></textarea>
     <button mat-mini-fab type="button" aria-label="Gửi câu hỏi" [disabled]="loading || !draft.trim()" (click)="send()">

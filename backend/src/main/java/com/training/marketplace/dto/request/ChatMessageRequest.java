@@ -13,6 +13,15 @@ public record ChatMessageRequest(
         @Size(max = 500, message = "Message must not exceed 500 characters")
         String message,
 
-        @Valid ChatPageContext pageContext
+        @Valid ChatPageContext pageContext,
+
+        @Size(max = 50, message = "Coupon code must not exceed 50 characters")
+        String couponCode
 ) {
+    public ChatMessageRequest(
+            UUID conversationId,
+            String message,
+            ChatPageContext pageContext) {
+        this(conversationId, message, pageContext, null);
+    }
 }

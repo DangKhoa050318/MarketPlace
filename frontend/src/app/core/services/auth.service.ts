@@ -5,6 +5,7 @@ import { EMPTY, Observable, tap } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api-response.model';
+import { PromotionService } from './promotion.service';
 
 export interface AuthResponse {
   accessToken: string;
@@ -19,7 +20,11 @@ export class AuthService {
   private journeyApiUrl = `${environment.apiUrl}/journey`;
   private sessionStorageKey = 'recently_viewed_session_id';
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private promotionService: PromotionService
+  ) {}
 
   login(credentials: { username: string; password: string }): Observable<ApiResponse<AuthResponse>> {
     return this.http.post<ApiResponse<AuthResponse>>(`${this.apiUrl}/login`, credentials).pipe(
@@ -65,6 +70,7 @@ export class AuthService {
   }
 
   private clearSession(): void {
+    this.promotionService.clearApplied();
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('username');

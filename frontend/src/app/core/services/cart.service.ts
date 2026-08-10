@@ -5,6 +5,7 @@ import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api-response.model';
 import { AddToCartRequest, Cart, UpdateCartItemRequest } from '../models/cart.model';
+import { PromotionService } from './promotion.service';
 
 @Injectable({ providedIn: 'root' })
 export class CartService {
@@ -16,13 +17,17 @@ export class CartService {
     map(cart => cart ? cart.totalItems : 0)
   );
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private promotionService: PromotionService
+  ) {}
 
   getCart(): Observable<ApiResponse<Cart>> {
     return this.http.get<ApiResponse<Cart>>(this.apiUrl).pipe(
       tap(res => {
         if (res.success && res.data) {
           this.cartSubject.next(res.data);
+          this.revalidateCoupon();
         }
       })
     );
@@ -34,6 +39,7 @@ export class CartService {
       tap(res => {
         if (res.success && res.data) {
           this.cartSubject.next(res.data);
+          this.revalidateCoupon();
         }
       })
     );
@@ -45,6 +51,7 @@ export class CartService {
       tap(res => {
         if (res.success && res.data) {
           this.cartSubject.next(res.data);
+          this.revalidateCoupon();
         }
       })
     );
@@ -52,13 +59,16 @@ export class CartService {
 
   removeItem(variantId: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/items/${variantId}`).pipe(
-      tap(() => this.getCart().subscribe())
+      tap(() => {
+        this.getCart().subscribe();
+      })
     );
   }
 
   clearCart(): Observable<void> {
     return this.http.delete<void>(this.apiUrl).pipe(
       tap(() => {
+        this.promotionService.clearApplied();
         this.cartSubject.next({
           userId: 0,
           items: [],
@@ -67,5 +77,19 @@ export class CartService {
         });
       })
     );
+  }
+
+  markCheckoutComplete(): void {
+    this.promotionService.clearApplied();
+    this.cartSubject.next({
+      userId: 0,
+      items: [],
+      totalAmount: 0,
+      totalItems: 0
+    });
+  }
+
+  private revalidateCoupon(): void {
+    this.promotionService.revalidateApplied().subscribe({ error: () => undefined });
   }
 }

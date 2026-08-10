@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -21,6 +21,7 @@ import { Cart, CartItem } from '../../core/models/cart.model';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { CheckoutDialogComponent } from './checkout-dialog/checkout-dialog.component';
 import { VietQrDialogComponent } from '../../shared/components/vietqr-dialog/vietqr-dialog.component';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-cart',
@@ -618,9 +619,10 @@ import { VietQrDialogComponent } from '../../shared/components/vietqr-dialog/vie
     }
   `]
 })
-export class CartComponent implements OnInit {
+export class CartComponent implements OnInit, OnDestroy {
   private readonly freeShippingThreshold = 3750000;
   private readonly standardShippingFee = 125000;
+  private couponSubscription?: Subscription;
   cart: Cart | null = null;
   loading = false;
   actionLoading = false;
@@ -669,53 +671,27 @@ export class CartComponent implements OnInit {
     if (!code) return;
     this.applyingCoupon = true;
     this.couponError = null;
-    this.promotionService.preview(code).subscribe({
+    this.promotionService.apply(code).subscribe({
       next: (res) => {
         this.applyingCoupon = false;
         const p = res.data;
         if (p?.valid) {
-          this.appliedCode = p.code;
-          this.discountAmount = p.discountAmount;
           this.couponError = null;
         } else {
-          this.appliedCode = null;
-          this.discountAmount = 0;
           this.couponError = this.reasonMessage(p?.reason);
         }
       },
       error: (err) => {
         this.applyingCoupon = false;
-        this.appliedCode = null;
-        this.discountAmount = 0;
         this.couponError = err.error?.message || 'Could not validate coupon';
       }
     });
   }
 
   removeCoupon(): void {
-    this.appliedCode = null;
-    this.discountAmount = 0;
+    this.promotionService.clearApplied();
     this.couponError = null;
     this.couponInput = '';
-  }
-
-  /** F-306: after the cart changes, ask the backend to re-check the applied coupon and update totals. */
-  private revalidateCoupon(): void {
-    if (!this.appliedCode) return;
-    const code = this.appliedCode;
-    this.promotionService.preview(code).subscribe({
-      next: (res) => {
-        const p = res.data;
-        if (p?.valid) {
-          this.discountAmount = p.discountAmount;
-        } else {
-          this.appliedCode = null;
-          this.discountAmount = 0;
-          this.notification.error(`Coupon ${code} no longer applies: ${this.reasonMessage(p?.reason)}`);
-        }
-      },
-      error: () => { /* keep current state on transient error */ }
-    });
   }
 
   private reasonMessage(reason?: string): string {
@@ -733,7 +709,16 @@ export class CartComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.couponSubscription = this.promotionService.appliedCoupon$.subscribe(preview => {
+      this.appliedCode = preview?.code || null;
+      this.discountAmount = preview?.discountAmount || 0;
+      if (preview) this.couponInput = preview.code;
+    });
     this.loadCart();
+  }
+
+  ngOnDestroy(): void {
+    this.couponSubscription?.unsubscribe();
   }
 
   loadCart(): void {
@@ -760,7 +745,6 @@ export class CartComponent implements OnInit {
         this.actionLoading = false;
         if (res.success && res.data) {
           this.cart = res.data;
-          this.revalidateCoupon();
         }
       },
       error: (err) => {
@@ -777,7 +761,6 @@ export class CartComponent implements OnInit {
         this.actionLoading = false;
         this.notification.success(`Removed "${item.productName}" from cart`);
         this.loadCart();
-        this.revalidateCoupon();
       },
       error: () => {
         this.actionLoading = false;
@@ -838,6 +821,7 @@ export class CartComponent implements OnInit {
         this.orderService.createOrder(result).subscribe({
           next: (res) => {
             this.actionLoading = false;
+            this.promotionService.clearApplied();
             this.analyticsService.track(AnalyticsEventType.OrderCreated, {
               orderId: res.data?.id,
               totalAmount: res.data?.totalAmount,

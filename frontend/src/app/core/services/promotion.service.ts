@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { BehaviorSubject, EMPTY, Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PageResponse } from '../models/api-response.model';
 import {
@@ -14,12 +14,44 @@ import {
 @Injectable({ providedIn: 'root' })
 export class PromotionService {
   private apiUrl = `${environment.apiUrl}/coupons`;
+  private appliedCouponSubject = new BehaviorSubject<CouponPreviewResponse | null>(null);
+
+  readonly appliedCoupon$ = this.appliedCouponSubject.asObservable();
 
   constructor(private http: HttpClient) {}
 
   /** Customer: preview a coupon against the current cart (backend reads the cart itself). */
   preview(code: string): Observable<ApiResponse<CouponPreviewResponse>> {
     return this.http.post<ApiResponse<CouponPreviewResponse>>(`${this.apiUrl}/preview`, { code });
+  }
+
+  /** Validate and select a coupon for the current cart without consuming a usage slot. */
+  apply(code: string): Observable<ApiResponse<CouponPreviewResponse>> {
+    return this.preview(code.trim().toUpperCase()).pipe(
+      tap(response => {
+        const preview = response.data;
+        if (response.success && preview?.valid) {
+          this.appliedCouponSubject.next(preview);
+        } else {
+          this.clearApplied();
+        }
+      })
+    );
+  }
+
+  /** Re-check the selected coupon after cart contents change. Transient HTTP errors keep the state. */
+  revalidateApplied(): Observable<ApiResponse<CouponPreviewResponse>> {
+    const applied = this.appliedCouponSubject.value;
+    if (!applied) return EMPTY;
+    return this.apply(applied.code);
+  }
+
+  clearApplied(): void {
+    this.appliedCouponSubject.next(null);
+  }
+
+  appliedCouponCode(): string | undefined {
+    return this.appliedCouponSubject.value?.code;
   }
 
   // --- Admin ---

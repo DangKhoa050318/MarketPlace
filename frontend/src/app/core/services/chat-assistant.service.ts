@@ -17,11 +17,16 @@ export class ChatAssistantService {
 
   constructor(private http: HttpClient) {}
 
-  send(message: string, pageContext?: ChatPageContext): Observable<ApiResponse<ChatMessageResponse>> {
+  send(
+    message: string,
+    pageContext?: ChatPageContext,
+    couponCode?: string
+  ): Observable<ApiResponse<ChatMessageResponse>> {
     const payload: ChatMessageRequest = {
       conversationId: localStorage.getItem(this.conversationKey) || undefined,
       message,
-      pageContext
+      pageContext,
+      couponCode
     };
     return this.http.post<ApiResponse<ChatMessageResponse>>(this.apiUrl, payload, {
       headers: new HttpHeaders({ 'X-Session-Id': this.sessionId() })

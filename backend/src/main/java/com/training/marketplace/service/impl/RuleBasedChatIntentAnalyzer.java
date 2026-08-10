@@ -171,7 +171,8 @@ public class RuleBasedChatIntentAnalyzer {
     private String cleanupQuery(String message) {
         String cleaned = PRICE_PHRASE.matcher(normalize(message)).replaceAll(" ");
         cleaned = cleaned.replaceAll("(?i)\\b(toi|minh|em|can|muon|mua|tim|goi y|tu van|cho|giup|hay|san pham|"
-                + "ban chay|pho bien|voucher|coupon|ma giam gia|giam gia|khuyen mai|campaign|uu dai|dang|co|voi|va|"
+                + "ban chay|pho bien|voucher|coupon|ma giam gia|giam gia|khuyen mai|campaign|uu dai|ap dung|"
+                + "dang|co|voi|va|trong|cac|tren|nao|"
                 + "xin chao|chao ban|chao|hello|hi|hey|alo|cam on|thank you|thanks|tks)\\b", " ");
         cleaned = cleaned.replaceAll("[?,.!]+", " ").replaceAll("\\s+", " ").trim();
         return cleaned.length() < 2 ? null : cleaned;

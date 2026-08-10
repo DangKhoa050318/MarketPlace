@@ -57,6 +57,30 @@ class RuleBasedChatIntentAnalyzerTest {
     }
 
     @Test
+    void removesVoucherActionWordsFromProductQuery() {
+        var result = analyzer.analyze(
+                "Gợi ý laptop đang áp dụng voucher",
+                List.of(),
+                null);
+
+        assertThat(result.intents()).contains(ChatIntent.CAMPAIGN_OFFERS);
+        assertThat(result.query()).isEqualTo("laptop");
+        assertThat(result.needsClarification()).isFalse();
+    }
+
+    @Test
+    void reusesPreviousProductQueryForVoucherFollowUp() {
+        var result = analyzer.analyze(
+                "Trong các sản phẩm trên, sản phẩm nào đang có voucher?",
+                List.of(new ChatHistoryMessage("user", "Gợi ý laptop dưới 20 triệu")),
+                null);
+
+        assertThat(result.intents()).contains(ChatIntent.CAMPAIGN_OFFERS);
+        assertThat(result.query()).isEqualTo("laptop");
+        assertThat(result.maxPrice()).isEqualByComparingTo(new BigDecimal("20000000"));
+    }
+
+    @Test
     void usesRecentUserHistoryForFollowUpConstraints() {
         var result = analyzer.analyze(
                 "Dưới 15 triệu",

@@ -18,7 +18,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.text.Normalizer;
 
 @Service
 @RequiredArgsConstructor
@@ -68,6 +70,12 @@ public class ChatProductDiscoveryServiceImpl implements ChatProductDiscoveryServ
             candidates = productQueryRepository.findByProductIds(ids, criteria);
         } else {
             candidates = productQueryRepository.search(criteria);
+            if (candidates.isEmpty() && hasText(criteria.query())) {
+                Long categoryId = resolveCategoryId(criteria);
+                if (categoryId != null) {
+                    candidates = productQueryRepository.search(relaxNeeds(criteria, categoryId));
+                }
+            }
         }
 
         List<ChatProductCandidate> ranked = new ArrayList<>(candidates);
@@ -112,15 +120,62 @@ public class ChatProductDiscoveryServiceImpl implements ChatProductDiscoveryServ
         if (criteria.pageCategoryId() != null) {
             return criteria.pageCategoryId();
         }
-        if (criteria.category() == null || criteria.category().isBlank()) {
+        String requestedCategory = hasText(criteria.category())
+                ? criteria.category() : criteria.query();
+        if (!hasText(requestedCategory)) {
             return null;
         }
-        String requested = criteria.category().trim().toLowerCase();
         return categoryRepository.findAll().stream()
-                .filter(category -> category.getName().toLowerCase().contains(requested)
-                        || requested.contains(category.getName().toLowerCase()))
+                .filter(category -> matchesCategory(requestedCategory, category.getName()))
                 .map(category -> category.getId())
                 .findFirst()
                 .orElse(null);
+    }
+
+    private ChatSearchCriteria relaxNeeds(ChatSearchCriteria criteria, Long categoryId) {
+        return new ChatSearchCriteria(
+                null,
+                null,
+                categoryId,
+                criteria.minPrice(),
+                criteria.maxPrice(),
+                criteria.brand(),
+                criteria.productScopeIds(),
+                criteria.categoryScopeIds(),
+                criteria.offerOnly(),
+                criteria.cartWideOffer(),
+                criteria.limit());
+    }
+
+    private boolean matchesCategory(String requested, String categoryName) {
+        String normalizedRequest = normalize(requested);
+        String normalizedCategory = normalize(categoryName);
+        if (normalizedCategory.contains(normalizedRequest)
+                || normalizedRequest.contains(normalizedCategory)) {
+            return true;
+        }
+        List<String> requestedTokens = tokens(normalizedRequest);
+        List<String> categoryTokens = tokens(normalizedCategory);
+        return requestedTokens.stream().anyMatch(requestedToken -> categoryTokens.stream()
+                .anyMatch(categoryToken -> requestedToken.startsWith(categoryToken)
+                        || categoryToken.startsWith(requestedToken)));
+    }
+
+    private List<String> tokens(String value) {
+        return java.util.Arrays.stream(value.split("[^a-z0-9]+"))
+                .filter(token -> token.length() >= 4)
+                .toList();
+    }
+
+    private String normalize(String value) {
+        return Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace('đ', 'd')
+                .replace('Đ', 'D')
+                .toLowerCase(Locale.ROOT);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

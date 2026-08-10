@@ -4,13 +4,17 @@ import com.training.marketplace.config.ChatAssistantProperties;
 import com.training.marketplace.analytics.AnalyticsEventSource;
 import com.training.marketplace.analytics.AnalyticsEventType;
 import com.training.marketplace.dto.request.ChatMessageRequest;
+import com.training.marketplace.dto.request.CreateOrderRequest;
 import com.training.marketplace.dto.request.ChatPageContext;
 import com.training.marketplace.dto.request.TrackAnalyticsEventRequest;
 import com.training.marketplace.dto.response.ChatMessageResponse;
+import com.training.marketplace.dto.response.ChatOrderSummaryResponse;
 import com.training.marketplace.dto.response.ChatProductCardResponse;
 import com.training.marketplace.dto.response.ChatVoucherResponse;
+import com.training.marketplace.dto.response.OrderResponse;
 import com.training.marketplace.enums.ChatIntent;
 import com.training.marketplace.enums.DiscountType;
+import com.training.marketplace.enums.PaymentMethod;
 import com.training.marketplace.enums.PromotionScopeType;
 import com.training.marketplace.enums.ScopeRefType;
 import com.training.marketplace.exception.BadRequestException;
@@ -20,6 +24,8 @@ import com.training.marketplace.service.AnalyticsEventService;
 import com.training.marketplace.service.ChatAiGateway;
 import com.training.marketplace.service.ChatAssistantService;
 import com.training.marketplace.service.ChatCampaignOffer;
+import com.training.marketplace.service.ChatCheckoutStage;
+import com.training.marketplace.service.ChatCheckoutState;
 import com.training.marketplace.service.ChatConversationSnapshot;
 import com.training.marketplace.service.ChatConversationStore;
 import com.training.marketplace.service.ChatHistoryMessage;
@@ -27,6 +33,7 @@ import com.training.marketplace.service.ChatIntentAnalysis;
 import com.training.marketplace.service.ChatProductCandidate;
 import com.training.marketplace.service.ChatProductDiscoveryService;
 import com.training.marketplace.service.ChatSearchCriteria;
+import com.training.marketplace.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -55,6 +62,7 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
     private final CampaignOfferService campaignOfferService;
     private final ChatProductDiscoveryService productDiscoveryService;
     private final AnalyticsEventService analyticsEventService;
+    private final OrderService orderService;
 
     @Override
     public ChatMessageResponse reply(
@@ -70,11 +78,22 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
                 ? UUID.randomUUID() : request.conversationId();
         ChatConversationSnapshot conversation = loadConversation(
                 conversationId, ownerKey, userId, normalizedSessionId);
+        UUID messageId = UUID.randomUUID();
+        UUID traceId = UUID.randomUUID();
+        ChatMessageResponse checkoutResponse = checkoutReply(
+                userId,
+                normalizedSessionId,
+                ownerKey,
+                conversation,
+                request,
+                messageId,
+                traceId);
+        if (checkoutResponse != null) {
+            return checkoutResponse;
+        }
 
         ChatIntentAnalysis fallback = fallbackAnalyzer.analyze(
                 request.message(), conversation.messages(), request.pageContext());
-        UUID messageId = UUID.randomUUID();
-        UUID traceId = UUID.randomUUID();
         if (isConversational(fallback)) {
             return conversationalReply(
                     userId,
@@ -209,7 +228,8 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
                     if (userId != null && sessionId != null
                             && ("s:" + sessionId).equals(existing.ownerKey())) {
                         return new ChatConversationSnapshot(
-                                existing.conversationId(), ownerKey, existing.messages());
+                                existing.conversationId(), ownerKey, existing.messages(),
+                                existing.checkoutState());
                     }
                     if (!ownerKey.equals(existing.ownerKey())) {
                         throw new ForbiddenException("Conversation does not belong to the current visitor");
@@ -219,12 +239,301 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
                 .orElseGet(() -> new ChatConversationSnapshot(conversationId, ownerKey, List.of()));
     }
 
+    private ChatMessageResponse checkoutReply(
+            Long userId,
+            String sessionId,
+            String ownerKey,
+            ChatConversationSnapshot conversation,
+            ChatMessageRequest request,
+            UUID messageId,
+            UUID traceId) {
+        ChatCheckoutState state = conversation.checkoutState();
+        String normalized = normalizeText(request.message());
+        if (state == null && !isCheckoutStart(normalized)) {
+            return null;
+        }
+        if (isCheckoutCancellation(normalized)) {
+            return checkoutResponse(
+                    userId, sessionId, ownerKey, conversation, request.message(),
+                    "Đã hủy quy trình thanh toán trong chat. Giỏ hàng của bạn vẫn được giữ nguyên.",
+                    List.of("Sản phẩm bán chạy", "Tiếp tục mua sắm"), null, null, messageId, traceId);
+        }
+        if (state == null) {
+            if (isCodSelection(normalized)) {
+                return selectCod(
+                        userId, sessionId, ownerKey, conversation, request,
+                        messageId, traceId);
+            }
+            return checkoutResponse(
+                    userId, sessionId, ownerKey, conversation, request.message(),
+                    paymentMethodMessage(),
+                    paymentMethodReplies(),
+                    new ChatCheckoutState(
+                            ChatCheckoutStage.AWAITING_PAYMENT_METHOD,
+                            null,
+                            normalizedCoupon(request.couponCode())),
+                    null,
+                    messageId,
+                    traceId);
+        }
+        return switch (state.stage()) {
+            case AWAITING_PAYMENT_METHOD -> paymentMethodReply(
+                    userId, sessionId, ownerKey, conversation, request, state,
+                    messageId, traceId);
+            case AWAITING_ADDRESS -> addressReply(
+                    userId, sessionId, ownerKey, conversation, request, state,
+                    messageId, traceId);
+            case AWAITING_NOTE -> noteReply(
+                    userId, sessionId, ownerKey, conversation, request, state,
+                    messageId, traceId);
+        };
+    }
+
+    private ChatMessageResponse paymentMethodReply(
+            Long userId,
+            String sessionId,
+            String ownerKey,
+            ChatConversationSnapshot conversation,
+            ChatMessageRequest request,
+            ChatCheckoutState state,
+            UUID messageId,
+            UUID traceId) {
+        String normalized = normalizeText(request.message());
+        if (isCodSelection(normalized)) {
+            return selectCod(
+                    userId, sessionId, ownerKey, conversation,
+                    new ChatMessageRequest(
+                            request.conversationId(), request.message(), request.pageContext(),
+                            first(request.couponCode(), state.couponCode())),
+                    messageId, traceId);
+        }
+        if (isOtherPaymentSelection(normalized)) {
+            return checkoutResponse(
+                    userId, sessionId, ownerKey, conversation, request.message(),
+                    "Hiện tại thanh toán trực tiếp trong chat chỉ hỗ trợ Cash on Delivery (COD). "
+                            + "Bạn có thể chọn COD tại đây hoặc dùng trang checkout cho phương thức khác.",
+                    List.of("Cash on Delivery (COD)", "Hủy thanh toán"),
+                    state,
+                    null,
+                    messageId,
+                    traceId);
+        }
+        return checkoutResponse(
+                userId, sessionId, ownerKey, conversation, request.message(),
+                "Bạn vui lòng chọn một phương thức trong danh sách. Trong MVP, chat chỉ xử lý trực tiếp COD.",
+                paymentMethodReplies(), state, null, messageId, traceId);
+    }
+
+    private ChatMessageResponse selectCod(
+            Long userId,
+            String sessionId,
+            String ownerKey,
+            ChatConversationSnapshot conversation,
+            ChatMessageRequest request,
+            UUID messageId,
+            UUID traceId) {
+        if (userId == null) {
+            return checkoutResponse(
+                    null, sessionId, ownerKey, conversation, request.message(),
+                    "Bạn cần đăng nhập để đặt đơn COD. Sau khi đăng nhập, hãy chọn lại Cash on Delivery (COD).",
+                    List.of("Cash on Delivery (COD)", "Hủy thanh toán"),
+                    new ChatCheckoutState(
+                            ChatCheckoutStage.AWAITING_PAYMENT_METHOD,
+                            null,
+                            normalizedCoupon(request.couponCode())),
+                    null,
+                    messageId,
+                    traceId);
+        }
+        return checkoutResponse(
+                userId, sessionId, ownerKey, conversation, request.message(),
+                "Bạn đã chọn Cash on Delivery (COD). Vui lòng nhập đầy đủ địa chỉ giao hàng.",
+                List.of("Hủy thanh toán"),
+                new ChatCheckoutState(
+                        ChatCheckoutStage.AWAITING_ADDRESS,
+                        null,
+                        normalizedCoupon(request.couponCode())),
+                null,
+                messageId,
+                traceId);
+    }
+
+    private ChatMessageResponse addressReply(
+            Long userId,
+            String sessionId,
+            String ownerKey,
+            ChatConversationSnapshot conversation,
+            ChatMessageRequest request,
+            ChatCheckoutState state,
+            UUID messageId,
+            UUID traceId) {
+        if (userId == null) {
+            return checkoutResponse(
+                    null, sessionId, ownerKey, conversation, request.message(),
+                    "Bạn cần đăng nhập trước khi tiếp tục đặt đơn COD.",
+                    List.of("Hủy thanh toán"), state, null, messageId, traceId);
+        }
+        String address = request.message().trim();
+        if (address.length() < 10) {
+            return checkoutResponse(
+                    userId, sessionId, ownerKey, conversation, request.message(),
+                    "Địa chỉ giao hàng chưa đủ chi tiết. Vui lòng nhập số nhà, tên đường, phường/xã và tỉnh/thành phố.",
+                    List.of("Hủy thanh toán"), state, null, messageId, traceId);
+        }
+        return checkoutResponse(
+                userId, sessionId, ownerKey, conversation, "[Địa chỉ giao hàng đã được cung cấp]",
+                "Mình đã ghi nhận địa chỉ giao hàng. Bạn hãy nhập ghi chú giao hàng, "
+                        + "hoặc chọn “Bỏ qua ghi chú” nếu không cần.",
+                List.of("Bỏ qua ghi chú", "Hủy thanh toán"),
+                new ChatCheckoutState(
+                        ChatCheckoutStage.AWAITING_NOTE,
+                        address,
+                        first(normalizedCoupon(request.couponCode()), state.couponCode())),
+                null,
+                messageId,
+                traceId);
+    }
+
+    private ChatMessageResponse noteReply(
+            Long userId,
+            String sessionId,
+            String ownerKey,
+            ChatConversationSnapshot conversation,
+            ChatMessageRequest request,
+            ChatCheckoutState state,
+            UUID messageId,
+            UUID traceId) {
+        if (userId == null) {
+            return checkoutResponse(
+                    null, sessionId, ownerKey, conversation, request.message(),
+                    "Bạn cần đăng nhập trước khi hoàn tất đơn COD.",
+                    List.of("Hủy thanh toán"), state, null, messageId, traceId);
+        }
+        String normalized = normalizeText(request.message());
+        String note = isSkipNote(normalized) ? null : request.message().trim();
+        String historyMessage = note == null
+                ? "Bỏ qua ghi chú" : "[Ghi chú giao hàng đã được cung cấp]";
+        String couponCode = first(normalizedCoupon(request.couponCode()), state.couponCode());
+        try {
+            OrderResponse order = orderService.createOrder(
+                    userId,
+                    new CreateOrderRequest(state.shippingAddress(), note, couponCode));
+            String answer = "Đặt hàng COD thành công. Mã đơn hàng #" + order.id()
+                    + ", tổng thanh toán " + money(order.totalAmount()) + ". "
+                    + "Đơn đã được xác nhận và bạn sẽ thanh toán khi nhận hàng tại địa chỉ đã cung cấp.";
+            return checkoutResponse(
+                    userId, sessionId, ownerKey, conversation, historyMessage, answer,
+                    List.of("Sản phẩm bán chạy", "Tiếp tục mua sắm"),
+                    null,
+                    toOrderSummary(order),
+                    messageId,
+                    traceId);
+        } catch (BadRequestException exception) {
+            String reason = "Shopping cart is empty".equals(exception.getMessage())
+                    ? "Giỏ hàng của bạn đang trống. Hãy thêm sản phẩm trước khi thanh toán."
+                    : exception.getMessage();
+            return checkoutResponse(
+                    userId, sessionId, ownerKey, conversation, historyMessage,
+                    "Mình chưa thể tạo đơn COD: " + reason,
+                    List.of("Sản phẩm bán chạy", "Tiếp tục mua sắm"),
+                    null,
+                    null,
+                    messageId,
+                    traceId);
+        }
+    }
+
+    private ChatMessageResponse checkoutResponse(
+            Long userId,
+            String sessionId,
+            String ownerKey,
+            ChatConversationSnapshot conversation,
+            String userMessage,
+            String answer,
+            List<String> quickReplies,
+            ChatCheckoutState state,
+            ChatOrderSummaryResponse order,
+            UUID messageId,
+            UUID traceId) {
+        saveExchange(conversation, ownerKey, userMessage, answer, state);
+        ChatIntentAnalysis analysis = new ChatIntentAnalysis(
+                List.of(ChatIntent.CHECKOUT), null, null, null, null, null,
+                Map.of(), false, null);
+        trackChatEvent(userId, sessionId, analysis, 0, false);
+        return new ChatMessageResponse(
+                conversation.conversationId(), messageId, answer,
+                List.of(ChatIntent.CHECKOUT), List.of(), quickReplies, order, traceId);
+    }
+
+    private ChatOrderSummaryResponse toOrderSummary(OrderResponse order) {
+        int itemCount = order.items() == null ? 0 : order.items().stream()
+                .mapToInt(item -> item.quantity())
+                .sum();
+        return new ChatOrderSummaryResponse(
+                order.id(), order.status(), order.paymentMethod(), order.paymentStatus(),
+                order.totalAmount(), order.discountAmount(), order.shippingFee(), order.couponCode(),
+                order.shippingAddress(), order.note(), itemCount, order.createdAt());
+    }
+
+    private String paymentMethodMessage() {
+        return "Các phương thức thanh toán hiện có:\n"
+                + "1. Cash on Delivery (COD) — được hỗ trợ trực tiếp trong chat\n"
+                + "2. Credit Card\n"
+                + "3. Bank Transfer\n"
+                + "4. PayGate BNPL\n"
+                + "Bạn muốn chọn phương thức nào?";
+    }
+
+    private List<String> paymentMethodReplies() {
+        return List.of(
+                "Cash on Delivery (COD)",
+                "Credit Card",
+                "Bank Transfer",
+                "PayGate BNPL",
+                "Hủy thanh toán");
+    }
+
+    private boolean isCheckoutStart(String normalized) {
+        return normalized.matches(".*\\b(thanh toan|checkout|chot don|dat hang|hoan tat don hang|tra tien)\\b.*");
+    }
+
+    private boolean isCodSelection(String normalized) {
+        return normalized.matches(".*\\b(cod|cash on delivery|thanh toan khi nhan hang|tra tien khi nhan hang)\\b.*");
+    }
+
+    private boolean isOtherPaymentSelection(String normalized) {
+        return normalized.matches(".*\\b(credit card|the tin dung|bank transfer|chuyen khoan|paygate|bnpl)\\b.*");
+    }
+
+    private boolean isCheckoutCancellation(String normalized) {
+        return normalized.matches(".*\\b(huy thanh toan|huy dat hang|dung thanh toan|thoat thanh toan)\\b.*");
+    }
+
+    private boolean isSkipNote(String normalized) {
+        return normalized.matches("^(bo qua( ghi chu)?|khong|khong co|khong can|khong ghi chu|none)$");
+    }
+
+    private String normalizedCoupon(String couponCode) {
+        return couponCode == null || couponCode.isBlank()
+                ? null : couponCode.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeText(String value) {
+        return java.text.Normalizer.normalize(value == null ? "" : value, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace('đ', 'd')
+                .replace('Đ', 'D')
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", " ")
+                .trim();
+    }
+
     private ChatIntentAnalysis merge(ChatIntentAnalysis primary, ChatIntentAnalysis fallback) {
         List<ChatIntent> intents = primary.intents() == null || primary.intents().isEmpty()
                 ? fallback.intents() : primary.intents();
         return new ChatIntentAnalysis(
                 intents,
-                first(primary.query(), fallback.query()),
+                mergedQuery(primary, fallback, intents),
                 first(primary.category(), fallback.category()),
                 fallback.minPrice() == null ? primary.minPrice() : fallback.minPrice(),
                 fallback.maxPrice() == null ? primary.maxPrice() : fallback.maxPrice(),
@@ -234,15 +543,36 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
                 first(primary.clarificationQuestion(), fallback.clarificationQuestion()));
     }
 
-    private String combinedQuery(ChatIntentAnalysis analysis) {
-        List<String> parts = new ArrayList<>();
-        if (analysis.query() != null && !analysis.query().isBlank()) {
-            parts.add(analysis.query());
+    private String mergedQuery(
+            ChatIntentAnalysis primary,
+            ChatIntentAnalysis fallback,
+            List<ChatIntent> intents) {
+        if (intents.contains(ChatIntent.CAMPAIGN_OFFERS)
+                && fallback.query() != null
+                && containsVoucherQueryNoise(primary.query())) {
+            return fallback.query();
         }
-        analysis.attributes().values().stream()
-                .filter(value -> value != null && !value.isBlank())
-                .forEach(parts::add);
-        return parts.isEmpty() ? null : String.join(" ", parts);
+        return first(primary.query(), fallback.query());
+    }
+
+    private boolean containsVoucherQueryNoise(String query) {
+        if (query == null || query.isBlank()) {
+            return false;
+        }
+        String normalized = java.text.Normalizer.normalize(query, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace('đ', 'd')
+                .replace('Đ', 'D')
+                .toLowerCase(java.util.Locale.ROOT);
+        return normalized.matches(".*\\b(voucher|coupon|campaign|khuyen mai|giam gia|uu dai)\\b.*")
+                || normalized.matches(".*\\bap\\s+dung\\b.*")
+                || normalized.matches(".*\\b(san pham|mat hang)\\s+(o\\s+)?(ben\\s+)?tren\\b.*")
+                || normalized.matches(".*\\btrong\\s+cac\\b.*");
+    }
+
+    private String combinedQuery(ChatIntentAnalysis analysis) {
+        return analysis.query() == null || analysis.query().isBlank()
+                ? null : analysis.query();
     }
 
     private BigDecimal lowerPrice(ChatIntentAnalysis analysis) {
@@ -382,12 +712,27 @@ public class ChatAssistantServiceImpl implements ChatAssistantService {
             String ownerKey,
             String userMessage,
             String assistantMessage) {
+        saveExchange(
+                conversation,
+                ownerKey,
+                userMessage,
+                assistantMessage,
+                conversation.checkoutState());
+    }
+
+    private void saveExchange(
+            ChatConversationSnapshot conversation,
+            String ownerKey,
+            String userMessage,
+            String assistantMessage,
+            ChatCheckoutState checkoutState) {
         List<ChatHistoryMessage> messages = new ArrayList<>(conversation.messages());
         messages.add(new ChatHistoryMessage("user", userMessage));
         messages.add(new ChatHistoryMessage("assistant", assistantMessage));
         int fromIndex = Math.max(0, messages.size() - properties.getMaxHistoryMessages());
         conversationStore.save(new ChatConversationSnapshot(
-                conversation.conversationId(), ownerKey, messages.subList(fromIndex, messages.size())));
+                conversation.conversationId(), ownerKey, messages.subList(fromIndex, messages.size()),
+                checkoutState));
     }
 
     private String normalizeSessionId(String sessionId) {
