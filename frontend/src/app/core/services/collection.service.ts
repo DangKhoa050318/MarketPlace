@@ -59,7 +59,15 @@ export class CollectionService {
     return this.http.put<ApiResponse<CollectionResponse>>(`${this.apiUrl}/${id}/items/order`, request);
   }
 
+  restore(id: number): Observable<ApiResponse<CollectionResponse>> {
+    return this.http.post<ApiResponse<CollectionResponse>>(`${this.apiUrl}/${id}/restore`, {});
+  }
+
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+
+  hardDelete(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${id}?hard=true`);
   }
 }

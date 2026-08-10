@@ -92,13 +92,28 @@ public class AdminCollectionController {
         return ApiResponse.success("Collection unpublished", result);
     }
 
+    @PostMapping("/{id}/restore")
+    @Operation(summary = "Restore a soft-deleted collection (ADMIN)")
+    public ApiResponse<CollectionResponse> restore(Authentication authentication, @PathVariable Long id) {
+        CollectionResponse result = collectionService.restore(id);
+        auditService.record(actor(authentication), "COLLECTION_RESTORE", "ProductCollection", id, "active=true");
+        return ApiResponse.success("Collection restored", result);
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Soft-delete a collection (ADMIN)")
-    public void delete(Authentication authentication, @PathVariable Long id) {
-        collectionService.delete(id);
-        auditService.record(actor(authentication), "COLLECTION_DELETE", "ProductCollection", id,
-                "soft delete (active=false)");
+    @Operation(summary = "Delete a collection: soft (active=false) by default, permanent with ?hard=true (ADMIN)")
+    public void delete(Authentication authentication, @PathVariable Long id,
+                       @RequestParam(defaultValue = "false") boolean hard) {
+        if (hard) {
+            collectionService.hardDelete(id);
+            auditService.record(actor(authentication), "COLLECTION_HARD_DELETE", "ProductCollection", id,
+                    "permanent delete");
+        } else {
+            collectionService.delete(id);
+            auditService.record(actor(authentication), "COLLECTION_DELETE", "ProductCollection", id,
+                    "soft delete (active=false)");
+        }
     }
 
     // --- items ---

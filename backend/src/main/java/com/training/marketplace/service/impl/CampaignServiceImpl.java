@@ -7,10 +7,13 @@ import com.training.marketplace.dto.response.CampaignResponse;
 import com.training.marketplace.entity.Campaign;
 import com.training.marketplace.entity.PromotionCode;
 import com.training.marketplace.enums.CampaignStatus;
+import com.training.marketplace.enums.MerchandisingTargetType;
 import com.training.marketplace.exception.BadRequestException;
+import com.training.marketplace.exception.ConflictException;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.mapper.CampaignMapper;
 import com.training.marketplace.repository.CampaignRepository;
+import com.training.marketplace.repository.MerchandisingEventRepository;
 import com.training.marketplace.repository.PromotionCodeRepository;
 import com.training.marketplace.service.CampaignService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +32,7 @@ public class CampaignServiceImpl implements CampaignService {
 
     private final CampaignRepository campaignRepository;
     private final PromotionCodeRepository promotionCodeRepository;
+    private final MerchandisingEventRepository eventRepository;
     private final CampaignMapper campaignMapper;
 
     @Override
@@ -72,6 +76,31 @@ public class CampaignServiceImpl implements CampaignService {
         campaign.setActive(false);
         campaignRepository.save(campaign);
         log.info("Campaign soft-deleted: id={}", id);
+    }
+
+    @Override
+    @Transactional
+    public CampaignResponse restore(Long id) {
+        Campaign campaign = findOr404(id);
+        campaign.setActive(true);
+        log.info("Campaign restored (active=true): id={}", id);
+        return toResponse(campaignRepository.save(campaign));
+    }
+
+    @Override
+    @Transactional
+    public void hardDelete(Long id) {
+        Campaign campaign = findOr404(id);
+        if (campaign.getPromotionCodeId() != null) {
+            throw new ConflictException(
+                    "Campaign is linked to a coupon and can only be deactivated, not permanently deleted");
+        }
+        if (eventRepository.existsByTargetTypeAndTargetId(MerchandisingTargetType.CAMPAIGN, id)) {
+            throw new ConflictException(
+                    "Campaign has recorded impression/click history and can only be deactivated, not permanently deleted");
+        }
+        campaignRepository.delete(campaign);
+        log.info("Campaign hard-deleted: id={}", id);
     }
 
     @Override

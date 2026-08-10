@@ -60,18 +60,25 @@ import { ConfirmDialogComponent } from '../../../../shared/components/confirm-di
             <tr><th>Name</th><th>Status</th><th>Window</th><th>Coupon</th><th class="right">Actions</th></tr>
           </thead>
           <tbody>
-            <tr *ngFor="let c of items">
+            <tr *ngFor="let c of items" [class.row-inactive]="!c.active">
               <td><strong>{{ c.name }}</strong><div class="muted small" *ngIf="c.description">{{ c.description }}</div></td>
-              <td><span class="badge" [ngClass]="c.status.toLowerCase()">{{ c.status }}</span></td>
+              <td>
+                <span class="badge" [ngClass]="c.status.toLowerCase()">{{ c.status }}</span>
+                <span class="badge inactive" *ngIf="!c.active">Inactive</span>
+              </td>
               <td class="muted small">
                 {{ c.startsAt ? (c.startsAt | date:'short') : '—' }}<br>{{ c.endsAt ? (c.endsAt | date:'short') : '—' }}
               </td>
               <td>{{ c.couponCode || '—' }}</td>
               <td class="right">
                 <button mat-icon-button (click)="edit(c)" matTooltip="Edit"><mat-icon>edit</mat-icon></button>
-                <button mat-icon-button *ngIf="c.status !== 'PUBLISHED'" (click)="publish(c)" matTooltip="Publish"><mat-icon>publish</mat-icon></button>
-                <button mat-icon-button *ngIf="c.status !== 'ARCHIVED'" (click)="archive(c)" matTooltip="Archive"><mat-icon>archive</mat-icon></button>
-                <button mat-icon-button color="warn" (click)="remove(c)" matTooltip="Deactivate"><mat-icon>delete_outline</mat-icon></button>
+                <ng-container *ngIf="c.active">
+                  <button mat-icon-button *ngIf="c.status !== 'PUBLISHED'" (click)="publish(c)" matTooltip="Publish"><mat-icon>publish</mat-icon></button>
+                  <button mat-icon-button *ngIf="c.status !== 'ARCHIVED'" (click)="archive(c)" matTooltip="Archive"><mat-icon>archive</mat-icon></button>
+                  <button mat-icon-button color="warn" (click)="remove(c)" matTooltip="Deactivate"><mat-icon>delete_outline</mat-icon></button>
+                </ng-container>
+                <button mat-icon-button *ngIf="!c.active" color="primary" (click)="activate(c)" matTooltip="Activate"><mat-icon>restore_from_trash</mat-icon></button>
+                <button mat-icon-button *ngIf="!c.active" color="warn" (click)="hardRemove(c)" matTooltip="Delete permanently"><mat-icon>delete_forever</mat-icon></button>
               </td>
             </tr>
             <tr *ngIf="items.length === 0"><td colspan="5" class="empty">No campaigns found</td></tr>
@@ -108,6 +115,8 @@ import { ConfirmDialogComponent } from '../../../../shared/components/confirm-di
     .badge.published { background: rgba(22,163,74,.12); color: #16a34a; }
     .badge.draft { background: rgba(234,179,8,.15); color: #b45309; }
     .badge.archived { background: rgba(148,163,184,.15); color: #64748b; }
+    .badge.inactive { background: rgba(148,163,184,.18); color: #64748b; margin-left: 6px; }
+    tr.row-inactive { opacity: .55; }
     .pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding-top: 12px; }
   `]
 })
@@ -169,6 +178,26 @@ export class CampaignListComponent implements OnInit {
       this.campaignService.delete(c.id).subscribe({
         next: () => { this.notification.success('Campaign deactivated'); this.reload(); },
         error: () => this.notification.error('Failed to deactivate campaign')
+      });
+    });
+  }
+
+  activate(c: CampaignResponse): void {
+    this.campaignService.restore(c.id).subscribe({
+      next: () => { this.notification.success('Campaign activated'); this.reload(); },
+      error: () => this.notification.error('Failed to activate campaign')
+    });
+  }
+
+  hardRemove(c: CampaignResponse): void {
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      data: { title: 'Delete Campaign Permanently', message: `Permanently delete "${c.name}"? This cannot be undone.` }
+    });
+    ref.afterClosed().subscribe((ok: boolean) => {
+      if (!ok) return;
+      this.campaignService.hardDelete(c.id).subscribe({
+        next: () => { this.notification.success('Campaign permanently deleted'); this.reload(); },
+        error: (err) => this.notification.error(err?.error?.message || 'Cannot delete: campaign still has links')
       });
     });
   }

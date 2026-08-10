@@ -18,6 +18,8 @@ public interface ProductCollectionItemRepository extends JpaRepository<ProductCo
 
     boolean existsByCollectionIdAndProductId(Long collectionId, Long productId);
 
+    boolean existsByCollectionId(Long collectionId);
+
     void deleteByCollectionId(Long collectionId);
 
     /** Next append position; -1 default so the first item lands at display_order 0. */

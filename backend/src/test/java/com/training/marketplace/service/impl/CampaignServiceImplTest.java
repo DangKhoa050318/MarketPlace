@@ -4,10 +4,13 @@ import com.training.marketplace.dto.request.CreateCampaignRequest;
 import com.training.marketplace.dto.response.CampaignResponse;
 import com.training.marketplace.entity.Campaign;
 import com.training.marketplace.enums.CampaignStatus;
+import com.training.marketplace.enums.MerchandisingTargetType;
 import com.training.marketplace.exception.BadRequestException;
+import com.training.marketplace.exception.ConflictException;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.mapper.CampaignMapper;
 import com.training.marketplace.repository.CampaignRepository;
+import com.training.marketplace.repository.MerchandisingEventRepository;
 import com.training.marketplace.repository.PromotionCodeRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +37,8 @@ class CampaignServiceImplTest {
     private CampaignRepository campaignRepository;
     @Mock
     private PromotionCodeRepository promotionCodeRepository;
+    @Mock
+    private MerchandisingEventRepository eventRepository;
     @Mock
     private CampaignMapper campaignMapper;
 
@@ -118,6 +123,40 @@ class CampaignServiceImplTest {
 
         assertThat(campaign.getActive()).isFalse();
         verify(campaignRepository).save(campaign);
+    }
+
+    @Test
+    void hardDelete_rejectsWhenLinkedToCoupon() {
+        Campaign campaign = Campaign.builder().name("Sale").promotionCodeId(5L).build();
+        given(campaignRepository.findById(1L)).willReturn(Optional.of(campaign));
+
+        assertThatThrownBy(() -> service.hardDelete(1L))
+                .isInstanceOf(ConflictException.class);
+
+        verify(campaignRepository, never()).delete(any());
+    }
+
+    @Test
+    void hardDelete_rejectsWhenEventHistoryExists() {
+        Campaign campaign = Campaign.builder().name("Sale").build(); // no coupon link
+        given(campaignRepository.findById(1L)).willReturn(Optional.of(campaign));
+        given(eventRepository.existsByTargetTypeAndTargetId(MerchandisingTargetType.CAMPAIGN, 1L)).willReturn(true);
+
+        assertThatThrownBy(() -> service.hardDelete(1L))
+                .isInstanceOf(ConflictException.class);
+
+        verify(campaignRepository, never()).delete(any());
+    }
+
+    @Test
+    void hardDelete_deletesWhenStandalone() {
+        Campaign campaign = Campaign.builder().name("Sale").build();
+        given(campaignRepository.findById(1L)).willReturn(Optional.of(campaign));
+        given(eventRepository.existsByTargetTypeAndTargetId(MerchandisingTargetType.CAMPAIGN, 1L)).willReturn(false);
+
+        service.hardDelete(1L);
+
+        verify(campaignRepository).delete(campaign);
     }
 
     @Test
