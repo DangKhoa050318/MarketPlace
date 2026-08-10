@@ -11,6 +11,7 @@ import com.training.marketplace.service.RecommendationCandidate;
 import com.training.marketplace.service.RecommendationContext;
 import com.training.marketplace.service.RecommendationStrategy;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,8 +57,14 @@ public class SimilarProductRecommendationStrategy implements RecommendationStrat
         return RecommendationStrategyType.SIMILAR;
     }
 
+    /** Cache name for computed SIMILAR results; TTL is configured in {@code RedisConfig}. */
+    static final String SIMILAR_CACHE = "similar-recommendations";
+
     @Override
     @Transactional(readOnly = true)
+    // MP-M2: the full active-catalog scan + scoring below is deterministic per (productId, limit),
+    // so cache the computed result (TTL-bounded) instead of recomputing it on every request.
+    @Cacheable(cacheNames = SIMILAR_CACHE, key = "#context.productId() + ':' + #context.limit()")
     public List<RecommendationCandidate> recommend(RecommendationContext context) {
         if (context.productId() == null) {
             throw new BadRequestException("Source product ID is required for SIMILAR recommendations");

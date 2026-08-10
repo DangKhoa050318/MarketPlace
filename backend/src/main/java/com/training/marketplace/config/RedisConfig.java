@@ -80,6 +80,9 @@ public class RedisConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer));
 
         RedisCacheConfiguration analyticsCacheConfig = cacheConfig.entryTtl(analyticsCacheTtl);
+        // MP-M2: SIMILAR product recommendations are deterministic; a short TTL bounds staleness
+        // when catalog prices/attributes change while still skipping the full-scan on cache hits.
+        RedisCacheConfiguration similarRecommendationConfig = cacheConfig.entryTtl(Duration.ofMinutes(15));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(cacheConfig)
@@ -87,7 +90,8 @@ public class RedisConfig {
                         AnalyticsCacheNames.OVERVIEW, analyticsCacheConfig,
                         AnalyticsCacheNames.PRODUCT_PERFORMANCE, analyticsCacheConfig,
                         AnalyticsCacheNames.PROMOTION_RECOMMENDATION, analyticsCacheConfig,
-                        AnalyticsCacheNames.PROMOTION_TREND, analyticsCacheConfig))
+                        AnalyticsCacheNames.PROMOTION_TREND, analyticsCacheConfig,
+                        "similar-recommendations", similarRecommendationConfig))
                 .build();
     }
 
