@@ -43,9 +43,9 @@ export function setup() {
   const baseUrl = __ENV.BASE_URL || 'http://localhost:8080';
   const users = [];
 
-  // Login cho 20 user khác nhau để test đa luồng
-  // Lưu ý: Dùng X-Forwarded-For để spoof IP, tránh bị RateLimitingFilter chặn (limit 5 req/min/IP)
-  for (let i = 1; i <= 20; i++) {
+  // Login cho 5 user khác nhau để test (Limit 5 req/min theo RateLimitingFilter)
+  // Không dùng X-Forwarded-For spoofing vì đó là anti-pattern che giấu lỗ hổng security
+  for (let i = 1; i <= 5; i++) {
     const userStr = i < 10 ? `0${i}` : `${i}`;
     const username = `demo_customer_${userStr}`;
     const loginPayload = JSON.stringify({
@@ -53,11 +53,9 @@ export function setup() {
       password: 'admin123'
     });
     
-    const randomIp = `192.168.1.${i}`;
     const loginRes = http.post(`${baseUrl}/api/v1/auth/login`, loginPayload, {
       headers: { 
-        'Content-Type': 'application/json',
-        'X-Forwarded-For': randomIp
+        'Content-Type': 'application/json'
       },
     });
 
