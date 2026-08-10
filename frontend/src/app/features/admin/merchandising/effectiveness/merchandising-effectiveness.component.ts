@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -105,7 +105,7 @@ import {
     .empty { text-align: center; color: var(--text-muted); padding: 40px; border-radius: 14px; }
   `]
 })
-export class MerchandisingEffectivenessComponent implements OnInit {
+export class MerchandisingEffectivenessComponent {
   form: FormGroup;
   loading = false;
   result?: MerchandisingSummaryResponse;
@@ -124,8 +124,6 @@ export class MerchandisingEffectivenessComponent implements OnInit {
       to: [this.toLocalInput(now), Validators.required]
     });
   }
-
-  ngOnInit(): void {}
 
   load(): void {
     if (this.form.invalid) return;

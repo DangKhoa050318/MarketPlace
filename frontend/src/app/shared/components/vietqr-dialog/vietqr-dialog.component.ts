@@ -6,7 +6,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { catchError, finalize, of } from 'rxjs';
 import { VietQrService } from '../../../core/services/vietqr.service';
-import { BankData } from '../../../core/services/banks-data';
 import { environment } from '../../../../environments/environment';
 
 export interface VietQrDialogData {

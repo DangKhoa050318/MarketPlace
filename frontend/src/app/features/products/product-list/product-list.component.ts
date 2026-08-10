@@ -9,7 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { Subject, debounceTime, distinctUntilChanged, finalize, of, switchMap, takeUntil, tap } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, finalize, switchMap, takeUntil, tap } from 'rxjs';
 import {
   AnalyticsEventSource,
   AnalyticsEventType,
@@ -793,7 +793,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
     const items = variantNamesStr
       .split(',')
       .map(s => {
-        let t = s.trim();
+        const t = s.trim();
         if (/^Standard Variant\s*0?(\d+)$/i.test(t)) {
           return `Tùy chọn ${t.replace(/^Standard Variant\s*0?/i, '')}`;
         }
