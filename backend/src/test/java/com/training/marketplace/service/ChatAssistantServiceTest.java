@@ -463,7 +463,6 @@ class ChatAssistantServiceTest {
         PaygatePayloadResponse payload = new PaygatePayloadResponse(
                 89L,
                 7L,
-                "MARKETPLACE_MP",
                 new BigDecimal("16300000"),
                 new BigDecimal("16300000"),
                 BigDecimal.ZERO,
