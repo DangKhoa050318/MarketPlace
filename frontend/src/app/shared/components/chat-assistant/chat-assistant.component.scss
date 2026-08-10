@@ -232,6 +232,24 @@
 
 .order-card__link mat-icon { font-size: 15px; width: 15px; height: 15px; }
 
+.order-card__payment {
+  margin: 10px 0 8px;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 9px;
+  color: #fff;
+  background: #0284c7;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.order-card__payment:hover { background: #0369a1; }
+.order-card__payment mat-icon { font-size: 17px; width: 17px; height: 17px; }
+
 .quick-replies {
   display: flex;
   flex-wrap: wrap;
