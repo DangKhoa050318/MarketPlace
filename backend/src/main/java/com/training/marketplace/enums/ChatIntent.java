@@ -6,5 +6,6 @@ public enum ChatIntent {
     HELP,
     BEST_SELLER,
     PRODUCT_DISCOVERY,
-    CAMPAIGN_OFFERS
+    CAMPAIGN_OFFERS,
+    CHECKOUT
 }

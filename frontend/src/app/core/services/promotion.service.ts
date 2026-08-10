@@ -50,6 +50,10 @@ export class PromotionService {
     this.appliedCouponSubject.next(null);
   }
 
+  appliedCouponCode(): string | undefined {
+    return this.appliedCouponSubject.value?.code;
+  }
+
   // --- Admin ---
   list(opts: { active?: boolean; type?: DiscountType; q?: string; page?: number; size?: number } = {})
     : Observable<ApiResponse<PageResponse<PromotionCodeResponse>>> {

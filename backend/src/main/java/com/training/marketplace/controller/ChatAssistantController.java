@@ -21,14 +21,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/chat")
 @RequiredArgsConstructor
-@Tag(name = "Chat Assistant", description = "Shopping discovery and active campaign assistant")
+@Tag(
+        name = "Chat Assistant",
+        description = "Shopping discovery, campaign voucher, cart command and COD checkout assistant")
 public class ChatAssistantController {
 
     private final ChatAssistantService chatAssistantService;
     private final UserService userService;
 
     @PostMapping("/messages")
-    @Operation(summary = "Send a shopping question to the assistant")
+    @Operation(
+            summary = "Send a message to the shopping assistant",
+            description = "Supports product discovery and a stateful authenticated COD checkout flow. "
+                    + "Pass the same conversationId for payment method, address and optional note steps.")
     public ApiResponse<ChatMessageResponse> reply(
             Authentication authentication,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,

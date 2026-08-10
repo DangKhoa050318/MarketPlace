@@ -79,6 +79,16 @@ export class CartService {
     );
   }
 
+  markCheckoutComplete(): void {
+    this.promotionService.clearApplied();
+    this.cartSubject.next({
+      userId: 0,
+      items: [],
+      totalAmount: 0,
+      totalItems: 0
+    });
+  }
+
   private revalidateCoupon(): void {
     this.promotionService.revalidateApplied().subscribe({ error: () => undefined });
   }

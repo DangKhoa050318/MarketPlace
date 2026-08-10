@@ -176,6 +176,62 @@
   font-size: 15px;
 }
 
+.order-card {
+  display: block;
+  margin-top: 10px;
+  padding: 12px;
+  color: #334155;
+  text-decoration: none;
+  background: #fff;
+  border: 1px solid #a7f3d0;
+  border-radius: 13px;
+}
+
+.order-card__header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 7px;
+  color: #065f46;
+}
+
+.order-card__header mat-icon { font-size: 19px; width: 19px; height: 19px; }
+.order-card__header span { font-size: 0.66rem; font-weight: 700; }
+
+.order-card dl {
+  margin: 10px 0;
+  display: grid;
+  gap: 5px;
+}
+
+.order-card dl div { display: flex; justify-content: space-between; gap: 12px; }
+.order-card dt, .order-card dd { margin: 0; font-size: 0.7rem; }
+.order-card dd { text-align: right; font-weight: 700; }
+
+.order-card p {
+  margin: 8px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  color: #64748b;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.order-card p mat-icon { flex: 0 0 auto; font-size: 15px; width: 15px; height: 15px; }
+
+.order-card__link {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  color: #4f46e5;
+  font-size: 0.69rem;
+  font-weight: 700;
+}
+
+.order-card__link mat-icon { font-size: 15px; width: 15px; height: 15px; }
+
 .quick-replies {
   display: flex;
   flex-wrap: wrap;

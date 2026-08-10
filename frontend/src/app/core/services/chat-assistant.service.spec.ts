@@ -64,4 +64,20 @@ describe('ChatAssistantService', () => {
       }
     });
   });
+
+  it('sends the selected coupon with checkout chat messages', () => {
+    service.send('Cash on Delivery (COD)', undefined, 'SCHOOL10').subscribe();
+
+    const request = http.expectOne(`${environment.apiUrl}/chat/messages`);
+    expect(request.request.body.couponCode).toBe('SCHOOL10');
+    request.flush({
+      success: true,
+      message: 'ok',
+      timestamp: new Date().toISOString(),
+      data: {
+        conversationId: 'conversation-1', messageId: 'message-3', answer: 'Nhập địa chỉ',
+        intents: ['CHECKOUT'], products: [], quickReplies: [], traceId: 'trace-3'
+      }
+    });
+  });
 });

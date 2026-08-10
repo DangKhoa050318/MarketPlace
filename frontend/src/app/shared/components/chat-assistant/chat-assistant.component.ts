@@ -36,7 +36,7 @@ export class ChatAssistantComponent {
   draft = '';
   messages: UiMessage[] = [{
     role: 'assistant',
-    text: 'Xin chào! Mình có thể tìm sản phẩm bán chạy, tư vấn theo nhu cầu hoặc tìm voucher đang có hiệu lực.'
+    text: 'Xin chào! Mình có thể tư vấn sản phẩm, tìm voucher, hỗ trợ giỏ hàng hoặc đặt đơn COD ngay trong chat.'
   }];
 
   constructor(
@@ -76,7 +76,11 @@ export class ChatAssistantComponent {
     }
 
     this.loading = true;
-    this.chatService.send(message, this.pageContext()).pipe(
+    this.chatService.send(
+      message,
+      this.pageContext(),
+      this.promotionService.appliedCouponCode()
+    ).pipe(
       finalize(() => {
         this.loading = false;
         this.scrollSoon();
@@ -93,6 +97,9 @@ export class ChatAssistantComponent {
           { conversationId: response.data.conversationId, traceId: response.data.traceId },
           { productId: product.productId, source: AnalyticsEventSource.ChatAssistant }
         ));
+        if (response.data.order) {
+          this.cartService.markCheckoutComplete();
+        }
       },
       error: () => this.messages.push({
         role: 'assistant',

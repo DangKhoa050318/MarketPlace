@@ -2,8 +2,13 @@ package com.training.marketplace.service;
 
 import com.training.marketplace.config.ChatAssistantProperties;
 import com.training.marketplace.dto.request.ChatMessageRequest;
+import com.training.marketplace.dto.request.CreateOrderRequest;
+import com.training.marketplace.dto.response.OrderResponse;
 import com.training.marketplace.enums.ChatIntent;
 import com.training.marketplace.enums.DiscountType;
+import com.training.marketplace.enums.OrderStatus;
+import com.training.marketplace.enums.PaymentMethod;
+import com.training.marketplace.enums.PaymentStatus;
 import com.training.marketplace.enums.PromotionScopeType;
 import com.training.marketplace.enums.ScopeRefType;
 import com.training.marketplace.exception.BadRequestException;
@@ -13,6 +18,8 @@ import com.training.marketplace.service.impl.RuleBasedChatIntentAnalyzer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,12 +31,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -42,6 +51,7 @@ class ChatAssistantServiceTest {
     @Mock private CampaignOfferService campaignOfferService;
     @Mock private ChatProductDiscoveryService discoveryService;
     @Mock private AnalyticsEventService analyticsEventService;
+    @Mock private OrderService orderService;
 
     private ChatAssistantService service;
 
@@ -57,7 +67,8 @@ class ChatAssistantServiceTest {
                 new RuleBasedChatIntentAnalyzer(),
                 campaignOfferService,
                 discoveryService,
-                analyticsEventService);
+                analyticsEventService,
+                orderService);
     }
 
     @Test
@@ -250,6 +261,93 @@ class ChatAssistantServiceTest {
     }
 
     @Test
+    void completesCodCheckoutConversationAndReturnsOrderSummary() {
+        AtomicReference<ChatConversationSnapshot> stored = new AtomicReference<>();
+        when(conversationStore.find(any())).thenAnswer(invocation ->
+                Optional.ofNullable(stored.get()));
+        doAnswer(invocation -> {
+            stored.set(invocation.getArgument(0));
+            return null;
+        }).when(conversationStore).save(any(ChatConversationSnapshot.class));
+        when(orderService.createOrder(eq(7L), any(CreateOrderRequest.class)))
+                .thenReturn(orderResponse());
+
+        var methods = service.reply(
+                7L, "session-1",
+                new ChatMessageRequest(null, "Tôi muốn thanh toán", null, "SCHOOL10"));
+        var cod = service.reply(
+                7L, "session-1",
+                new ChatMessageRequest(
+                        methods.conversationId(), "Cash on Delivery (COD)", null, "SCHOOL10"));
+        var address = service.reply(
+                7L, "session-1",
+                new ChatMessageRequest(
+                        methods.conversationId(),
+                        "123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM",
+                        null,
+                        "SCHOOL10"));
+        var completed = service.reply(
+                7L, "session-1",
+                new ChatMessageRequest(
+                        methods.conversationId(), "Bỏ qua ghi chú", null, "SCHOOL10"));
+
+        assertThat(methods.intents()).containsExactly(ChatIntent.CHECKOUT);
+        assertThat(methods.quickReplies()).contains("Cash on Delivery (COD)", "Credit Card");
+        assertThat(cod.answer()).contains("địa chỉ giao hàng");
+        assertThat(address.answer()).contains("ghi chú giao hàng");
+        assertThat(completed.answer()).contains("Đặt hàng COD thành công").contains("#88");
+        assertThat(completed.order()).isNotNull();
+        assertThat(completed.order().paymentMethod()).isEqualTo(PaymentMethod.COD);
+        assertThat(completed.order().paymentStatus()).isEqualTo(PaymentStatus.UNPAID);
+        assertThat(stored.get().checkoutState()).isNull();
+        assertThat(stored.get().messages())
+                .noneMatch(message -> message.content().contains("123 Nguyễn Trãi"));
+
+        ArgumentCaptor<CreateOrderRequest> requestCaptor =
+                ArgumentCaptor.forClass(CreateOrderRequest.class);
+        verify(orderService).createOrder(eq(7L), requestCaptor.capture());
+        assertThat(requestCaptor.getValue().shippingAddress())
+                .isEqualTo("123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM");
+        assertThat(requestCaptor.getValue().note()).isNull();
+        assertThat(requestCaptor.getValue().couponCode()).isEqualTo("SCHOOL10");
+        assertThat(requestCaptor.getValue().paymentMethod()).isEqualTo(PaymentMethod.COD);
+    }
+
+    @Test
+    void requiresAuthenticationBeforeCollectingCodAddress() {
+        when(conversationStore.find(any())).thenReturn(Optional.empty());
+
+        var response = service.reply(
+                null,
+                "session-1",
+                new ChatMessageRequest(null, "Tôi muốn thanh toán bằng COD", null));
+
+        assertThat(response.answer()).contains("cần đăng nhập");
+        verifyNoInteractions(orderService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "Tôi muốn thanh toán",
+            "Mình muốn checkout",
+            "Hãy chốt đơn giúp tôi",
+            "Tôi muốn trả tiền",
+            "Tôi muốn đặt hàng"
+    })
+    void recognizesEquivalentCheckoutRequests(String message) {
+        when(conversationStore.find(any())).thenReturn(Optional.empty());
+
+        var response = service.reply(
+                7L,
+                "session-1",
+                new ChatMessageRequest(null, message, null));
+
+        assertThat(response.intents()).containsExactly(ChatIntent.CHECKOUT);
+        assertThat(response.quickReplies()).contains("Cash on Delivery (COD)");
+        verifyNoInteractions(aiGateway, discoveryService, orderService);
+    }
+
+    @Test
     void rejectsConversationOwnedByAnotherVisitor() {
         UUID conversationId = UUID.randomUUID();
         when(conversationStore.find(conversationId)).thenReturn(Optional.of(
@@ -295,5 +393,23 @@ class ChatAssistantServiceTest {
                 new BigDecimal("18000000"),
                 new BigDecimal("19500000"),
                 8);
+    }
+
+    private OrderResponse orderResponse() {
+        return new OrderResponse(
+                88L,
+                7L,
+                "customer",
+                "customer@example.com",
+                "123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM",
+                new BigDecimal("16300000"),
+                new BigDecimal("1800000"),
+                new BigDecimal("100000"),
+                "SCHOOL10",
+                OrderStatus.CONFIRMED,
+                null,
+                List.of(),
+                LocalDateTime.now(),
+                LocalDateTime.now());
     }
 }

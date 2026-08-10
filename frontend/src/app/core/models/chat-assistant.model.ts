@@ -4,7 +4,8 @@ export type ChatIntent =
   | 'HELP'
   | 'BEST_SELLER'
   | 'PRODUCT_DISCOVERY'
-  | 'CAMPAIGN_OFFERS';
+  | 'CAMPAIGN_OFFERS'
+  | 'CHECKOUT';
 
 export interface ChatPageContext {
   productId?: number;
@@ -46,6 +47,22 @@ export interface ChatMessageRequest {
   conversationId?: string;
   message: string;
   pageContext?: ChatPageContext;
+  couponCode?: string;
+}
+
+export interface ChatOrderSummary {
+  id: number;
+  status: string;
+  paymentMethod: 'COD' | 'CREDIT_CARD' | 'PAYGATE_BNPL' | 'BANK_TRANSFER';
+  paymentStatus: string;
+  totalAmount: number;
+  discountAmount: number;
+  shippingFee: number;
+  couponCode?: string;
+  shippingAddress: string;
+  note?: string;
+  itemCount: number;
+  createdAt: string;
 }
 
 export interface ChatMessageResponse {
@@ -55,5 +72,6 @@ export interface ChatMessageResponse {
   intents: ChatIntent[];
   products: ChatProductCard[];
   quickReplies: string[];
+  order?: ChatOrderSummary;
   traceId: string;
 }

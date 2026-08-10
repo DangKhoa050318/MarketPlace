@@ -11,17 +11,21 @@ import { ChatAssistantComponent } from './chat-assistant.component';
 
 describe('ChatAssistantComponent cart commands', () => {
   let component: ChatAssistantComponent;
+  let chatService: jasmine.SpyObj<ChatAssistantService>;
   let authService: jasmine.SpyObj<AuthService>;
   let cartService: jasmine.SpyObj<CartService>;
   let promotionService: jasmine.SpyObj<PromotionService>;
 
   beforeEach(() => {
-    const chatService = jasmine.createSpyObj<ChatAssistantService>(
+    chatService = jasmine.createSpyObj<ChatAssistantService>(
       'ChatAssistantService', ['send', 'clearConversation']);
     const analytics = jasmine.createSpyObj<AnalyticsService>('AnalyticsService', ['track']);
     authService = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated']);
-    cartService = jasmine.createSpyObj<CartService>('CartService', ['addToCart']);
-    promotionService = jasmine.createSpyObj<PromotionService>('PromotionService', ['apply']);
+    cartService = jasmine.createSpyObj<CartService>(
+      'CartService', ['addToCart', 'markCheckoutComplete']);
+    promotionService = jasmine.createSpyObj<PromotionService>(
+      'PromotionService', ['apply', 'appliedCouponCode']);
+    promotionService.appliedCouponCode.and.returnValue(undefined);
     const router = { url: '/products' };
 
     component = new ChatAssistantComponent(
@@ -91,6 +95,44 @@ describe('ChatAssistantComponent cart commands', () => {
 
     expect(promotionService.apply).toHaveBeenCalledOnceWith('SCHOOL10');
     expect(component.messages[component.messages.length - 1].text).toContain('Đã áp dụng voucher SCHOOL10');
+  });
+
+  it('updates local cart state when COD checkout completes in chat', () => {
+    promotionService.appliedCouponCode.and.returnValue('SCHOOL10');
+    chatService.send.and.returnValue(of({
+      success: true,
+      message: 'Order created',
+      timestamp: new Date().toISOString(),
+      data: {
+        conversationId: 'conversation-1',
+        messageId: 'message-checkout',
+        answer: 'Đặt hàng COD thành công.',
+        intents: ['CHECKOUT'],
+        products: [],
+        quickReplies: [],
+        traceId: 'trace-checkout',
+        order: {
+          id: 88,
+          status: 'CONFIRMED',
+          paymentMethod: 'COD',
+          paymentStatus: 'UNPAID',
+          totalAmount: 16300000,
+          discountAmount: 1800000,
+          shippingFee: 100000,
+          couponCode: 'SCHOOL10',
+          shippingAddress: '123 Nguyễn Trãi, Quận 5, TP.HCM',
+          itemCount: 1,
+          createdAt: new Date().toISOString()
+        }
+      }
+    }));
+
+    component.send('Bỏ qua ghi chú');
+
+    expect(chatService.send).toHaveBeenCalledWith(
+      'Bỏ qua ghi chú', undefined, 'SCHOOL10');
+    expect(cartService.markCheckoutComplete).toHaveBeenCalled();
+    expect(component.messages[component.messages.length - 1].response?.order?.id).toBe(88);
   });
 });
 
