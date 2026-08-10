@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -641,7 +641,7 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
     }
   `]
 })
-export class OrderDetailComponent implements OnInit {
+export class OrderDetailComponent implements OnInit, OnDestroy {
   order: Order | null = null;
   delivery: Delivery | null = null;
   loading = true;
@@ -657,6 +657,7 @@ export class OrderDetailComponent implements OnInit {
   returnEvidenceImageUrls: string[] = [];
   uploadingReturnEvidence = false;
   displayedColumns = ['productName', 'variantInfo', 'unitPrice', 'quantity', 'subtotal'];
+  private pollingTimer: any = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -724,7 +725,7 @@ export class OrderDetailComponent implements OnInit {
         this.orderService.confirmVietQrPayment(orderId).subscribe({
           next: (res) => {
             if (res.success) {
-              this.notification.success('Payment confirmed! Your order is now CONFIRMED.');
+              this.notification.success('Payment is being processed. Please wait...');
               this.loadOrderDetail(orderId);
             }
           },
@@ -756,6 +757,60 @@ export class OrderDetailComponent implements OnInit {
     }
   }
 
+  ngOnDestroy(): void {
+    this.stopPolling();
+  }
+
+  private stopPolling(): void {
+    if (this.pollingTimer) {
+      clearInterval(this.pollingTimer);
+      this.pollingTimer = null;
+    }
+  }
+
+  private checkAndStartPolling(): void {
+    const isPendingPaygate = this.order?.status === 'PENDING' && this.order?.paymentStatus === 'PENDING_PAYGATE';
+    const isPendingVietQr = this.order?.status === 'PENDING'
+      && this.order?.paymentStatus === 'UNPAID'
+      && this.order?.paymentMethod === 'BANK_TRANSFER';
+    if (isPendingPaygate || isPendingVietQr) {
+      if (!this.pollingTimer) {
+        this.pollingTimer = setInterval(() => this.pollPaymentStatus(), 3000);
+      }
+    } else {
+      this.stopPolling();
+    }
+  }
+
+  private pollPaymentStatus(): void {
+    if (!this.order?.id) return;
+    this.orderService.getUserOrderById(this.order.id).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          const newStatus = res.data.status;
+          const newPaymentStatus = res.data.paymentStatus;
+          const oldStatus = this.order?.status;
+          const oldPaymentStatus = this.order?.paymentStatus;
+
+          this.order = res.data;
+          this.checkAndStartPolling();
+
+          if (newStatus !== oldStatus || newPaymentStatus !== oldPaymentStatus) {
+            if (newPaymentStatus === 'PAID') {
+               this.notification.success('Payment completed successfully!');
+               this.stopPolling();
+               this.dialog.closeAll();
+            } else if (newStatus === 'CANCELLED') {
+               this.notification.info('Payment was cancelled or expired.');
+               this.stopPolling();
+               this.dialog.closeAll();
+            }
+          }
+        }
+      }
+    });
+  }
+
   loadOrderDetail(id: number): void {
     this.loading = true;
     this.delivery = null;
@@ -764,6 +819,7 @@ export class OrderDetailComponent implements OnInit {
       tap((res) => {
         if (res.success && res.data) {
           this.order = res.data;
+          this.checkAndStartPolling();
         }
       }),
       switchMap((res) => {

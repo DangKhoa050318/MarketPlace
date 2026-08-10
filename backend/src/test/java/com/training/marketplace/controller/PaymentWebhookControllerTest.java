@@ -42,15 +42,15 @@ class PaymentWebhookControllerTest {
                 "SUCCESS"
         );
 
-        when(paymentWebhookService.processPaygateWebhook(any(), any()))
+        when(paymentWebhookService.processPaygateWebhook(any(), any(), any()))
                 .thenReturn(Map.of("orderId", 100L, "status", "CONFIRMED", "paymentStatus", "PAID"));
 
-        ApiResponse<Map<String, Object>> response = webhookController.handlePaygateWebhook("signature-123", request);
+        ApiResponse<Map<String, Object>> response = webhookController.handlePaygateWebhook("signature-123", "{}");
 
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.getData().get("orderId")).isEqualTo(100L);
         assertThat(response.getData().get("status")).isEqualTo("CONFIRMED");
 
-        verify(paymentWebhookService).processPaygateWebhook(eq(request), eq("signature-123"));
+        verify(paymentWebhookService).processPaygateWebhook(any(PaygateWebhookRequest.class), eq("signature-123"), any());
     }
 }

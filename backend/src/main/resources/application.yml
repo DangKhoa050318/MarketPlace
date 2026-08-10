@@ -93,6 +93,7 @@ marketplace:
     api-url: ${PAYGATE_API_URL:http://localhost:8081}
     checkout-url: ${PAYGATE_CHECKOUT_URL:http://localhost:4201/checkout}
     api-key: ${PAYGATE_API_KEY:marketplace-api-key-123456}
+    merchant-code: ${PAYGATE_MERCHANT_CODE:MARKETPLACE_MP}
     return-url: ${PAYGATE_RETURN_URL:http://localhost:4200/orders/callback}
     cancel-url: ${PAYGATE_CANCEL_URL:http://localhost:4200/orders/callback}
     webhook:

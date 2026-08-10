@@ -70,7 +70,7 @@ class PaymentWebhookServiceTest {
         );
 
         // when
-        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(request, "mock-merchant-api-key-123456");
+        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(request, "mock-merchant-api-key-123456", null);
 
         // then
         assertThat(result.get("orderId")).isEqualTo(orderId);
@@ -107,7 +107,7 @@ class PaymentWebhookServiceTest {
         );
 
         // when
-        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(request, null);
+        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(request, null, null);
 
         // then
         assertThat(result.get("idempotent")).isEqualTo(true);
@@ -131,7 +131,7 @@ class PaymentWebhookServiceTest {
         );
 
         // when & then
-        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(request, null))
+        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(request, null, null))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Order");
     }
@@ -149,7 +149,7 @@ class PaymentWebhookServiceTest {
         );
 
         // when & then — a wrong secret is an auth failure (403), and never touches the order/stock
-        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(request, "invalid-bad-signature"))
+        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(request, "invalid-bad-signature", null))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Invalid webhook signature");
         verifyNoInteractions(orderRepository, inventoryFacade);
@@ -162,7 +162,7 @@ class PaymentWebhookServiceTest {
         PaygateWebhookRequest request = new PaygateWebhookRequest(
                 "PAYMENT_COMPLETED", "TXN_1", 1L, "ORD-100", new BigDecimal("100.00"), "SUCCESS");
 
-        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(request, null))
+        assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(request, null, null))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Missing webhook signature");
         verifyNoInteractions(orderRepository, inventoryFacade);
@@ -176,7 +176,10 @@ class PaymentWebhookServiceTest {
                 "PAYMENT_COMPLETED", "TXN_1", 1L, "ORD-100", new BigDecimal("100.00"), "SUCCESS");
 
         assertThatThrownBy(() -> paymentWebhookService.processPaygateWebhook(
-                request, "prefix-mock-merchant-api-key-123456-suffix"))
+                request,
+                "some-junk" + "mock-merchant-api-key-123456" + "more-junk",
+                null
+        ))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Invalid webhook signature");
         verifyNoInteractions(orderRepository, inventoryFacade);
@@ -202,8 +205,10 @@ class PaymentWebhookServiceTest {
                 "PAYMENT_COMPLETED", "TXN_1", 1L, "ORD-200", new BigDecimal("100.00"), "SUCCESS");
 
         Map<String, Object> result = paymentWebhookService.processPaygateWebhook(
-                request, "mock-merchant-api-key-123456");
-
+                request,
+                "mock-merchant-api-key-123456",
+                null
+        );
         assertThat(result.get("status")).isEqualTo("CONFIRMED");
         assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
         assertThat(order.getPaygateTransactionRef()).isEqualTo("TXN_1");
@@ -232,7 +237,7 @@ class PaymentWebhookServiceTest {
         );
 
         // when
-        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(request, null);
+        Map<String, Object> result = paymentWebhookService.processPaygateWebhook(request, null, null);
 
         // then
         assertThat(result.get("idempotent")).isEqualTo(true);

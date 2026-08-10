@@ -69,9 +69,9 @@ class PaymentWebhookServiceImplTest {
         Order order = orderWith(1L, OrderStatus.PROCESSING, PaymentStatus.UNPAID);
         given(orderRepository.findByIdForUpdate(1L)).willReturn(Optional.of(order));
 
-        service.processPaygateWebhook(cancelled("1"), null); // first: cancels + releases
-        service.processPaygateWebhook(cancelled("1"), null); // retry -> idempotent no-op
-        service.processPaygateWebhook(cancelled("1"), null); // retry -> idempotent no-op
+        service.processPaygateWebhook(cancelled("1"), null, null); // first: cancels + releases
+        service.processPaygateWebhook(cancelled("1"), null, null); // retry -> idempotent no-op
+        service.processPaygateWebhook(cancelled("1"), null, null); // retry -> idempotent no-op
 
         verify(inventoryFacade, times(1)).release(eq(1L), anyMap());
         verify(inventoryFacade, never()).fulfill(eq(1L), anyMap());
@@ -83,9 +83,9 @@ class PaymentWebhookServiceImplTest {
         Order order = orderWith(2L, OrderStatus.PENDING, PaymentStatus.UNPAID);
         given(orderRepository.findByIdForUpdate(2L)).willReturn(Optional.of(order));
 
-        service.processPaygateWebhook(success("2"), null); // first: confirms + marks paid
-        service.processPaygateWebhook(success("2"), null); // retry -> idempotent no-op
-        service.processPaygateWebhook(success("2"), null); // retry -> idempotent no-op
+        service.processPaygateWebhook(success("2"), null, null); // first: confirms + marks paid
+        service.processPaygateWebhook(success("2"), null, null); // retry -> idempotent no-op
+        service.processPaygateWebhook(success("2"), null, null); // retry -> idempotent no-op
 
         verify(inventoryFacade, never()).fulfill(eq(1L), anyMap());
         verify(inventoryFacade, never()).release(eq(1L), anyMap());
@@ -101,7 +101,7 @@ class PaymentWebhookServiceImplTest {
         Order order = orderWith(3L, OrderStatus.CONFIRMED, PaymentStatus.PAID);
         given(orderRepository.findByIdForUpdate(3L)).willReturn(Optional.of(order));
 
-        Map<String, Object> result = service.processPaygateWebhook(cancelled("3"), null);
+        Map<String, Object> result = service.processPaygateWebhook(cancelled("3"), null, null);
 
         verify(inventoryFacade, never()).release(eq(1L), anyMap());
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
@@ -119,7 +119,7 @@ class PaymentWebhookServiceImplTest {
         PaygateWebhookRequest eventOnly = new PaygateWebhookRequest(
                 "PAYMENT_CANCELLED", "TX-4", 1L, "4", new BigDecimal("100.00"), "PENDING");
 
-        service.processPaygateWebhook(eventOnly, null);
+        service.processPaygateWebhook(eventOnly, null, null);
 
         verify(inventoryFacade, times(1)).release(eq(1L), anyMap());
         verify(inventoryFacade, never()).fulfill(eq(1L), anyMap());
