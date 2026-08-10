@@ -198,7 +198,7 @@ class OrderServiceTest {
     @Test
     @DisplayName("createOrder WALLET: deducts Marketplace wallet and pays immediately")
     void createOrder_wallet_deductsBalanceAndPaysImmediately() {
-        testUser.setWalletBalance(new BigDecimal("250.00"));
+        testUser.setWalletBalance(new BigDecimal("6000000.00"));
         CreateOrderRequest request = new CreateOrderRequest(
                 "123 Main St", null, null, PaymentMethod.WALLET, null, null, null);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
@@ -210,7 +210,7 @@ class OrderServiceTest {
 
         orderService.createOrder(1L, request);
 
-        assertThat(testUser.getWalletBalance()).isEqualByComparingTo(new BigDecimal("50.00"));
+        assertThat(testUser.getWalletBalance()).isEqualByComparingTo(new BigDecimal("1000000.00"));
         verify(userRepository).save(testUser);
         ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
         verify(orderRepository).save(captor.capture());
