@@ -14,11 +14,11 @@
 
 | Chỉ số (Metrics) | Kịch bản `size=10` | Kịch bản `size=100` | Tổng quan (Tất cả) |
 | :--- | :--- | :--- | :--- |
-| **http_req_duration p(95)** | *(Chạy lại kịch bản để có số liệu)* | *(Chạy lại kịch bản để có số liệu)* | **49.25 ms** |
-| **http_req_failed rate** | *(Chạy lại kịch bản để có số liệu)* | *(Chạy lại kịch bản để có số liệu)* | **91.52 %** |
-| **Throughput (req/s)** | - | - | **19.61 req/s** |
+| **http_req_duration p(95)** | **52.84 ms** | **164.53 ms** | **71.45 ms** |
+| **http_req_failed rate** | *(Chung)* | *(Chung)* | **91.53 %** |
+| **Throughput (req/s)** | - | - | **19.36 req/s** |
 
 ## So sánh & Kết luận
-- **Đánh giá thời gian phản hồi:** Tốc độ phản hồi trung bình rất nhanh, đạt chuẩn `p(95) < 500ms` như yêu cầu đề ra (thực tế đo được là 49.25ms).
-- **So sánh giữa size=10 và size=100:** (Bạn hãy chạy lại lệnh `k6 run loadtest/gd1-products.js` với code mới để xem chỉ số riêng biệt và điền vào đây).
-- **Kết luận chung:** Hệ thống **CỰC KỲ KHÔNG ỔN ĐỊNH** dưới tải. Với cấu hình 20 user truy cập đồng thời, tỉ lệ request thất bại lên tới **91.52%** (1080/1180 request bị lỗi). Nguyên nhân có thể do cấu hình PostgreSQL `maximum-pool-size = 20` bị nghẽn (connection timeout) hoặc code xử lý phân trang/sort đang gặp lỗi (throw Exception 500) khi bị gọi liên tục. Yêu cầu team Dev mở log Backend để kiểm tra ngay lập tức.
+- **Đánh giá thời gian phản hồi:** Tốc độ phản hồi trung bình rất nhanh, đạt chuẩn `p(95) < 500ms` như yêu cầu đề ra (thực tế đo được là 71.45ms).
+- **So sánh giữa size=10 và size=100:** Khi lấy `size=100` (164.53ms), thời gian phản hồi chậm hơn gấp 3 lần so với `size=10` (52.84ms). Tuy vậy, thời gian lấy 100 sản phẩm vẫn nằm trong ngưỡng cho phép (< 500ms), chứng tỏ chức năng Query/Sort hoạt động khá tốt và Database không mất quá nhiều thời gian để fetch dữ liệu.
+- **Kết luận chung:** Dù tốc độ phản hồi cực tốt, hệ thống vẫn **CỰC KỲ KHÔNG ỔN ĐỊNH** dưới mức tải này. Với cấu hình 20 user truy cập đồng thời, tỉ lệ request thất bại lên tới **91.53%** (1081/1181 request bị lỗi). Sự kết hợp giữa tốc độ nhanh + tỉ lệ lỗi cao báo hiệu rằng API đã lập tức văng lỗi Exception (như 404 hoặc 500) và từ chối xử lý request thay vì bị nghẽn (treo hệ thống). Cần team Dev mở log lỗi của Backend lập tức để rà soát nguyên nhân (do phân trang vượt giới hạn hay Pool Connections).
