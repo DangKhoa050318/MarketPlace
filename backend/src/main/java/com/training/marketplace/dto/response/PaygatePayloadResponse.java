@@ -5,7 +5,6 @@ import java.math.BigDecimal;
 public record PaygatePayloadResponse(
         Long orderId,
         Long customerId,
-        String merchantId,
         BigDecimal totalAmount,
         BigDecimal upfrontAmount,
         BigDecimal financeAmount,
@@ -16,7 +15,7 @@ public record PaygatePayloadResponse(
         String transferContent,
         String qrPayload
 ) {
-    public PaygatePayloadResponse(Long orderId, Long customerId, String merchantId, BigDecimal totalAmount, BigDecimal upfrontAmount, BigDecimal financeAmount, String paymentChannel, String paymentUrl) {
-        this(orderId, customerId, merchantId, totalAmount, upfrontAmount, financeAmount, paymentChannel, paymentUrl, null, null, null, null);
+    public PaygatePayloadResponse(Long orderId, Long customerId, BigDecimal totalAmount, BigDecimal upfrontAmount, BigDecimal financeAmount, String paymentChannel, String paymentUrl) {
+        this(orderId, customerId, totalAmount, upfrontAmount, financeAmount, paymentChannel, paymentUrl, null, null, null, null);
     }
 }
