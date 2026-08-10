@@ -1,11 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { Router, RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
-import { ChatProductCard, ChatMessageResponse } from '../../../core/models/chat-assistant.model';
+import { finalize, Observable, Subscription } from 'rxjs';
+import { ChatOrderSummary, ChatProductCard, ChatMessageResponse } from '../../../core/models/chat-assistant.model';
 import { AnalyticsEventSource, AnalyticsEventType } from '../../../core/models/analytics-event.model';
 import { AnalyticsService } from '../../../core/services/analytics.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -13,6 +13,10 @@ import { CartService } from '../../../core/services/cart.service';
 import { ChatAssistantService } from '../../../core/services/chat-assistant.service';
 import { ChatCartCommand, ChatCartCommandService } from '../../../core/services/chat-cart-command.service';
 import { ChatVoucherCommand, ChatVoucherCommandService } from '../../../core/services/chat-voucher-command.service';
+import {
+  ChatPaymentOutcome,
+  ChatPaymentStatusService
+} from '../../../core/services/chat-payment-status.service';
 import { PromotionService } from '../../../core/services/promotion.service';
 
 interface UiMessage {
@@ -28,15 +32,16 @@ interface UiMessage {
   templateUrl: './chat-assistant.component.html',
   styleUrls: ['./chat-assistant.component.scss']
 })
-export class ChatAssistantComponent {
+export class ChatAssistantComponent implements OnInit, OnDestroy {
   @ViewChild('messageViewport') private viewport?: ElementRef<HTMLElement>;
 
   open = false;
   loading = false;
   draft = '';
+  private paymentWatch?: Subscription;
   messages: UiMessage[] = [{
     role: 'assistant',
-    text: 'Xin chào! Mình có thể tư vấn sản phẩm, tìm voucher, hỗ trợ giỏ hàng hoặc đặt đơn COD ngay trong chat.'
+    text: 'Xin chào! Mình có thể tư vấn sản phẩm, tìm voucher, hỗ trợ giỏ hàng và thanh toán COD hoặc PayGate ngay trong chat.'
   }];
 
   constructor(
@@ -47,8 +52,20 @@ export class ChatAssistantComponent {
     private cartCommandService: ChatCartCommandService,
     private voucherCommandService: ChatVoucherCommandService,
     private promotionService: PromotionService,
+    private paymentStatusService: ChatPaymentStatusService,
     private router: Router
   ) {}
+
+  ngOnInit(): void {
+    const pendingPayment = this.paymentStatusService.resume();
+    if (pendingPayment) {
+      this.monitorPayment(pendingPayment);
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.paymentWatch?.unsubscribe();
+  }
 
   toggle(): void {
     this.open = !this.open;
@@ -151,6 +168,40 @@ export class ChatAssistantComponent {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency', currency: 'VND', maximumFractionDigits: 0
     }).format(value);
+  }
+
+  watchPaygatePayment(order: ChatOrderSummary): void {
+    if (!order.paymentUrl) return;
+    this.monitorPayment(this.paymentStatusService.watch(order.id));
+  }
+
+  private monitorPayment(outcome$: Observable<ChatPaymentOutcome>): void {
+    this.paymentWatch?.unsubscribe();
+    this.paymentWatch = outcome$.subscribe(outcome => {
+      this.applyPaymentOutcome(outcome);
+      this.open = true;
+      if (outcome.status === 'SUCCESS') {
+        const transactionRef = outcome.order?.paygateTransactionRef
+          ? ` Mã giao dịch PayGate: ${outcome.order.paygateTransactionRef}.`
+          : '';
+        this.reply(`Thanh toán đơn hàng #${outcome.orderId} đã thành công.${transactionRef}`);
+      } else if (outcome.status === 'FAILED') {
+        this.reply(`Thanh toán đơn hàng #${outcome.orderId} đã thất bại hoặc bị hủy. Đơn hàng không bị tính tiền.`);
+      } else {
+        this.reply(`Thanh toán đơn hàng #${outcome.orderId} vẫn đang được PayGate xử lý. Bạn có thể kiểm tra lại trong trang chi tiết đơn hàng.`);
+      }
+    });
+  }
+
+  private applyPaymentOutcome(outcome: ChatPaymentOutcome): void {
+    if (!outcome.order) return;
+    this.messages.forEach(message => {
+      const order = message.response?.order;
+      if (order?.id === outcome.orderId) {
+        order.status = outcome.order!.status;
+        order.paymentStatus = outcome.order!.paymentStatus || order.paymentStatus;
+      }
+    });
   }
 
   private handleCartCommand(command: ChatCartCommand): void {

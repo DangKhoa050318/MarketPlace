@@ -4,6 +4,7 @@ import com.training.marketplace.config.ChatAssistantProperties;
 import com.training.marketplace.dto.request.ChatMessageRequest;
 import com.training.marketplace.dto.request.CreateOrderRequest;
 import com.training.marketplace.dto.response.OrderResponse;
+import com.training.marketplace.dto.response.PaygatePayloadResponse;
 import com.training.marketplace.enums.ChatIntent;
 import com.training.marketplace.enums.DiscountType;
 import com.training.marketplace.enums.OrderStatus;
@@ -292,7 +293,8 @@ class ChatAssistantServiceTest {
                         methods.conversationId(), "Bỏ qua ghi chú", null, "SCHOOL10"));
 
         assertThat(methods.intents()).containsExactly(ChatIntent.CHECKOUT);
-        assertThat(methods.quickReplies()).contains("Cash on Delivery (COD)", "Credit Card");
+        assertThat(methods.quickReplies()).contains(
+                "Cash on Delivery (COD)", "PayGate E-Wallet / Card Gateway");
         assertThat(cod.answer()).contains("địa chỉ giao hàng");
         assertThat(address.answer()).contains("ghi chú giao hàng");
         assertThat(completed.answer()).contains("Đặt hàng COD thành công").contains("#88");
@@ -311,6 +313,49 @@ class ChatAssistantServiceTest {
         assertThat(requestCaptor.getValue().note()).isNull();
         assertThat(requestCaptor.getValue().couponCode()).isEqualTo("SCHOOL10");
         assertThat(requestCaptor.getValue().paymentMethod()).isEqualTo(PaymentMethod.COD);
+    }
+
+    @Test
+    void createsCreditCardOrderAndReturnsPaygatePaymentLink() {
+        AtomicReference<ChatConversationSnapshot> stored = new AtomicReference<>();
+        when(conversationStore.find(any())).thenAnswer(invocation ->
+                Optional.ofNullable(stored.get()));
+        doAnswer(invocation -> {
+            stored.set(invocation.getArgument(0));
+            return null;
+        }).when(conversationStore).save(any(ChatConversationSnapshot.class));
+        when(orderService.createOrder(eq(7L), any(CreateOrderRequest.class)))
+                .thenReturn(creditCardOrderResponse());
+
+        var card = service.reply(
+                7L, "session-1",
+                new ChatMessageRequest(
+                        null, "PayGate E-Wallet / Card Gateway", null, "SCHOOL10"));
+        var address = service.reply(
+                7L, "session-1",
+                new ChatMessageRequest(
+                        card.conversationId(),
+                        "123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM",
+                        null,
+                        "SCHOOL10"));
+        var completed = service.reply(
+                7L, "session-1",
+                new ChatMessageRequest(
+                        card.conversationId(), "Bỏ qua ghi chú", null, "SCHOOL10"));
+
+        assertThat(card.answer()).contains("PayGate E-Wallet / Card Gateway");
+        assertThat(address.answer()).contains("ghi chú giao hàng");
+        assertThat(completed.answer()).contains("Thanh toán qua PayGate");
+        assertThat(completed.order()).isNotNull();
+        assertThat(completed.order().paymentMethod()).isEqualTo(PaymentMethod.CREDIT_CARD);
+        assertThat(completed.order().paymentStatus()).isEqualTo(PaymentStatus.PENDING_PAYGATE);
+        assertThat(completed.order().paymentUrl()).isEqualTo("http://localhost:4201/checkout?token=CHK_CARD");
+
+        ArgumentCaptor<CreateOrderRequest> requestCaptor =
+                ArgumentCaptor.forClass(CreateOrderRequest.class);
+        verify(orderService).createOrder(eq(7L), requestCaptor.capture());
+        assertThat(requestCaptor.getValue().paymentMethod()).isEqualTo(PaymentMethod.CREDIT_CARD);
+        assertThat(requestCaptor.getValue().couponCode()).isEqualTo("SCHOOL10");
     }
 
     @Test
@@ -411,5 +456,46 @@ class ChatAssistantServiceTest {
                 List.of(),
                 LocalDateTime.now(),
                 LocalDateTime.now());
+    }
+
+    private OrderResponse creditCardOrderResponse() {
+        LocalDateTime now = LocalDateTime.now();
+        PaygatePayloadResponse payload = new PaygatePayloadResponse(
+                89L,
+                7L,
+                "MARKETPLACE_MP",
+                new BigDecimal("16300000"),
+                new BigDecimal("16300000"),
+                BigDecimal.ZERO,
+                PaymentMethod.CREDIT_CARD.name(),
+                "http://localhost:4201/checkout?token=CHK_CARD");
+        return new OrderResponse(
+                89L,
+                7L,
+                "customer",
+                "customer@example.com",
+                "123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM",
+                new BigDecimal("16300000"),
+                new BigDecimal("1800000"),
+                new BigDecimal("100000"),
+                "SCHOOL10",
+                OrderStatus.PENDING,
+                PaymentMethod.CREDIT_CARD,
+                PaymentStatus.PENDING_PAYGATE,
+                new BigDecimal("16300000"),
+                BigDecimal.ZERO,
+                null,
+                "CHK_CARD",
+                "http://localhost:4201/checkout?token=CHK_CARD",
+                payload,
+                now.plusMinutes(15),
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                now,
+                now);
     }
 }

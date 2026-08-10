@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(
         name = "Chat Assistant",
-        description = "Shopping discovery, campaign voucher, cart command and COD checkout assistant")
+        description = "Shopping discovery, campaign voucher, cart command, COD and PayGate card checkout assistant")
 public class ChatAssistantController {
 
     private final ChatAssistantService chatAssistantService;
@@ -32,8 +32,9 @@ public class ChatAssistantController {
     @PostMapping("/messages")
     @Operation(
             summary = "Send a message to the shopping assistant",
-            description = "Supports product discovery and a stateful authenticated COD checkout flow. "
-                    + "Pass the same conversationId for payment method, address and optional note steps.")
+            description = "Supports product discovery and stateful authenticated COD or PayGate E-Wallet/Card checkout. "
+                    + "Pass the same conversationId for payment method, address and optional note steps. "
+                    + "PayGate checkout responses include a payment URL; order status remains authoritative via webhook.")
     public ApiResponse<ChatMessageResponse> reply(
             Authentication authentication,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,

@@ -53,7 +53,7 @@ export interface ChatMessageRequest {
 export interface ChatOrderSummary {
   id: number;
   status: string;
-  paymentMethod: 'COD' | 'CREDIT_CARD' | 'PAYGATE_BNPL' | 'BANK_TRANSFER';
+  paymentMethod: 'COD' | 'CREDIT_CARD' | 'PAYGATE_BNPL' | 'BANK_TRANSFER' | 'WALLET';
   paymentStatus: string;
   totalAmount: number;
   discountAmount: number;
@@ -62,6 +62,8 @@ export interface ChatOrderSummary {
   shippingAddress: string;
   note?: string;
   itemCount: number;
+  paymentUrl?: string;
+  paymentExpiresAt?: string;
   createdAt: string;
 }
 
