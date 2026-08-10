@@ -354,7 +354,6 @@ public class OrderServiceImpl implements OrderService {
             payload = new PaygatePayloadResponse(
                     order.getId(),
                     order.getUser().getId(),
-                    "mock-merchant-api-key-123456",
                     order.getTotalAmount(),
                     order.getUpfrontAmount(),
                     order.getFinanceAmount(),

@@ -7,7 +7,6 @@ export type ReturnRequestStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'RETUR
 export interface PaygatePayload {
   orderId: number;
   customerId: number;
-  merchantId: string;
   totalAmount: number;
   upfrontAmount: number;
   financeAmount: number;

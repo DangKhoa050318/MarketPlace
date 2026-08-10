@@ -76,7 +76,6 @@ public class PaymentServiceImpl implements PaymentService {
         return new PaygatePayloadResponse(
                 order.getId(),
                 order.getUser().getId(),
-                "mock-merchant-api-key-123456",
                 order.getTotalAmount(),
                 order.getUpfrontAmount(),
                 order.getFinanceAmount(),
@@ -118,7 +117,6 @@ public class PaymentServiceImpl implements PaymentService {
             return new PaygatePayloadResponse(
                     order.getId(),
                     userId,
-                    "mock-merchant-api-key-123456",
                     order.getTotalAmount(),
                     order.getUpfrontAmount(),
                     order.getFinanceAmount(),
@@ -163,7 +161,6 @@ public class PaymentServiceImpl implements PaymentService {
         return new PaygatePayloadResponse(
                 order.getId(),
                 userId,
-                "mock-merchant-api-key-123456",
                 order.getTotalAmount(),
                 order.getUpfrontAmount(),
                 order.getFinanceAmount(),
