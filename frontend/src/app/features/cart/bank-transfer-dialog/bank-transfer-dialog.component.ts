@@ -636,29 +636,12 @@ export class BankTransferDialogComponent {
     this.http.post(`${environment.paygateApiUrl}/api/v1/bank-transfers/receive`, body).subscribe({
       next: () => {
         this.simulating = false;
-        this.snackBar.open('⚡ Đã gửi Webhook thanh toán thành công từ PayGate!', 'Đóng', { duration: 3000 });
+        this.snackBar.open('⚡ Đã gửi yêu cầu xác nhận thanh toán tới PayGate!', 'Đóng', { duration: 3000 });
         this.viewOrders();
       },
       error: () => {
-        // Direct local simulation callback fallback
-        const webhookBody = {
-          transactionRef: body.bankRef,
-          orderId: `ORD-${this.data.orderId}`,
-          status: 'COMPLETED',
-          amount: body.amount
-        };
-        this.http.post('/api/v1/payments/paygate-webhook', webhookBody).subscribe({
-          next: () => {
-            this.simulating = false;
-            this.snackBar.open('⚡ Đơn hàng đã được xác nhận PAID qua Webhook!', 'Đóng', { duration: 3000 });
-            this.viewOrders();
-          },
-          error: () => {
-            this.simulating = false;
-            this.snackBar.open('Thông tin chuyển khoản đã ghi nhận.', 'Đóng', { duration: 3000 });
-            this.viewOrders();
-          }
-        });
+        this.simulating = false;
+        this.snackBar.open('Không thể kết nối PayGate. Vui lòng thử lại sau.', 'Đóng', { duration: 3000 });
       }
     });
   }
