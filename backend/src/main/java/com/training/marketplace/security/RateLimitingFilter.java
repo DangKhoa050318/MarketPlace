@@ -28,6 +28,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     public static final int MAX_REQUESTS_PER_MINUTE = 100;
     /** Tighter cap for the login endpoint to slow credential brute-forcing (#L). */
     public static final int LOGIN_MAX_REQUESTS_PER_MINUTE = 5;
+    /** Tighter cap for the public chat endpoint — it fans out to a paid LLM, so abuse is costly (MP-C4). */
+    public static final int CHAT_MAX_REQUESTS_PER_MINUTE = 20;
     public static final int WINDOW_SECONDS = 60;
 
     private final StringRedisTemplate redisTemplate;
@@ -43,12 +45,18 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        boolean isLogin = "POST".equalsIgnoreCase(request.getMethod())
-                && request.getRequestURI().endsWith("/api/v1/auth/login");
-        int limit = isLogin ? LOGIN_MAX_REQUESTS_PER_MINUTE : MAX_REQUESTS_PER_MINUTE;
+        boolean isPost = "POST".equalsIgnoreCase(request.getMethod());
+        boolean isLogin = isPost && request.getRequestURI().endsWith("/api/v1/auth/login");
+        boolean isChat = isPost && request.getRequestURI().endsWith("/api/v1/chat/messages");
+        int limit = isLogin ? LOGIN_MAX_REQUESTS_PER_MINUTE
+                : isChat ? CHAT_MAX_REQUESTS_PER_MINUTE
+                : MAX_REQUESTS_PER_MINUTE;
         // Login is pre-auth → key by IP (brute-force is per source). Other traffic keys by the
         // authenticated username when available so users behind a shared NAT IP aren't punished (#J).
-        String scope = isLogin ? "login:" + extractClientIp(request) : resolveIdentity(request);
+        // Chat gets its own bucket so its tighter cap doesn't consume (or borrow from) the general one.
+        String scope = isLogin ? "login:" + extractClientIp(request)
+                : isChat ? "chat:" + resolveIdentity(request)
+                : resolveIdentity(request);
         String key = "rate_limit:" + scope;
 
         try {

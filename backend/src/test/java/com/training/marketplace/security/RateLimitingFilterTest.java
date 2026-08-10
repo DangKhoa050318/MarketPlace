@@ -148,6 +148,38 @@ class RateLimitingFilterTest {
     }
 
     @Test
+    void doFilter_chatEndpoint_usesTighterChatLimitAndOwnBucket() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/chat/messages");
+        request.setRemoteAddr("192.168.1.77");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(valueOperations.increment("rate_limit:chat:ip:192.168.1.77")).thenReturn(3L);
+        when(redisTemplate.getExpire("rate_limit:chat:ip:192.168.1.77", TimeUnit.SECONDS)).thenReturn(50L);
+
+        rateLimitingFilter.doFilterInternal(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("20");
+        assertThat(response.getHeader("X-RateLimit-Remaining")).isEqualTo("17");
+        verify(valueOperations).increment("rate_limit:chat:ip:192.168.1.77");
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void doFilter_21stChatRequest_returns429WithChatLimit() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/chat/messages");
+        request.setRemoteAddr("192.168.1.78");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(valueOperations.increment("rate_limit:chat:ip:192.168.1.78")).thenReturn(21L);
+        when(redisTemplate.getExpire("rate_limit:chat:ip:192.168.1.78", TimeUnit.SECONDS)).thenReturn(30L);
+
+        rateLimitingFilter.doFilterInternal(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("20");
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
     void doFilter_sixthLoginRequest_returns429WithLoginLimit() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
         request.setRemoteAddr("192.168.1.50");
