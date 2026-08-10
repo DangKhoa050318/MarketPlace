@@ -196,6 +196,49 @@ class OrderServiceTest {
     }
 
     @Test
+    @DisplayName("createOrder WALLET: deducts Marketplace wallet and pays immediately")
+    void createOrder_wallet_deductsBalanceAndPaysImmediately() {
+        testUser.setWalletBalance(new BigDecimal("250.00"));
+        CreateOrderRequest request = new CreateOrderRequest(
+                "123 Main St", null, null, PaymentMethod.WALLET, null, null, null);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(cartService.getCart(1L)).thenReturn(cartResponse);
+        when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+        when(orderMapper.toResponse(testOrder)).thenReturn(testOrderResponse);
+        stubCurrentVariantPrice();
+
+        orderService.createOrder(1L, request);
+
+        assertThat(testUser.getWalletBalance()).isEqualByComparingTo(new BigDecimal("50.00"));
+        verify(userRepository).save(testUser);
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(captor.getValue().getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        verify(inventoryFacade).fulfill(eq(1L), eq(Map.of(10L, 2)));
+    }
+
+    @Test
+    @DisplayName("createOrder WALLET: insufficient Marketplace wallet balance is rejected")
+    void createOrder_walletInsufficientBalance_throws() {
+        testUser.setWalletBalance(new BigDecimal("100.00"));
+        CreateOrderRequest request = new CreateOrderRequest(
+                "123 Main St", null, null, PaymentMethod.WALLET, null, null, null);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(cartService.getCart(1L)).thenReturn(cartResponse);
+        when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
+        stubCurrentVariantPrice();
+
+        assertThatThrownBy(() -> orderService.createOrder(1L, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("wallet balance is insufficient");
+
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(userRepository, never()).save(testUser);
+    }
+
+    @Test
     @DisplayName("createOrder: blocks checkout when a variant price changed")
     void createOrder_priceChanged_blocksAndAsksToReviewCart() {
         CreateOrderRequest request = new CreateOrderRequest("123 Main St", null, null);

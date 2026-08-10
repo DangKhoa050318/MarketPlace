@@ -105,6 +105,10 @@ import { Observable } from 'rxjs';
                   <mat-icon>shopping_cart</mat-icon>
                   <span>My Cart</span>
                 </button>
+                <button mat-menu-item routerLink="/wallet">
+                  <mat-icon>account_balance_wallet</mat-icon>
+                  <span>Marketplace Wallet</span>
+                </button>
                 <button mat-menu-item routerLink="/wishlist">
                   <mat-icon>favorite</mat-icon>
                   <span>Wishlist</span>

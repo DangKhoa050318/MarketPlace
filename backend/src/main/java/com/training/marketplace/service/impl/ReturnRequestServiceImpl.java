@@ -17,6 +17,7 @@ import com.training.marketplace.enums.PaymentStatus;
 import com.training.marketplace.enums.RefundRequestStatus;
 import com.training.marketplace.enums.ReturnRequestStatus;
 import com.training.marketplace.exception.BadRequestException;
+import com.training.marketplace.exception.RefundProcessingException;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.repository.DeliveryRepository;
 import com.training.marketplace.repository.OrderRepository;
@@ -123,7 +124,7 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = RefundProcessingException.class)
     public ReturnRequestResponse decide(Long returnRequestId, AdminReturnDecisionRequest request) {
         ReturnRequest rr = getReturnRequest(returnRequestId);
         if (rr.getStatus() != ReturnRequestStatus.REQUESTED) {
@@ -139,6 +140,10 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
             rr.setRefundWithoutReturn(true);
             boolean refunded = refundForReturn(rr, "Refund without return approved by admin");
             rr.setStatus(refunded ? ReturnRequestStatus.COMPLETED : ReturnRequestStatus.APPROVED);
+            if (!refunded) {
+                returnRequestRepository.save(rr);
+                throw new RefundProcessingException("Return was approved, but refund could not be processed. Please retry the refund after resolving the PayGate issue.");
+            }
         } else {
             rr.setStatus(ReturnRequestStatus.APPROVED);
         }
@@ -146,17 +151,25 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = RefundProcessingException.class)
     public ReturnRequestResponse recordQc(Long returnRequestId, ReturnQcRequest request) {
         ReturnRequest rr = getReturnRequest(returnRequestId);
-        if (rr.getStatus() != ReturnRequestStatus.APPROVED && rr.getStatus() != ReturnRequestStatus.RETURN_RECEIVED) {
+        if (rr.getStatus() != ReturnRequestStatus.APPROVED
+                && rr.getStatus() != ReturnRequestStatus.RETURN_RECEIVED
+                && rr.getStatus() != ReturnRequestStatus.QC_PASSED) {
             throw new BadRequestException("Only approved returns can be QC checked");
         }
         rr.setQcNote(request != null ? request.note() : null);
         if (request != null && request.passed()) {
-            restockReturnedItems(rr);
+            Map<Long, Integer> quantityByVariant = getReturnedItemQuantities(rr);
             boolean refunded = refundForReturn(rr, "Return QC passed");
-            rr.setStatus(refunded ? ReturnRequestStatus.COMPLETED : ReturnRequestStatus.QC_PASSED);
+            if (!refunded) {
+                rr.setStatus(ReturnRequestStatus.QC_PASSED);
+                returnRequestRepository.save(rr);
+                throw new RefundProcessingException("Return QC passed, but refund could not be processed. Returned items were not restocked; please retry the refund after resolving the PayGate issue.");
+            }
+            restockReturnedItems(rr, quantityByVariant);
+            rr.setStatus(ReturnRequestStatus.COMPLETED);
         } else {
             rr.setStatus(ReturnRequestStatus.QC_FAILED);
         }
@@ -164,7 +177,7 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = RefundProcessingException.class)
     public ReturnRequestResponse partialRefund(Long orderId, PartialRefundRequest request) {
         Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
@@ -181,13 +194,18 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
                 .userId(order.getUser().getId())
                 .orderItemId(item.getId())
                 .quantity(request.quantity())
-                .status(ReturnRequestStatus.COMPLETED)
+                .status(ReturnRequestStatus.APPROVED)
                 .reason(request.reason() != null && !request.reason().isBlank() ? request.reason() : "Admin partial refund")
                 .adminNote("Admin partial refund without return request")
                 .refundWithoutReturn(true)
                 .build());
-        refundItemQuantity(order, item, request.quantity(), rr.getReason(), "PAYGATE_REFUND:ORDER:" + orderId + ":ITEM:" + item.getId() + ":QTY:" + request.quantity());
-        return toResponse(rr);
+        boolean refunded = refundItemQuantity(order, item, request.quantity(), rr.getReason(), "PAYGATE_REFUND:PARTIAL:" + rr.getId());
+        if (!refunded) {
+            returnRequestRepository.save(rr);
+            throw new RefundProcessingException("Partial refund request was saved, but refund could not be processed. Please retry after resolving the PayGate issue.");
+        }
+        rr.setStatus(ReturnRequestStatus.COMPLETED);
+        return toResponse(returnRequestRepository.save(rr));
     }
 
     private boolean refundForReturn(ReturnRequest rr, String fallbackReason) {
@@ -232,7 +250,7 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
         if (order.getPaymentStatus() != PaymentStatus.PAID && order.getPaymentStatus() != PaymentStatus.PARTIALLY_REFUNDED) {
             throw new BadRequestException("Only paid orders can be refunded");
         }
-        BigDecimal amount = item.getUnitPrice().multiply(BigDecimal.valueOf(quantity)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal amount = calculateRefundAmount(order, item, quantity);
         if (processPaygateRefund(order, item.getId(), quantity, amount, reason, idempotencyKey)) {
             item.setRefundedQuantity(safeRefundedQuantity(item) + quantity);
             boolean allRefunded = order.getItems().stream().allMatch(i -> safeRefundedQuantity(i) >= i.getQuantity());
@@ -242,7 +260,33 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
         return false;
     }
 
-    private void restockReturnedItems(ReturnRequest rr) {
+    private BigDecimal calculateRefundAmount(Order order, OrderItem item, int quantity) {
+        BigDecimal grossAmount = item.getUnitPrice()
+                .multiply(BigDecimal.valueOf(quantity))
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal discount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
+        if (discount.compareTo(BigDecimal.ZERO) <= 0) {
+            return grossAmount;
+        }
+        BigDecimal itemSubtotal = order.getItems().stream()
+                .map(OrderItem::getSubtotal)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (itemSubtotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return grossAmount;
+        }
+        BigDecimal allocatedDiscount = discount
+                .multiply(grossAmount)
+                .divide(itemSubtotal, 2, RoundingMode.HALF_UP);
+        BigDecimal refunded = refundRequestRepository.sumAmountByOrderIdAndStatus(order.getId(), RefundRequestStatus.SUCCEEDED);
+        BigDecimal maxRefundable = order.getTotalAmount() != null
+                ? order.getTotalAmount().subtract(refunded != null ? refunded : BigDecimal.ZERO)
+                : grossAmount.subtract(allocatedDiscount);
+        BigDecimal discountedAmount = grossAmount.subtract(allocatedDiscount).setScale(2, RoundingMode.HALF_UP);
+        return discountedAmount.min(maxRefundable).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private Map<Long, Integer> getReturnedItemQuantities(ReturnRequest rr) {
         Order order = orderRepository.findByIdForUpdate(rr.getOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Order", rr.getOrderId()));
         Map<Long, Integer> quantityByVariant = new LinkedHashMap<>();
@@ -258,7 +302,13 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
                 }
             }
         }
+        return quantityByVariant;
+    }
+
+    private void restockReturnedItems(ReturnRequest rr, Map<Long, Integer> quantityByVariant) {
         if (!quantityByVariant.isEmpty()) {
+            Order order = orderRepository.findByIdForUpdate(rr.getOrderId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Order", rr.getOrderId()));
             inventoryFacade.restockReturn(order.getWarehouseId(), quantityByVariant);
         }
     }

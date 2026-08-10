@@ -12,6 +12,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -41,4 +43,8 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    @Column(name = "wallet_balance", nullable = false, precision = 19, scale = 2)
+    @Builder.Default
+    private BigDecimal walletBalance = BigDecimal.ZERO;
 }

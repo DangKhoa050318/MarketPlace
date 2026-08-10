@@ -13,6 +13,7 @@ import com.training.marketplace.exception.BadRequestException;
 import com.training.marketplace.exception.ResourceNotFoundException;
 import com.training.marketplace.repository.OrderRepository;
 import com.training.marketplace.repository.RefundRequestRepository;
+import com.training.marketplace.repository.UserRepository;
 import com.training.marketplace.service.InventoryFacade;
 import com.training.marketplace.service.PaygateClientService;
 import com.training.marketplace.service.PaymentService;
@@ -36,12 +37,13 @@ public class PaymentServiceImpl implements PaymentService {
     private final InventoryFacade inventoryFacade;
     private final PromotionService promotionService;
     private final PaygateClientService paygateClientService;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
     public PaygatePayloadResponse createPaymentSession(Order order, PaymentMethod paymentMethod) {
         boolean zeroTotal = order.getTotalAmount().compareTo(java.math.BigDecimal.ZERO) == 0;
-        if (paymentMethod == PaymentMethod.COD || zeroTotal) {
+        if (paymentMethod == PaymentMethod.COD || paymentMethod == PaymentMethod.WALLET || zeroTotal) {
             return null;
         }
 
@@ -106,8 +108,8 @@ public class PaymentServiceImpl implements PaymentService {
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
             throw new BadRequestException("Order is already paid");
         }
-        if (order.getPaymentMethod() == PaymentMethod.COD) {
-            throw new BadRequestException("COD orders do not require online payment");
+        if (order.getPaymentMethod() == PaymentMethod.COD || order.getPaymentMethod() == PaymentMethod.WALLET) {
+            throw new BadRequestException(order.getPaymentMethod() + " orders do not require online payment");
         }
 
         PaymentMethod paymentMethod = order.getPaymentMethod() != null ? order.getPaymentMethod() : PaymentMethod.CREDIT_CARD;
@@ -255,10 +257,45 @@ public class PaymentServiceImpl implements PaymentService {
                 && order.getPaymentMethod() != PaymentMethod.COD;
 
         if (paidOnline) {
-            processRefund(order, reason);
+            if (order.getPaymentMethod() == PaymentMethod.PAYGATE_BNPL) {
+                processBnplMarketplaceWalletCredit(order, reason);
+            } else {
+                processRefund(order, reason);
+            }
         } else if (order.getPaymentStatus() == PaymentStatus.PENDING_PAYGATE) {
             order.setPaymentStatus(PaymentStatus.UNPAID);
         }
+    }
+
+    private void processBnplMarketplaceWalletCredit(Order order, String reason) {
+        String idempotencyKey = "PAYGATE_BNPL_CREDIT:ORDER:" + order.getId() + ":FULL";
+        RefundRequest refundRequest = refundRequestRepository.findByIdempotencyKey(idempotencyKey)
+                .orElseGet(() -> refundRequestRepository.save(RefundRequest.builder()
+                        .order(order)
+                        .idempotencyKey(idempotencyKey)
+                        .transactionRef(order.getPaygateTransactionRef())
+                        .amount(order.getTotalAmount())
+                        .reason(reason)
+                        .status(RefundRequestStatus.PENDING)
+                        .build()));
+
+        if (refundRequest.getStatus() == RefundRequestStatus.SUCCEEDED) {
+            order.setPaymentStatus(PaymentStatus.REFUNDED);
+            return;
+        }
+
+        var user = order.getUser();
+        var currentBalance = user.getWalletBalance() != null ? user.getWalletBalance() : java.math.BigDecimal.ZERO;
+        user.setWalletBalance(currentBalance.add(order.getTotalAmount()).setScale(2, java.math.RoundingMode.HALF_UP));
+        userRepository.save(user);
+
+        refundRequest.setTransactionRef(order.getPaygateTransactionRef());
+        refundRequest.setStatus(RefundRequestStatus.SUCCEEDED);
+        refundRequest.setFailureReason(null);
+        refundRequestRepository.save(refundRequest);
+        order.setPaymentStatus(PaymentStatus.REFUNDED);
+        log.info("Credited Marketplace wallet for user {} by {} from cancelled BNPL order {}. Reason: {}",
+                user.getId(), order.getTotalAmount(), order.getId(), reason);
     }
 
     private void processRefund(Order order, String reason) {

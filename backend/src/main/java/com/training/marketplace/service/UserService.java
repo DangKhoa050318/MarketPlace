@@ -17,6 +17,8 @@ public interface UserService {
 
     UserResponse getById(Long id);
 
+    UserResponse getMe(Authentication authentication);
+
     User getAuthenticatedUser(Authentication authentication);
 
     User getByIdentifier(String identifier);

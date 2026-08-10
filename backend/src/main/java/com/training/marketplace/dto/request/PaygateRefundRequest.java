@@ -6,6 +6,7 @@ public record PaygateRefundRequest(
         String apiKey,
         String transactionRef,
         String orderId,
-        BigDecimal amount
+        BigDecimal amount,
+        String idempotencyKey
 ) {
 }
