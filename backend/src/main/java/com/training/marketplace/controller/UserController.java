@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -51,6 +52,12 @@ public class UserController {
     @Operation(summary = "Get user by ID")
     public ApiResponse<UserResponse> getById(@PathVariable Long id) {
         return ApiResponse.success(userService.getById(id));
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "Get current authenticated user profile")
+    public ApiResponse<UserResponse> getMe(Authentication authentication) {
+        return ApiResponse.success(userService.getMe(authentication));
     }
 
     @PostMapping

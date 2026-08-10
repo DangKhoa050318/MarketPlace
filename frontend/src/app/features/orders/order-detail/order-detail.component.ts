@@ -64,7 +64,7 @@ import { catchError, finalize, of, switchMap, tap } from 'rxjs';
                 <button *ngIf="!isSessionExpired && order.paymentMethod === 'BANK_TRANSFER'" mat-raised-button class="vietqr-btn" (click)="openVietQrModal()">
                   <mat-icon>qr_code_2</mat-icon> VietQR
                 </button>
-                <button *ngIf="!isSessionExpired && order.paymentMethod !== 'BANK_TRANSFER'" mat-raised-button color="accent" class="paygate-btn" (click)="continuePaygatePayment()">
+                <button *ngIf="!isSessionExpired && order.paymentMethod !== 'BANK_TRANSFER' && order.paymentMethod !== 'WALLET'" mat-raised-button color="accent" class="paygate-btn" (click)="continuePaygatePayment()">
                   <mat-icon>payment</mat-icon> PayGate
                 </button>
                 <span *ngIf="isSessionExpired" class="badge-pill badge-expired">
@@ -891,7 +891,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     if (!this.order || this.cancelling) {
       return;
     }
-    const paidOnline = this.order.paymentStatus === 'PAID' && this.order.paymentMethod !== 'COD';
+    const paidOnline = this.order.paymentStatus === 'PAID' && this.order.paymentMethod !== 'COD' && this.order.paymentMethod !== 'WALLET';
     const message = paidOnline
       ? `Order #${this.order.id} has been paid. Cancelling now will request a PayGate refund.`
       : `Cancel Order #${this.order.id}?`;
@@ -1078,7 +1078,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   }
 
   cancelButtonLabel(): string {
-    if (this.order?.paymentStatus === 'PAID' && this.order.paymentMethod !== 'COD') {
+    if (this.order?.paymentStatus === 'PAID' && this.order.paymentMethod !== 'COD' && this.order.paymentMethod !== 'WALLET') {
       return 'Cancel & refund';
     }
     if (this.order?.paymentStatus === 'REFUND_PENDING') {

@@ -168,7 +168,7 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
               <th mat-header-cell *matHeaderCellDef>Payment</th>
               <td mat-cell *matCellDef="let order">
                 <span *ngIf="order.paymentMethod" class="badge-payment-chip">
-                  <span class="pay-method-text">{{ order.paymentMethod === 'COD' ? 'COD' : (order.paymentMethod === 'PAYGATE_BNPL' ? 'BNPL' : (order.paymentMethod === 'BANK_TRANSFER' ? 'VietQR' : 'Paygate')) }}</span>
+                  <span class="pay-method-text">{{ order.paymentMethod === 'COD' ? 'COD' : (order.paymentMethod === 'PAYGATE_BNPL' ? 'BNPL' : (order.paymentMethod === 'BANK_TRANSFER' ? 'VietQR' : (order.paymentMethod === 'WALLET' ? 'Wallet' : 'Paygate'))) }}</span>
                 </span>
                 <span *ngIf="!order.paymentMethod" class="text-muted">—</span>
               </td>
@@ -191,7 +191,7 @@ import { VietQrDialogComponent } from '../../../shared/components/vietqr-dialog/
                     <mat-icon>qr_code_2</mat-icon>
                   </button>
                   <button 
-                    *ngIf="order.status === 'PENDING' && (order.paymentStatus === 'UNPAID' || order.paymentStatus === 'PENDING_PAYGATE') && !isSessionExpired(order) && order.paymentMethod !== 'BANK_TRANSFER'" 
+                    *ngIf="order.status === 'PENDING' && (order.paymentStatus === 'UNPAID' || order.paymentStatus === 'PENDING_PAYGATE') && !isSessionExpired(order) && order.paymentMethod !== 'BANK_TRANSFER' && order.paymentMethod !== 'WALLET'" 
                     mat-icon-button 
                     class="icon-btn-action btn-paygate" 
                     (click)="continuePaygatePayment(order)"
@@ -1085,7 +1085,7 @@ export class OrderListComponent implements OnInit {
   }
 
   onCancelOrder(order: Order): void {
-    const paidOnline = order.paymentStatus === 'PAID' && order.paymentMethod !== 'COD';
+    const paidOnline = order.paymentStatus === 'PAID' && order.paymentMethod !== 'COD' && order.paymentMethod !== 'WALLET';
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
       data: {
         title: paidOnline ? 'Cancel & Refund Order' : 'Cancel Order',
@@ -1118,7 +1118,7 @@ export class OrderListComponent implements OnInit {
     return order.paymentStatus !== 'PAID' &&
            order.status !== 'CANCELLED' &&
            order.status !== 'DELIVERED' &&
-           order.paymentMethod !== 'COD';
+           order.paymentMethod !== 'COD' && order.paymentMethod !== 'WALLET';
   }
 
   onConfirmReceived(order: Order): void {
@@ -1321,7 +1321,7 @@ export class OrderListComponent implements OnInit {
     if (order.paymentStatus === 'PENDING_PAYGATE') {
       return 'Cancel unpaid PayGate session';
     }
-    if (order.paymentStatus === 'PAID' && order.paymentMethod !== 'COD') {
+    if (order.paymentStatus === 'PAID' && order.paymentMethod !== 'COD' && order.paymentMethod !== 'WALLET') {
       return 'Cancel and refund via PayGate';
     }
     if (order.paymentStatus === 'REFUND_PENDING') {

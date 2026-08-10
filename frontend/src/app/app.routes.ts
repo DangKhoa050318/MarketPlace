@@ -29,6 +29,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/wishlist/wishlist.component').then(m => m.WishlistComponent)
       },
       {
+        path: 'wallet',
+        canActivate: [authGuard],
+        loadComponent: () => import('./features/wallet/wallet.component').then(m => m.WalletComponent)
+      },
+      {
         path: 'orders',
         canActivate: [authGuard],
         loadComponent: () => import('./features/orders/order-list/order-list.component').then(m => m.OrderListComponent)

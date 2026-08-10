@@ -93,7 +93,21 @@ export interface CheckoutDialogData {
               </div>
             </div>
 
-            <!-- Option 3: BNPL (Buy Now Pay Later) -->
+            <!-- Option 3: Marketplace Wallet -->
+            <div
+              class="payment-card"
+              [class.active]="selectedMethod === 'WALLET'"
+              (click)="selectMethod('WALLET')">
+              <div class="radio-indicator"></div>
+              <mat-icon class="method-icon wallet-icon">account_balance_wallet</mat-icon>
+              <div class="method-details">
+                <span class="method-title">Marketplace Wallet</span>
+                <span class="method-desc">Use credit from cancelled BNPL orders for this purchase.</span>
+              </div>
+              <span class="badge-bank">Credit</span>
+            </div>
+
+            <!-- Option 4: BNPL (Buy Now Pay Later) -->
             <div
               class="payment-card"
               [class.active]="selectedMethod === 'PAYGATE_BNPL'"
@@ -107,7 +121,7 @@ export interface CheckoutDialogData {
               <span class="badge-promo">0% Interest</span>
             </div>
 
-            <!-- Option 4: Bank Transfer / QR VietQR -->
+            <!-- Option 5: Bank Transfer / QR VietQR -->
             <div
               class="payment-card"
               [class.active]="selectedMethod === 'BANK_TRANSFER'"
@@ -184,8 +198,8 @@ export interface CheckoutDialogData {
           class="btn-glowing"
           (click)="onSubmit()"
           [disabled]="form.invalid || submitting || isBnplSplitInvalid()">
-          <mat-icon>{{ selectedMethod === 'COD' ? 'shopping_bag' : (selectedMethod === 'BANK_TRANSFER' ? 'qr_code_2' : 'open_in_new') }}</mat-icon>
-          {{ submitting ? 'Processing...' : (selectedMethod === 'COD' ? 'Confirm COD Order' : (selectedMethod === 'BANK_TRANSFER' ? 'Confirm & Show VietQR Code' : 'Proceed to PayGate Portal')) }}
+          <mat-icon>{{ selectedMethod === 'COD' ? 'shopping_bag' : (selectedMethod === 'BANK_TRANSFER' ? 'qr_code_2' : (selectedMethod === 'WALLET' ? 'account_balance_wallet' : 'open_in_new')) }}</mat-icon>
+          {{ submitting ? 'Processing...' : (selectedMethod === 'COD' ? 'Confirm COD Order' : (selectedMethod === 'BANK_TRANSFER' ? 'Confirm & Show VietQR Code' : (selectedMethod === 'WALLET' ? 'Pay with Marketplace Wallet' : 'Proceed to PayGate Portal'))) }}
         </button>
       </mat-dialog-actions>
     </div>
@@ -365,6 +379,7 @@ export interface CheckoutDialogData {
     }
     .cod-icon { color: #16a34a; }
     .card-icon { color: #0284c7; }
+    .wallet-icon { color: #7c3aed; }
     .bnpl-icon { color: #d97706; }
     .bank-icon { color: #0284c7; }
 
@@ -662,6 +677,14 @@ export class CheckoutDialogComponent {
         description: 'Thanh toan 100% qua PayGate E-Wallet / Card Gateway',
         returnUrl: `${environment.appBaseUrl}/orders/callback?status=SUCCESS`,
         cancelUrl: `${environment.appBaseUrl}/orders/callback?status=CANCELLED`
+      }, null, 2);
+    } else if (this.selectedMethod === 'WALLET') {
+      return JSON.stringify({
+        shippingAddress: this.form.value.shippingAddress || '123 Delivery Street',
+        note: this.form.value.note || '',
+        paymentMethod: 'WALLET',
+        couponCode: this.data.couponCode || null,
+        walletCharge: this.payableTotal()
       }, null, 2);
     } else {
       return JSON.stringify({

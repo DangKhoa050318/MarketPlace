@@ -222,7 +222,8 @@ public class PaygateClientServiceImpl implements PaygateClientService {
                 apiKey,
                 transactionRef,
                 "ORD-" + orderId,
-                normalizeVnd(amount));
+                normalizeVnd(amount),
+                idempotencyKey);
 
         log.info("Requesting PayGate merchant refund for transactionRef={}, orderId={}, amount={}, idempotencyKey={}",
                 transactionRef, request.orderId(), request.amount(), idempotencyKey);

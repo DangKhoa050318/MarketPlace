@@ -12,6 +12,7 @@ export interface User {
   fullName: string;
   role: string;
   active: boolean;
+  walletBalance: number;
   createdAt: string;
 }
 
@@ -54,6 +55,10 @@ export class UserService {
 
   getById(id: number): Observable<ApiResponse<User>> {
     return this.http.get<ApiResponse<User>>(`${this.apiUrl}/${id}`);
+  }
+
+  getMe(): Observable<ApiResponse<User>> {
+    return this.http.get<ApiResponse<User>>(`${this.apiUrl}/me`);
   }
 
   create(user: CreateUserRequest): Observable<ApiResponse<User>> {

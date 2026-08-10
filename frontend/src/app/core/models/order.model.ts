@@ -1,5 +1,5 @@
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
-export type PaymentMethod = 'COD' | 'CREDIT_CARD' | 'PAYGATE_BNPL' | 'BANK_TRANSFER';
+export type PaymentMethod = 'COD' | 'CREDIT_CARD' | 'PAYGATE_BNPL' | 'BANK_TRANSFER' | 'WALLET';
 export type PaymentStatus = 'UNPAID' | 'PENDING_PAYGATE' | 'PAID' | 'REFUND_PENDING' | 'PARTIALLY_REFUNDED' | 'REFUNDED';
 export type RefundRequestStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED';
 export type ReturnRequestStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'RETURN_RECEIVED' | 'QC_PASSED' | 'QC_FAILED' | 'COMPLETED';

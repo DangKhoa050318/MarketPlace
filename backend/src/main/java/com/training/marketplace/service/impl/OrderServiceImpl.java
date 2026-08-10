@@ -201,6 +201,15 @@ public class OrderServiceImpl implements OrderService {
             finance = BigDecimal.ZERO;
         }
 
+        if (paymentMethod == PaymentMethod.WALLET) {
+            BigDecimal walletBalance = user.getWalletBalance() != null ? user.getWalletBalance() : BigDecimal.ZERO;
+            if (walletBalance.compareTo(grandTotal) < 0) {
+                throw new BadRequestException("Marketplace wallet balance is insufficient");
+            }
+            user.setWalletBalance(walletBalance.subtract(grandTotal).setScale(2, java.math.RoundingMode.HALF_UP));
+            userRepository.save(user);
+        }
+
         order.setPaymentMethod(paymentMethod);
         order.setUpfrontAmount(upfront != null ? upfront : grandTotal);
         order.setFinanceAmount(finance != null ? finance : BigDecimal.ZERO);
@@ -208,7 +217,7 @@ public class OrderServiceImpl implements OrderService {
         // A 0đ order (e.g. a full-value coupon) has nothing to charge, and PayGate cannot process a
         // zero-amount checkout — settle it immediately like a successful prepaid payment.
         boolean zeroTotal = grandTotal.compareTo(BigDecimal.ZERO) == 0;
-        if (zeroTotal) {
+        if (zeroTotal || paymentMethod == PaymentMethod.WALLET) {
             order.setStatus(OrderStatus.CONFIRMED);
             order.setPaymentStatus(PaymentStatus.PAID);
         } else if (paymentMethod == PaymentMethod.COD) {
@@ -224,7 +233,7 @@ public class OrderServiceImpl implements OrderService {
         // 0đ order is settled on creation, so convert its reservation into an actual stock decrement now
         // (no PayGate webhook will arrive to do it). Fulfil exactly once — the SHIPPED transition skips
         // orders that are already PAID.
-        if (zeroTotal && warehouseId != null && !quantityByVariant.isEmpty()) {
+        if ((zeroTotal || paymentMethod == PaymentMethod.WALLET) && warehouseId != null && !quantityByVariant.isEmpty()) {
             inventoryFacade.fulfill(warehouseId, quantityByVariant);
         }
 
@@ -344,12 +353,13 @@ public class OrderServiceImpl implements OrderService {
         if ((effectivePaygateUrl == null || effectivePaygateUrl.isBlank()) && order.getPaygateToken() != null) {
             effectivePaygateUrl = "http://localhost:4201/checkout?token=" + order.getPaygateToken();
         }
-        if ((effectivePaygateUrl == null || effectivePaygateUrl.isBlank()) && order.getPaymentMethod() != PaymentMethod.COD) {
+        if ((effectivePaygateUrl == null || effectivePaygateUrl.isBlank()) && requiresExternalPayment(order.getPaymentMethod())) {
             effectivePaygateUrl = "http://localhost:4201/checkout?orderId=ORD-" + order.getId();
         }
 
         PaygatePayloadResponse payload = resp.paygatePayload();
-        if (payload == null && order.getStatus() == OrderStatus.PENDING && order.getPaymentStatus() != PaymentStatus.PAID && order.getPaymentMethod() != PaymentMethod.COD) {
+        if (payload == null && order.getStatus() == OrderStatus.PENDING && order.getPaymentStatus() != PaymentStatus.PAID
+                && requiresExternalPayment(order.getPaymentMethod())) {
             String channel = order.getPaymentMethod() != null ? order.getPaymentMethod().name() : "BANK_TRANSFER";
             payload = new PaygatePayloadResponse(
                     order.getId(),
@@ -387,6 +397,10 @@ public class OrderServiceImpl implements OrderService {
                 }
             }
         }
+    }
+
+    private boolean requiresExternalPayment(PaymentMethod paymentMethod) {
+        return paymentMethod != null && paymentMethod != PaymentMethod.COD && paymentMethod != PaymentMethod.WALLET;
     }
 
     @Override

@@ -4,5 +4,6 @@ public enum PaymentMethod {
     COD,
     CREDIT_CARD,
     PAYGATE_BNPL,
-    BANK_TRANSFER
+    BANK_TRANSFER,
+    WALLET
 }

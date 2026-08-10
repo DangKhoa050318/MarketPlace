@@ -48,6 +48,12 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
+    public UserResponse getMe(org.springframework.security.core.Authentication authentication) {
+        return userMapper.toResponse(getAuthenticatedUser(authentication));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public User getAuthenticatedUser(org.springframework.security.core.Authentication authentication) {
         if (authentication == null || authentication.getName() == null) {
             throw new ResourceNotFoundException("User", "authentication", "null");

@@ -86,6 +86,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/deliveries/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/reviews/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/me").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/users/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/reviews/**").hasAnyRole("CUSTOMER", "STAFF", "MANAGER", "ADMIN")
                         // Warehouse back-office
