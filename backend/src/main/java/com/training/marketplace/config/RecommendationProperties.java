@@ -45,6 +45,12 @@ public class RecommendationProperties {
     @Min(2)
     private int minCoPurchasedOccurrences = 2;
 
+    @Min(50)
+    private int similarCandidatePoolSize = 500;
+
+    @Min(24)
+    private int similarPrecomputeSize = 50;
+
     @AssertTrue(message = "Best-seller valid statuses cannot include PENDING or CANCELLED")
     public boolean isValidOrderStatusConfiguration() {
         return validOrderStatuses != null

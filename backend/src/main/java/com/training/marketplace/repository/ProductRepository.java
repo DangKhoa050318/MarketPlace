@@ -17,8 +17,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Optional<Product> findBySlug(String slug);
     boolean existsBySlug(String slug);
     long countByActiveTrue();
-    List<Product> findAllByActiveTrue();
-
     @Query("""
             SELECT p.id
               FROM Product p
