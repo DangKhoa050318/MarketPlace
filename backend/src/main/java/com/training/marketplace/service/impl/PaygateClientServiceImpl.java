@@ -12,6 +12,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
@@ -149,8 +151,17 @@ public class PaygateClientServiceImpl implements PaygateClientService {
                 return response;
             }
             log.warn("PayGate returned non-success response: {}", response);
-        } catch (Exception e) {
+            throw new BadRequestException("PayGate returned an unsuccessful checkout response");
+        } catch (HttpStatusCodeException e) {
+            log.warn("PayGate rejected checkout session for order {} with status {}", orderIdStr, e.getStatusCode());
+            throw new BadRequestException("PayGate rejected checkout session: " + e.getStatusCode());
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (ResourceAccessException e) {
             log.warn("Failed to reach PayGate service at {}. Error: {}", fullEndpoint, e.getMessage());
+        } catch (Exception e) {
+            log.error("Unexpected PayGate checkout error for order {}", orderIdStr, e);
+            throw new BadRequestException("Cannot create checkout session due to a PayGate integration error");
         }
 
         // Fallback for offline local dev mode

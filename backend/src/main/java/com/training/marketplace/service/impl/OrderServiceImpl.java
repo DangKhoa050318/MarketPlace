@@ -189,6 +189,12 @@ public class OrderServiceImpl implements OrderService {
             if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
                 upfront = request.upfrontAmount() != null ? request.upfrontAmount() : grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
                 finance = request.financeAmount() != null ? request.financeAmount() : grandTotal.subtract(upfront);
+                if (upfront.compareTo(BigDecimal.ZERO) < 0 || finance.compareTo(BigDecimal.ZERO) < 0) {
+                    throw new BadRequestException("Upfront amount and finance amount cannot be negative");
+                }
+                if (grandTotal.compareTo(BigDecimal.ZERO) > 0 && finance.compareTo(BigDecimal.ZERO) == 0) {
+                    throw new BadRequestException("Finance amount must be greater than zero for BNPL orders");
+                }
                 if (upfront.add(finance).compareTo(grandTotal) != 0) {
                     throw new BadRequestException("Upfront amount and finance amount must exactly equal the total order amount");
                 }

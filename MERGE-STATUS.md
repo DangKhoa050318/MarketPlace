@@ -580,3 +580,18 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
 - ✅ Verify: Marketplace backend unit **408/408 PASS**; Angular unit **84/84 PASS** and production build
   **SUCCESS**. GatePay focused webhook tests **11/11 PASS**; its pre-existing full suite remains red in unrelated
   legacy controller/service tests.
+
+### BNPL review hardening — 2026-08-11
+
+- ✅ Tạo nhánh `fix/bnpl-review-hardening` ở cả MarketPlace và PayGate.
+- ✅ PayGate đóng IDOR/anonymous confirm, khóa proposal/checkout/profile cho các state transition và credit
+  exposure, chặn reuse terminal checkout, giữ repayment idempotent. Repayment thành công cộng toàn bộ gốc + lãi
+  vào approved credit limit không giới hạn đúng nghiệp vụ, nhưng replay cùng event không được cộng lần hai.
+- ✅ MarketPlace validate BNPL split không âm, yêu cầu finance dương cho order có giá trị và không còn đổi lỗi
+  HTTP nghiệp vụ từ PayGate thành mock checkout session.
+- ⏭️ Không thay đổi `MP-BNPL-C1` (store-credit policy) và `MP-BNPL-H2` (cancellation webhook), đúng phạm vi yêu cầu.
+- 📄 Report được tách theo repository: `docs/MarketPlace-BNPL-Review-Validation-Report.md` tại MarketPlace và
+  `GatePay/docs/PayGate-BNPL-Review-Validation-Report.md` tại PayGate; không còn dùng report gộp.
+- ✅ Verify: MarketPlace backend unit **413/413 PASS**; PayGate focused BNPL/security **12/12 PASS**.
+  PayGate full suite vẫn đỏ ở các test legacy ngoài phạm vi (WebMvc test fixture thiếu `MerchantRepository`,
+  `CheckoutServiceTest` inject interface và một lỗi có sẵn trong `TransactionServiceTest`).
