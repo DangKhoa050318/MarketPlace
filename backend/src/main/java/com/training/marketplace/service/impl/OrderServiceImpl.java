@@ -83,7 +83,6 @@ public class OrderServiceImpl implements OrderService {
     private final TransactionTemplate transactionTemplate;
 
     @Override
-    @Transactional
     public OrderResponse createOrder(Long userId, CreateOrderRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
@@ -125,122 +124,129 @@ public class OrderServiceImpl implements OrderService {
                     "Giá đã thay đổi, vui lòng xem lại giỏ hàng: " + String.join(", ", priceChanges));
         }
 
-        // 3. Reserve stock (locks stock_levels rows, validates no oversell). Authoritative point.
-        inventoryFacade.reserve(warehouseId, quantityByVariant);
+        // DB work runs in a bounded TransactionTemplate so the HikariCP connection (and its row locks)
+        // is released as soon as the order is persisted. The PayGate HTTP call and the RabbitMQ publish
+        // below must NOT hold a DB connection open — that was the GĐ2 HikariCP-exhaustion root cause.
+        Order savedOrder = transactionTemplate.execute(status -> {
+            // 3. Reserve stock (locks stock_levels rows, validates no oversell). Authoritative point.
+            inventoryFacade.reserve(warehouseId, quantityByVariant);
 
-        // 4. Build order + items using the (now-validated) current DB prices.
-        BigDecimal calculatedTotal = BigDecimal.ZERO;
-        Order order = Order.builder()
-                .user(user)
-                .warehouseId(warehouseId)
-                .status(OrderStatus.PENDING)
-                .totalAmount(BigDecimal.ZERO)
-                .shippingAddress(request.shippingAddress())
-                .note(request.note())
-                .build();
+            // 4. Build order + items using the (now-validated) current DB prices.
+            BigDecimal calculatedTotal = BigDecimal.ZERO;
+            Order order = Order.builder()
+                    .user(user)
+                    .warehouseId(warehouseId)
+                    .status(OrderStatus.PENDING)
+                    .totalAmount(BigDecimal.ZERO)
+                    .shippingAddress(request.shippingAddress())
+                    .note(request.note())
+                    .build();
 
-        for (CartItemResponse item : cart.items()) {
-            ProductVariant variant = variantById.get(item.variantId());
-            BigDecimal unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
-            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(item.quantity()));
-            calculatedTotal = calculatedTotal.add(subtotal);
-            order.addItem(OrderItem.builder()
-                    .variantId(item.variantId())
-                    .productId(item.productId())
-                    .sku(item.sku())
-                    .productName(item.productName())
-                    .variantName(item.variantName())
-                    .unitPrice(unitPrice)
-                    .quantity(item.quantity())
-                    .subtotal(subtotal)
-                    .build());
-        }
-
-        // 3a. Charge 125,000 VND below the 3,750,000 VND free-shipping threshold.
-        BigDecimal shippingFee = calculatedTotal.compareTo(FREE_SHIPPING_THRESHOLD) >= 0
-                ? BigDecimal.ZERO
-                : STANDARD_SHIPPING_FEE;
-        order.setShippingFee(shippingFee);
-
-        // 3b. Apply coupon (optional). Locks the coupon row, validates against the cart, and
-        //     increments used_count inside this transaction (no oversell of usage_limit).
-        BigDecimal discount = BigDecimal.ZERO;
-        AppliedCoupon appliedCoupon = null;
-        if (StringUtils.hasText(request.couponCode())) {
-            appliedCoupon = promotionService.consume(request.couponCode(), userId, cart);
-            discount = appliedCoupon.discountAmount();
-            order.setPromotionCodeId(appliedCoupon.promotionCodeId());
-            order.setCouponCode(appliedCoupon.code());
-        }
-        order.setDiscountAmount(discount);
-
-        BigDecimal grandTotal = calculatedTotal.subtract(discount).add(shippingFee);
-        if (grandTotal.compareTo(BigDecimal.ZERO) < 0) {
-            grandTotal = BigDecimal.ZERO;
-        }
-        order.setTotalAmount(grandTotal);
-
-        PaymentMethod paymentMethod = request.paymentMethod() != null ? request.paymentMethod() : PaymentMethod.COD;
-        BigDecimal upfront;
-        BigDecimal finance;
-        if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
-            upfront = request.upfrontAmount() != null ? request.upfrontAmount() : grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
-            finance = request.financeAmount() != null ? request.financeAmount() : grandTotal.subtract(upfront);
-            if (upfront.compareTo(BigDecimal.ZERO) < 0 || finance.compareTo(BigDecimal.ZERO) < 0) {
-                throw new BadRequestException("Upfront amount and finance amount cannot be negative");
+            for (CartItemResponse item : cart.items()) {
+                ProductVariant variant = variantById.get(item.variantId());
+                BigDecimal unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
+                BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(item.quantity()));
+                calculatedTotal = calculatedTotal.add(subtotal);
+                order.addItem(OrderItem.builder()
+                        .variantId(item.variantId())
+                        .productId(item.productId())
+                        .sku(item.sku())
+                        .productName(item.productName())
+                        .variantName(item.variantName())
+                        .unitPrice(unitPrice)
+                        .quantity(item.quantity())
+                        .subtotal(subtotal)
+                        .build());
             }
-            if (grandTotal.compareTo(BigDecimal.ZERO) > 0 && finance.compareTo(BigDecimal.ZERO) == 0) {
-                throw new BadRequestException("Finance amount must be greater than zero for BNPL orders");
+
+            // 3a. Charge 125,000 VND below the 3,750,000 VND free-shipping threshold.
+            BigDecimal shippingFee = calculatedTotal.compareTo(FREE_SHIPPING_THRESHOLD) >= 0
+                    ? BigDecimal.ZERO
+                    : STANDARD_SHIPPING_FEE;
+            order.setShippingFee(shippingFee);
+
+            // 3b. Apply coupon (optional). Locks the coupon row, validates against the cart, and
+            //     increments used_count inside this transaction (no oversell of usage_limit).
+            BigDecimal discount = BigDecimal.ZERO;
+            AppliedCoupon appliedCoupon = null;
+            if (StringUtils.hasText(request.couponCode())) {
+                appliedCoupon = promotionService.consume(request.couponCode(), userId, cart);
+                discount = appliedCoupon.discountAmount();
+                order.setPromotionCodeId(appliedCoupon.promotionCodeId());
+                order.setCouponCode(appliedCoupon.code());
             }
-            if (upfront.add(finance).compareTo(grandTotal) != 0) {
-                throw new BadRequestException("Upfront amount and finance amount must exactly equal the total order amount");
+            order.setDiscountAmount(discount);
+
+            BigDecimal grandTotal = calculatedTotal.subtract(discount).add(shippingFee);
+            if (grandTotal.compareTo(BigDecimal.ZERO) < 0) {
+                grandTotal = BigDecimal.ZERO;
             }
-        } else {
-            upfront = grandTotal;
-            finance = BigDecimal.ZERO;
-        }
+            order.setTotalAmount(grandTotal);
 
-        if (paymentMethod == PaymentMethod.WALLET) {
-            BigDecimal walletBalance = user.getWalletBalance() != null ? user.getWalletBalance() : BigDecimal.ZERO;
-            if (walletBalance.compareTo(grandTotal) < 0) {
-                throw new BadRequestException("Marketplace wallet balance is insufficient");
+            PaymentMethod paymentMethod = request.paymentMethod() != null ? request.paymentMethod() : PaymentMethod.COD;
+            BigDecimal upfront;
+            BigDecimal finance;
+            if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
+                upfront = request.upfrontAmount() != null ? request.upfrontAmount() : grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
+                finance = request.financeAmount() != null ? request.financeAmount() : grandTotal.subtract(upfront);
+                if (upfront.compareTo(BigDecimal.ZERO) < 0 || finance.compareTo(BigDecimal.ZERO) < 0) {
+                    throw new BadRequestException("Upfront amount and finance amount cannot be negative");
+                }
+                if (grandTotal.compareTo(BigDecimal.ZERO) > 0 && finance.compareTo(BigDecimal.ZERO) == 0) {
+                    throw new BadRequestException("Finance amount must be greater than zero for BNPL orders");
+                }
+                if (upfront.add(finance).compareTo(grandTotal) != 0) {
+                    throw new BadRequestException("Upfront amount and finance amount must exactly equal the total order amount");
+                }
+            } else {
+                upfront = grandTotal;
+                finance = BigDecimal.ZERO;
             }
-            user.setWalletBalance(walletBalance.subtract(grandTotal).setScale(2, java.math.RoundingMode.HALF_UP));
-            userRepository.save(user);
-        }
 
-        order.setPaymentMethod(paymentMethod);
-        order.setUpfrontAmount(upfront != null ? upfront : grandTotal);
-        order.setFinanceAmount(finance != null ? finance : BigDecimal.ZERO);
+            if (paymentMethod == PaymentMethod.WALLET) {
+                BigDecimal walletBalance = user.getWalletBalance() != null ? user.getWalletBalance() : BigDecimal.ZERO;
+                if (walletBalance.compareTo(grandTotal) < 0) {
+                    throw new BadRequestException("Marketplace wallet balance is insufficient");
+                }
+                user.setWalletBalance(walletBalance.subtract(grandTotal).setScale(2, java.math.RoundingMode.HALF_UP));
+                userRepository.save(user);
+            }
 
-        boolean zeroTotal = grandTotal.compareTo(BigDecimal.ZERO) == 0;
-        if (zeroTotal || paymentMethod == PaymentMethod.WALLET) {
-            order.setStatus(OrderStatus.CONFIRMED);
-            order.setPaymentStatus(PaymentStatus.PAID);
-        } else if (paymentMethod == PaymentMethod.COD) {
-            order.setStatus(OrderStatus.CONFIRMED);
-            order.setPaymentStatus(PaymentStatus.UNPAID);
-        } else {
-            order.setStatus(OrderStatus.PENDING);
-            order.setPaymentStatus(PaymentStatus.PENDING_PAYGATE);
-        }
+            order.setPaymentMethod(paymentMethod);
+            order.setUpfrontAmount(upfront != null ? upfront : grandTotal);
+            order.setFinanceAmount(finance != null ? finance : BigDecimal.ZERO);
 
-        Order savedOrder = orderRepository.save(order);
+            boolean zeroTotal = grandTotal.compareTo(BigDecimal.ZERO) == 0;
+            if (zeroTotal || paymentMethod == PaymentMethod.WALLET) {
+                order.setStatus(OrderStatus.CONFIRMED);
+                order.setPaymentStatus(PaymentStatus.PAID);
+            } else if (paymentMethod == PaymentMethod.COD) {
+                order.setStatus(OrderStatus.CONFIRMED);
+                order.setPaymentStatus(PaymentStatus.UNPAID);
+            } else {
+                order.setStatus(OrderStatus.PENDING);
+                order.setPaymentStatus(PaymentStatus.PENDING_PAYGATE);
+            }
 
-        if ((zeroTotal || paymentMethod == PaymentMethod.WALLET) && warehouseId != null && !quantityByVariant.isEmpty()) {
-            inventoryFacade.fulfill(warehouseId, quantityByVariant);
-        }
+            Order saved = orderRepository.save(order);
 
-        if (appliedCoupon != null) {
-            promotionService.recordRedemption(
-                    appliedCoupon.promotionCodeId(), userId, savedOrder.getId(), discount);
-        }
+            if ((zeroTotal || paymentMethod == PaymentMethod.WALLET) && warehouseId != null && !quantityByVariant.isEmpty()) {
+                inventoryFacade.fulfill(warehouseId, quantityByVariant);
+            }
 
-        try {
-            merchandisingEventService.attributeOrder(savedOrder.getId(), userId, savedOrder.getCreatedAt());
-        } catch (Exception ex) {
-            log.warn("Merchandising attribution skipped for order {}: {}", savedOrder.getId(), ex.getMessage());
-        }
+            if (appliedCoupon != null) {
+                promotionService.recordRedemption(
+                        appliedCoupon.promotionCodeId(), userId, saved.getId(), discount);
+            }
+
+            try {
+                merchandisingEventService.attributeOrder(saved.getId(), userId, saved.getCreatedAt());
+            } catch (Exception ex) {
+                log.warn("Merchandising attribution skipped for order {}: {}", saved.getId(), ex.getMessage());
+            }
+
+            return saved;
+        });
 
         BigDecimal grandTotalFinal = savedOrder.getTotalAmount();
         PaymentMethod paymentMethodFinal = savedOrder.getPaymentMethod();

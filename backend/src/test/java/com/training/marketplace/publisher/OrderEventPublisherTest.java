@@ -17,9 +17,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -47,15 +44,17 @@ class OrderEventPublisherTest {
     }
 
     @Test
-    @DisplayName("publishOrderCreatedEvent: throws IllegalStateException when transaction synchronization is not active")
-    void publishOrderCreatedEvent_withoutTransaction_throwsIllegalStateException() {
+    @DisplayName("publishOrderCreatedEvent: publishes directly when transaction synchronization is not active")
+    void publishOrderCreatedEvent_withoutTransaction_publishesDirectly() {
         OrderCreatedEvent event = createTestEvent();
 
-        assertThatThrownBy(() -> orderEventPublisher.publishOrderCreatedEvent(event))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Transaction synchronization is not active");
+        orderEventPublisher.publishOrderCreatedEvent(event);
 
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
+        verify(rabbitTemplate).convertAndSend(
+                RabbitMQConfig.ORDER_EXCHANGE,
+                RabbitMQConfig.ORDER_CREATED_ROUTING_KEY,
+                event
+        );
     }
 
     @Test

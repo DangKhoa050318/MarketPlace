@@ -40,7 +40,6 @@ public class PaymentServiceImpl implements PaymentService {
     private final UserRepository userRepository;
 
     @Override
-    @Transactional
     public PaygatePayloadResponse createPaymentSession(Order order, PaymentMethod paymentMethod) {
         boolean zeroTotal = order.getTotalAmount().compareTo(java.math.BigDecimal.ZERO) == 0;
         if (paymentMethod == PaymentMethod.COD || paymentMethod == PaymentMethod.WALLET || zeroTotal) {

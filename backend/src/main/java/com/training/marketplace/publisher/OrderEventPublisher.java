@@ -17,23 +17,27 @@ public class OrderEventPublisher {
     private final RabbitTemplate rabbitTemplate;
 
     public void publishOrderCreatedEvent(OrderCreatedEvent event) {
-        if (!TransactionSynchronizationManager.isActualTransactionActive()
-                || !TransactionSynchronizationManager.isSynchronizationActive()) {
-            throw new IllegalStateException("Transaction synchronization is not active when publishing OrderCreatedEvent");
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(
-            new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    log.info("Publishing OrderCreatedEvent: eventId={}, orderId={}", event.eventId(), event.orderId());
-                    rabbitTemplate.convertAndSend(
-                            RabbitMQConfig.ORDER_EXCHANGE,
-                            RabbitMQConfig.ORDER_CREATED_ROUTING_KEY,
-                            event
-                    );
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        log.info("Publishing OrderCreatedEvent: eventId={}, orderId={}", event.eventId(), event.orderId());
+                        rabbitTemplate.convertAndSend(
+                                RabbitMQConfig.ORDER_EXCHANGE,
+                                RabbitMQConfig.ORDER_CREATED_ROUTING_KEY,
+                                event
+                        );
+                    }
                 }
-            }
-        );
+            );
+        } else {
+            log.info("Publishing OrderCreatedEvent (no active tx): eventId={}, orderId={}", event.eventId(), event.orderId());
+            rabbitTemplate.convertAndSend(
+                    RabbitMQConfig.ORDER_EXCHANGE,
+                    RabbitMQConfig.ORDER_CREATED_ROUTING_KEY,
+                    event
+            );
+        }
     }
 }
