@@ -10,7 +10,9 @@ import com.training.marketplace.mapper.ProductVariantMapper;
 import com.training.marketplace.repository.ProductRepository;
 import com.training.marketplace.repository.ProductVariantRepository;
 import com.training.marketplace.service.ProductVariantService;
+import com.training.marketplace.service.ProductCatalogChangedEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,7 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     private final ProductVariantRepository variantRepository;
     private final ProductRepository productRepository;
     private final ProductVariantMapper variantMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -55,7 +58,9 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         ProductVariant variant = variantMapper.toEntity(request);
         variant.setProductId(productId);
         variant.setActive(true);
-        return variantMapper.toResponse(variantRepository.save(variant));
+        ProductVariant saved = variantRepository.save(variant);
+        eventPublisher.publishEvent(new ProductCatalogChangedEvent(saved.getProductId()));
+        return variantMapper.toResponse(saved);
     }
 
     @Override
@@ -64,7 +69,9 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         ProductVariant variant = variantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ProductVariant", id));
         variantMapper.updateEntity(variant, request);
-        return variantMapper.toResponse(variantRepository.save(variant));
+        ProductVariant saved = variantRepository.save(variant);
+        eventPublisher.publishEvent(new ProductCatalogChangedEvent(saved.getProductId()));
+        return variantMapper.toResponse(saved);
     }
 
     @Override
@@ -74,5 +81,6 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 .orElseThrow(() -> new ResourceNotFoundException("ProductVariant", id));
         variant.setActive(false);
         variantRepository.save(variant);
+        eventPublisher.publishEvent(new ProductCatalogChangedEvent(variant.getProductId()));
     }
 }
