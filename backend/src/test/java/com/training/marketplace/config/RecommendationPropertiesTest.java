@@ -39,6 +39,8 @@ class RecommendationPropertiesTest {
         assertThat(properties.getMinCoViewedOccurrences()).isEqualTo(2);
         assertThat(properties.getCoPurchasedLookback()).isEqualTo(Duration.ofDays(90));
         assertThat(properties.getMinCoPurchasedOccurrences()).isEqualTo(2);
+        assertThat(properties.getSimilarCandidatePoolSize()).isEqualTo(500);
+        assertThat(properties.getSimilarPrecomputeSize()).isEqualTo(50);
     }
 
     @Test
@@ -71,7 +73,9 @@ class RecommendationPropertiesTest {
                         "marketplace.recommendation.co-viewed-lookback=21d",
                         "marketplace.recommendation.min-co-viewed-occurrences=3",
                         "marketplace.recommendation.co-purchased-lookback=120d",
-                        "marketplace.recommendation.min-co-purchased-occurrences=4")
+                        "marketplace.recommendation.min-co-purchased-occurrences=4",
+                        "marketplace.recommendation.similar-candidate-pool-size=750",
+                        "marketplace.recommendation.similar-precompute-size=75")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     RecommendationProperties properties =
@@ -83,6 +87,8 @@ class RecommendationPropertiesTest {
                     assertThat(properties.getMinCoViewedOccurrences()).isEqualTo(3);
                     assertThat(properties.getCoPurchasedLookback()).isEqualTo(Duration.ofDays(120));
                     assertThat(properties.getMinCoPurchasedOccurrences()).isEqualTo(4);
+                    assertThat(properties.getSimilarCandidatePoolSize()).isEqualTo(750);
+                    assertThat(properties.getSimilarPrecomputeSize()).isEqualTo(75);
                 });
     }
 

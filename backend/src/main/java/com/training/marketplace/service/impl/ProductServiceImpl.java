@@ -16,7 +16,9 @@ import com.training.marketplace.repository.ProductRepository;
 import com.training.marketplace.repository.ProductVariantRepository;
 import com.training.marketplace.repository.StorefrontCatalogRepository;
 import com.training.marketplace.service.ProductService;
+import com.training.marketplace.service.ProductCatalogChangedEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -36,6 +38,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductMapper productMapper;
     private final ProductVariantMapper variantMapper;
     private final StorefrontCatalogRepository storefrontCatalogRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -85,7 +88,9 @@ public class ProductServiceImpl implements ProductService {
         }
         Product product = productMapper.toEntity(request);
         product.setActive(true);
-        return productMapper.toResponse(productRepository.save(product));
+        Product saved = productRepository.save(product);
+        eventPublisher.publishEvent(new ProductCatalogChangedEvent(saved.getId()));
+        return productMapper.toResponse(saved);
     }
 
     @Override
@@ -100,7 +105,9 @@ public class ProductServiceImpl implements ProductService {
         }
 
         productMapper.updateEntity(product, request);
-        return productMapper.toResponse(productRepository.save(product));
+        Product saved = productRepository.save(product);
+        eventPublisher.publishEvent(new ProductCatalogChangedEvent(saved.getId()));
+        return productMapper.toResponse(saved);
     }
 
     @Override
@@ -111,5 +118,6 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id));
         product.setActive(false);
         productRepository.save(product);
+        eventPublisher.publishEvent(new ProductCatalogChangedEvent(product.getId()));
     }
 }

@@ -123,6 +123,8 @@ marketplace:
     min-co-viewed-occurrences: ${RECOMMENDATION_MIN_CO_VIEWED_OCCURRENCES:2}
     co-purchased-lookback: ${RECOMMENDATION_CO_PURCHASED_LOOKBACK:90d}
     min-co-purchased-occurrences: ${RECOMMENDATION_MIN_CO_PURCHASED_OCCURRENCES:2}
+    similar-candidate-pool-size: ${RECOMMENDATION_SIMILAR_CANDIDATE_POOL_SIZE:500}
+    similar-precompute-size: ${RECOMMENDATION_SIMILAR_PRECOMPUTE_SIZE:50}
   chat:
     enabled: ${FEATURE_CHAT_ASSISTANT_ENABLED:true}
     conversation-ttl: ${CHAT_CONVERSATION_TTL:24h}

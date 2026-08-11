@@ -555,6 +555,19 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
 - ✅ Verify: backend unit **405/405 PASS**; Angular unit **84/84 PASS**; Angular production build
   **SUCCESS** (giữ nguyên 2 CSS budget warnings và 1 CommonJS warning có sẵn).
 
+### SIMILAR recommendation performance — 2026-08-11
+
+- ✅ Bỏ `findAllByActiveTrue()` và Java full-catalog scoring khỏi request path của
+  `/api/v1/recommendations?placement=PRODUCT_DETAIL_SIMILAR`.
+- ✅ Thêm indexed attribute-term lookup và bảng precomputed Top-K `product_similarities`; hot path chỉ
+  đọc theo `(source_product_id, rank)` rồi dùng batch hydration hiện hữu.
+- ✅ Cold source dùng candidate pool có giới hạn theo category/normalized brand/attribute overlap và
+  PostgreSQL advisory lock, không đưa toàn bộ catalog lên heap.
+- ✅ Catalog product/variant mutation phát after-commit event để invalidate source bị ảnh hưởng, clear
+  Redis cache và warm lại changed product bất đồng bộ.
+- ✅ Verify: backend compile/test-compile **SUCCESS**; backend unit **405/405 PASS**. Integration test
+  PostgreSQL đã thêm nhưng **SKIP** vì môi trường hiện tại không có Docker daemon.
+
 ### PayGate card + VietQR webhook reconciliation fix — 2026-08-11
 
 - ✅ GatePay local webhook dispatch now allowlists only the configured internal host (`localhost` by default),
