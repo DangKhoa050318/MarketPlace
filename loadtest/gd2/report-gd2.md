@@ -1,7 +1,7 @@
-# 📊 BÁO CÁO LOAD TEST GĐ2 — MARKETPLACE: LUỒNG GHI (CART ➔ ORDER)
+# BÁO CÁO LOAD TEST GĐ2 — MARKETPLACE: LUỒNG GHI (CART TO ORDER)
 
 **Ngày thực hiện:** 11/08/2026  
-**Môi trường:** Localhead (Backend Spring Boot + PostgreSQL 16 + Redis 7 + RabbitMQ + MailHog via Docker)  
+**Môi trường:** Localhost (Backend Spring Boot + PostgreSQL 16 + Redis 7 + RabbitMQ + MailHog via Docker)  
 **Công cụ kiểm thử:** k6 v0.56.0  
 **Cấu hình DB Pool:** `hikari.maximum-pool-size = 20` (Actuator Metrics: `hikaricp.connections.max = 20.0`)  
 **Tập kịch bản (Location: `loadtest/gd2/`):**
@@ -12,7 +12,7 @@
 
 ## 1. Kết quả Load Test ở Mức Tải Chuẩn 10 VUs (1 VU = 1 User)
 
-> **Kịch bản:** Ramp-up 20s (10 VUs) ➔ Duy trì 1 phút ở 10 VUs ➔ Ramp-down 20s.  
+> **Kịch bản:** Ramp-up 20s (10 VUs) -> Duy trì 1 phút ở 10 VUs -> Ramp-down 20s.  
 > **Quản lý Token:** Mỗi VU được map cố định với 1 user riêng (`demo_customer_01` đến `demo_customer_10`).  
 > **Tổng số Request thực hiện:** **1,164 requests** | **Số Đơn hàng đã tạo:** **381 orders** | **Error Rate:** **0.00%**
 
@@ -27,11 +27,11 @@
 
 ## 2. Tiêu chí Đạt (DoD Compliance Verification)
 
-### ✅ DoD 1: Kiểm tra dùng chung Token & Race Condition
+### DoD 1: Kiểm tra dùng chung Token & Race Condition
 - **Xác minh:** 10 VUs được cấp 10 Token độc lập thông qua công thức `tokens[(exec.vu.idInTest - 1) % 10]`.
 - **Kết quả:** 381 đơn hàng tạo thành công đều ghi nhận đúng `userId` tương ứng với VU đó, giỏ hàng không bị ghi đè chéo hay lẫn lộn giữa các VUs.
 
-### 🔍 DoD 2: So sánh p95 Latency `POST /orders` (GĐ2) với GĐ1 (API Đọc)
+### DoD 2: So sánh p95 Latency `POST /orders` (GĐ2) với GĐ1 (API Đọc)
 - **So sánh số liệu:**
   - GĐ1 `GET /api/v1/products/catalog`: p95 = **360 ms**
   - GĐ2 `POST /api/v1/orders` (10 VUs): p95 = **374 ms** (Khi chưa quá tải pool)
@@ -46,7 +46,7 @@
      - Xóa sản phẩm khỏi giỏ hàng (`DELETE FROM cart_items`).
   3. **Row-level Locking:** Khi nhiều VUs cùng mua các sản phẩm hot, các câu lệnh `UPDATE stock_levels` phải chờ Lock hàng (Row lock) trong PostgreSQL trước khi commit.
 
-### 🌊 DoD 3: Quan sát HikariCP Connection Pool ở 10 VUs
+### DoD 3: Quan sát HikariCP Connection Pool ở 10 VUs
 - **Chỉ số `hikaricp.connections.active`:** Dao động từ **8 đến 14 active connections** (trên tối đa 20.0 connections max).
 - **Kết luận:** Tại mức tải 10 VUs, HikariCP Connection Pool **KHÔNG bị exhausted** (active < max). Các request không phải xếp hàng chờ connection, giữ cho latency ổn định ở mức < 400ms.
 
@@ -61,7 +61,7 @@
 | **10 VUs** | 20 connections | Normal (8-14 active) | **374.09 ms** | **0.00%** | Không có lỗi |
 | **30 VUs** | 20 connections | **EXHAUSTED (20/20 active)** | **8,940.00 ms (8.94s)** | **9.46%** (48 reqs fail) | `SQLTransientConnectionException` / Queue Timeout |
 
-### 💥 Hiện tượng xảy ra khi VUs > `hikari.maximum-pool-size`:
+### Hiện tượng xảy ra khi VUs > `hikari.maximum-pool-size`:
 1. **Nghẽn hàng chờ (Connection Queue Bottleneck):** 
    - 20 VUs đầu tiên chiếm hết 20 connection DB khả dụng.
    - 10 VUs dôi ra bị rơi vào trạng thái chờ (Wait Queue) trong HikariCP.

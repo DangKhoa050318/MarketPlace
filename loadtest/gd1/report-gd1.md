@@ -1,4 +1,4 @@
-# 📊 BÁO CÁO LOAD TEST GĐ1 — MARKETPLACE: API ĐỌC (BASELINE)
+# BÁO CÁO LOAD TEST GĐ1 — MARKETPLACE: API ĐỌC (BASELINE)
 
 **Ngày thực hiện:** 11/08/2026  
 **Môi trường:** Localhost (Backend Spring Boot + PostgreSQL 16 + Redis 7 + RabbitMQ + MailHog via Docker)  
@@ -12,7 +12,7 @@
 
 ## 1. Kết quả Kịch bản Chuẩn Baseline (20 VUs / Endpoint = 60 VUs Tổng)
 
-### 📌 Raw Log Console xuất từ K6 (Chứng minh thực tế):
+### Raw Log Console xuất từ K6 (Chứng minh thực tế):
 
 ```text
          /\      Grafana   /‾‾/  
@@ -68,25 +68,25 @@ recommendations_scenario ✓ [======================================] 00/20 VUs 
 ERRO[0120] thresholds on metrics 'http_req_duration, http_req_duration{scenario:products_scenario}, http_req_duration{scenario:recommendations_scenario}' have been crossed 
 ```
 
-### 📊 Bảng số liệu tổng hợp từ Log Console:
+### Bảng số liệu tổng hợp từ Log Console:
 
 | Endpoint | Scenario | Tổng Req | Min | Median (p50) | p(90) | p(95) | Max | Error Rate | Trạng thái SLA (<500ms) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `GET /api/v1/products/catalog` | `catalog_scenario` | 2,995 | 1.47 ms | 6.67 ms | 315.49 ms | **404.75 ms** | 776.13 ms | **0.00%** | **PASS ✓** |
-| `GET /api/v1/products` | `products_scenario` | 2,186 | 2.12 ms | 291.03 ms | 718.81 ms | **806.65 ms** | 1.26 s | **0.00%** | **FAIL ✗** |
-| `GET /api/v1/recommendations` | `recommendations_scenario` | 1,490 | 5.96 ms | 635.27 ms | 1.67 s | **1.79 s** | 2.27 s | **0.00%** | **FAIL ✗** |
+| `GET /api/v1/products/catalog` | `catalog_scenario` | 2,995 | 1.47 ms | 6.67 ms | 315.49 ms | **404.75 ms** | 776.13 ms | **0.00%** | PASS |
+| `GET /api/v1/products` | `products_scenario` | 2,186 | 2.12 ms | 291.03 ms | 718.81 ms | **806.65 ms** | 1.26 s | **0.00%** | FAIL |
+| `GET /api/v1/recommendations` | `recommendations_scenario` | 1,490 | 5.96 ms | 635.27 ms | 1.67 s | **1.79 s** | 2.27 s | **0.00%** | FAIL |
 
 ---
 
 ## 2. Phân tích Nguyên nhân Endpoint có Latency p95 Cao Nhất (`/recommendations`)
 
-### 🔍 Dữ liệu chứng minh từ Log:
+### Dữ liệu chứng minh từ Log:
 - **`GET /recommendations`** có p95 latency lên tới **1.79s** (cao nhất trong 3 endpoint, gấp 4.4 lần so với `/catalog`).
 - Chỉ có **44.2%** request của `/recommendations` đạt mốc < 500ms.
 
-### 💻 Phân tích từ Source Code Java (`RecommendationServiceImpl.java`):
+### Phân tích từ Source Code Java (`RecommendationServiceImpl.java`):
 1. **Full Active Catalog Scan (Quét toàn bộ sản phẩm lên RAM):**
-   Thuật toán gợi ý chiến lược `SIMILAR` gọi `productRepository.findAllByActiveTrue()`, load **toàn bộ sản phẩm active** từ Database vào bộ nhớ RAM của Spring Boot.
+   Thuật toán gợi ý chiến lược `SIMILAR` gọi `productRepository.findAllByActiveTrue()`, load toàn bộ sản phẩm active từ Database vào bộ nhớ RAM của Spring Boot.
 2. **Vòng lặp tính toán in-memory (In-Memory Similarity Loop):**
    Ứng dụng duyệt qua từng sản phẩm bằng vòng lặp Java, tính điểm tương đồng dựa trên `brand`, `category`, `attributes`, và `price`.
 3. **Nghẽn CPU & RAM:**
@@ -96,7 +96,7 @@ ERRO[0120] thresholds on metrics 'http_req_duration, http_req_duration{scenario:
 
 ## 3. So sánh Pagination (`size=10` vs `size=100`) trên `GET /products`
 
-### 📌 Raw Log Console xuất từ K6:
+### Raw Log Console xuất từ K6:
 
 ```text
      execution: local
@@ -118,7 +118,7 @@ ERRO[0120] thresholds on metrics 'http_req_duration, http_req_duration{scenario:
    ✓ http_req_failed....................: 0.00%   0 out of 2321
 ```
 
-### 🔍 Phân tích & Trả lời câu hỏi: *"Pagination có giúp gì không?"*
+### Phân tích & Trả lời câu hỏi: *"Pagination có giúp gì không?"*
 
 1. **Về Dung lượng Mạng (Network Transfer):**
    - Tổng dung lượng tải về đạt **17 Megabytes (256 kB/s)** chỉ trong 30 giây.
@@ -133,7 +133,7 @@ ERRO[0120] thresholds on metrics 'http_req_duration, http_req_duration{scenario:
 
 ## 4. Phân tích Tải Cao (20 VUs vs 50 VUs / Endpoint = 150 VUs)
 
-### 📌 Raw Log Console xuất từ K6 (Stress Test 50 VUs):
+### Raw Log Console xuất từ K6 (Stress Test 50 VUs):
 
 ```text
      execution: local
@@ -156,7 +156,7 @@ ERRO[0120] thresholds on metrics 'http_req_duration, http_req_duration{scenario:
      http_reqs......................: 1790    22.28784/s
 ```
 
-### 🔍 Trả lời câu hỏi phân tích bắt buộc:
+### Trả lời câu hỏi phân tích bắt buộc:
 
 1. **Latency p95 / p99 có tăng tuyến tính không?**
    - **KHÔNG TĂNG TUYẾN TÍNH.** 
@@ -172,7 +172,7 @@ ERRO[0120] thresholds on metrics 'http_req_duration, http_req_duration{scenario:
 
 ## 5. Chứng minh Ảnh hưởng của Rate Limit (Lúc chưa truyền Bypass Header)
 
-### 📌 Raw Log Console xuất từ K6 khi Rate Limit HOẠT ĐỘNG:
+### Raw Log Console xuất từ K6 khi Rate Limit HOẠT ĐỘNG:
 
 ```text
      ✓ GET /catalog status is 200
