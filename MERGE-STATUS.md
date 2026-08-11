@@ -585,7 +585,8 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
 
 - ✅ Tạo nhánh `fix/bnpl-review-hardening` ở cả MarketPlace và PayGate.
 - ✅ PayGate đóng IDOR/anonymous confirm, khóa proposal/checkout/profile cho các state transition và credit
-  exposure, chặn reuse terminal checkout, giữ repayment idempotent và không tự tăng approved credit limit.
+  exposure, chặn reuse terminal checkout, giữ repayment idempotent. Repayment thành công cộng toàn bộ gốc + lãi
+  vào approved credit limit không giới hạn đúng nghiệp vụ, nhưng replay cùng event không được cộng lần hai.
 - ✅ MarketPlace validate BNPL split không âm, yêu cầu finance dương cho order có giá trị và không còn đổi lỗi
   HTTP nghiệp vụ từ PayGate thành mock checkout session.
 - ⏭️ Không thay đổi `MP-BNPL-C1` (store-credit policy) và `MP-BNPL-H2` (cancellation webhook), đúng phạm vi yêu cầu.
