@@ -11,11 +11,12 @@ test('purchased customer creates and edits a review and sees refreshed product d
   });
 
   await page.addInitScript(() => {
-    localStorage.setItem('access_token', 'e2e-token');
-    localStorage.setItem('refresh_token', 'e2e-refresh');
-    localStorage.setItem('username', 'verified-buyer');
-    localStorage.setItem('role', 'CUSTOMER');
+    localStorage.setItem('marketplace_session_present', 'true');
   });
+
+  await page.route('**/api/v1/auth/refresh', route => route.fulfill({
+    json: envelope({ accessToken: 'e2e-token', username: 'verified-buyer', role: 'CUSTOMER' })
+  }));
 
   await page.route('**/api/v1/products/1', route => route.fulfill({
     json: envelope({

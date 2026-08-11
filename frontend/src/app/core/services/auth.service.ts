@@ -1,15 +1,14 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { EMPTY, Observable, tap } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { EMPTY, Observable, of, shareReplay, tap, throwError } from 'rxjs';
+import { catchError, finalize, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api-response.model';
 import { PromotionService } from './promotion.service';
 
 export interface AuthResponse {
   accessToken: string;
-  refreshToken: string;
   username: string;
   role: string;
 }
@@ -19,6 +18,11 @@ export class AuthService {
   private apiUrl = `${environment.apiUrl}/auth`;
   private journeyApiUrl = `${environment.apiUrl}/journey`;
   private sessionStorageKey = 'recently_viewed_session_id';
+  private sessionHintKey = 'marketplace_session_present';
+  private accessToken: string | null = null;
+  private username: string | null = null;
+  private role: string | null = null;
+  private refreshInFlight$: Observable<ApiResponse<AuthResponse>> | null = null;
 
   constructor(
     private http: HttpClient,
@@ -27,10 +31,12 @@ export class AuthService {
   ) {}
 
   login(credentials: { username: string; password: string }): Observable<ApiResponse<AuthResponse>> {
-    return this.http.post<ApiResponse<AuthResponse>>(`${this.apiUrl}/login`, credentials).pipe(
+    return this.http.post<ApiResponse<AuthResponse>>(
+      `${this.apiUrl}/login`, credentials, { withCredentials: true }
+    ).pipe(
       tap(res => {
         if (res.success && res.data) {
-          this.storeTokens(res.data);
+          this.storeSession(res.data);
           this.mergeAnonymousJourney();
         }
       })
@@ -38,39 +44,83 @@ export class AuthService {
   }
 
   register(data: { username: string; email: string; password: string; fullName: string }): Observable<ApiResponse<AuthResponse>> {
-    return this.http.post<ApiResponse<AuthResponse>>(`${this.apiUrl}/register`, data).pipe(
+    return this.http.post<ApiResponse<AuthResponse>>(
+      `${this.apiUrl}/register`, data, { withCredentials: true }
+    ).pipe(
       tap(res => {
         if (res.success && res.data) {
-          this.storeTokens(res.data);
+          this.storeSession(res.data);
           this.mergeAnonymousJourney();
         }
       })
     );
   }
 
-  refreshToken(token: string): Observable<ApiResponse<AuthResponse>> {
-    return this.http.post<ApiResponse<AuthResponse>>(`${this.apiUrl}/refresh`, { refreshToken: token }).pipe(
-      tap(res => {
-        if (res.success && res.data) {
-          this.storeTokens(res.data);
-        }
-      })
+  refreshSession(): Observable<ApiResponse<AuthResponse>> {
+    if (!this.refreshInFlight$) {
+      this.refreshInFlight$ = this.http.post<ApiResponse<AuthResponse>>(
+        `${this.apiUrl}/refresh`,
+        {},
+        { withCredentials: true }
+      ).pipe(
+        tap(res => {
+          if (res.success && res.data) {
+            this.storeSession(res.data);
+          }
+        }),
+        catchError(error => {
+          this.expireSession();
+          return throwError(() => error);
+        }),
+        finalize(() => {
+          this.refreshInFlight$ = null;
+        }),
+        shareReplay({ bufferSize: 1, refCount: false })
+      );
+    }
+    return this.refreshInFlight$;
+  }
+
+  restoreSession(): Observable<boolean> {
+    if (this.isAuthenticated()) {
+      return of(true);
+    }
+    return this.refreshSession().pipe(
+      map(res => !!(res.success && res.data?.accessToken)),
+      catchError(() => of(false))
     );
   }
 
-  logout(): void {
-    const refreshToken = localStorage.getItem('refresh_token');
-    this.clearSession();
-    if (refreshToken) {
-      this.http.post(`${this.apiUrl}/logout`, { refreshToken }).pipe(
-        catchError(() => EMPTY)
-      ).subscribe();
+  initializeSession(): Observable<boolean> {
+    this.clearLegacyAuthStorage();
+    if (this.isAuthenticated()) {
+      return of(true);
     }
+    if (localStorage.getItem(this.sessionHintKey) !== 'true') {
+      return of(false);
+    }
+    return this.restoreSession();
+  }
+
+  logout(): void {
+    this.clearSession();
+    this.http.post(`${this.apiUrl}/logout`, {}, { withCredentials: true }).pipe(
+      catchError(() => EMPTY)
+    ).subscribe();
     this.router.navigate(['/login']);
   }
 
   private clearSession(): void {
     this.promotionService.clearApplied();
+    this.accessToken = null;
+    this.username = null;
+    this.role = null;
+    localStorage.removeItem(this.sessionHintKey);
+    this.clearLegacyAuthStorage();
+  }
+
+  private clearLegacyAuthStorage(): void {
+    // Remove values written by older builds during the migration to memory-only auth state.
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('username');
@@ -78,26 +128,35 @@ export class AuthService {
   }
 
   getToken(): string | null {
-    return localStorage.getItem('access_token');
+    return this.accessToken;
   }
 
   getUsername(): string | null {
-    return localStorage.getItem('username');
+    return this.username;
   }
 
   getRole(): string | null {
-    return localStorage.getItem('role');
+    return this.role;
   }
 
   isAuthenticated(): boolean {
     return !!this.getToken();
   }
 
-  private storeTokens(auth: AuthResponse): void {
-    localStorage.setItem('access_token', auth.accessToken);
-    localStorage.setItem('refresh_token', auth.refreshToken);
-    localStorage.setItem('username', auth.username);
-    localStorage.setItem('role', auth.role);
+  private storeSession(auth: AuthResponse): void {
+    this.accessToken = auth.accessToken;
+    this.username = auth.username;
+    this.role = auth.role;
+    this.clearLegacyAuthStorage();
+    localStorage.setItem(this.sessionHintKey, 'true');
+  }
+
+  private expireSession(): void {
+    this.clearSession();
+    this.http.post(`${this.apiUrl}/logout`, {}, { withCredentials: true }).pipe(
+      catchError(() => EMPTY)
+    ).subscribe();
+    this.router.navigate(['/login']);
   }
 
   private mergeAnonymousJourney(): void {

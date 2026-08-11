@@ -70,13 +70,18 @@ test('recommendation click preserves attribution through product view and add-to
   const recommendationRequestId = '11111111-1111-4111-8111-111111111111';
 
   await page.addInitScript(() => {
-    localStorage.setItem('access_token', 'e2e-token');
-    localStorage.setItem('refresh_token', 'e2e-refresh');
-    localStorage.setItem('username', 'recommendation-customer');
-    localStorage.setItem('role', 'CUSTOMER');
+    localStorage.setItem('marketplace_session_present', 'true');
     localStorage.setItem('analytics_consent', 'true');
     localStorage.setItem('recently_viewed_session_id', 'recommendation-e2e-session');
   });
+
+  await page.route('**/api/v1/auth/refresh', route => route.fulfill({
+    json: envelope({
+      accessToken: 'e2e-token',
+      username: 'recommendation-customer',
+      role: 'CUSTOMER'
+    })
+  }));
 
   await page.route('**/*.{png,jpg,jpeg,webp}', route => route.fulfill({
     status: 200,
