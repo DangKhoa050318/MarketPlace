@@ -233,7 +233,8 @@ export class MovementFormComponent implements OnInit {
 
     const val = this.form.value;
     const type = val.type;
-    const itemsReq = (val.items || []).map((i: { variantId: number; quantity: number }) => ({
+    const items = (val.items as Array<{ variantId: number; quantity: number }>) || [];
+    const itemsReq = items.map((i) => ({
       variantId: Number(i.variantId),
       quantity: Number(i.quantity)
     }));
