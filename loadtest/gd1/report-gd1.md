@@ -164,9 +164,13 @@ ERRO[0120] thresholds on metrics 'http_req_duration, http_req_duration{scenario:
    - p95 Latency tổng thể tăng từ **1.32s lên 8.58s** (tăng **6.5 lần**). p50 Median tăng từ 133ms lên **5.62s** (tăng **42 lần**).
    - **Nguyên nhân:** Nghẽn ở HikariCP Database Connection Pool (tối đa 20 connections). 130 VUs còn lại phải đứng chờ trong `Connection Queue`, đẩy `http_req_waiting` trung bình từ 278ms lên **4.61s**.
 
-2. **Error Rate có > 0% không?**
-   - **Error Rate = 0.00%** (0 request rớt ở cả 2 mức tải 20 VU và 50 VU).
-   - Không xuất hiện lỗi `Connection Refused`, `Timeout (504)`, hay `5xx Server Error`. Hệ thống chấp nhận trả về chậm hơn chứ không làm sập ứng dụng.
+2. **Error Rate có > 0% không? Nếu có, lỗi gì (timeout, 5xx, connection refused)?**
+   - **Khi truyền Bypass Header (Load Test GĐ1):**
+     - Dẫn chứng từ Log: `✓ http_req_failed: 0.00% 0 out of 6698` (20 VUs) và `✓ http_req_failed: 0.00% 0 out of 1790` (50 VUs).
+     - **Kết luận:** **Error Rate = 0.00%** (không có bất kỳ lỗi Timeout, Connection Refused hay 5xx Server Error nào). Hệ thống chịu tải mượt mà về mặt toàn vẹn dữ liệu, chấp nhận trả về chậm hơn chứ không làm sập ứng dụng hay rớt kết nối.
+   - **Khi KHÔNG truyền Bypass Header (Test bảo mật Rate Limit):**
+     - Dẫn chứng từ Log (Mục 5 bên dưới): `✗ http_req_failed: 98.14% 10563 out of 10763`.
+     - **Phân tích loại lỗi:** Loại lỗi duy nhất xuất hiện là **`HTTP 429 Too Many Requests`**. Nguyên nhân do `RateLimitingFilter` chặn đứng 98.14% request vượt quá quota 100 req/phút từ 1 IP duy nhất.
 
 ---
 
