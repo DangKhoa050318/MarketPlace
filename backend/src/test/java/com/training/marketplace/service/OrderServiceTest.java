@@ -170,6 +170,44 @@ class OrderServiceTest {
     }
 
     @Test
+    @DisplayName("createOrder BNPL: rejects negative upfront amount")
+    void createOrder_bnpl_negativeUpfront_throwsException() {
+        CreateOrderRequest request = new CreateOrderRequest(
+                "123 Main St", null, null, PaymentMethod.PAYGATE_BNPL,
+                new BigDecimal("-1"), new BigDecimal("5000001"), 3);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(cartService.getCart(1L)).thenReturn(cartResponse);
+        when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
+        stubCurrentVariantPrice();
+
+        assertThatThrownBy(() -> orderService.createOrder(1L, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("cannot be negative");
+
+        verify(orderRepository, never()).save(any(Order.class));
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
+    @DisplayName("createOrder BNPL: rejects negative finance amount")
+    void createOrder_bnpl_negativeFinance_throwsException() {
+        CreateOrderRequest request = new CreateOrderRequest(
+                "123 Main St", null, null, PaymentMethod.PAYGATE_BNPL,
+                new BigDecimal("5000001"), new BigDecimal("-1"), 3);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(cartService.getCart(1L)).thenReturn(cartResponse);
+        when(inventoryFacade.defaultWarehouseId()).thenReturn(1L);
+        stubCurrentVariantPrice();
+
+        assertThatThrownBy(() -> orderService.createOrder(1L, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("cannot be negative");
+
+        verify(orderRepository, never()).save(any(Order.class));
+        verifyNoInteractions(paymentService);
+    }
+
+    @Test
     @DisplayName("createOrder: zero-total order auto CONFIRMED/PAID, fulfils stock, skips PayGate")
     void createOrder_zeroTotal_autoPaidAndFulfilled_skipsPaygate() {
         CreateOrderRequest request = new CreateOrderRequest(
