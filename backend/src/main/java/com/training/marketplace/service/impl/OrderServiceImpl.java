@@ -43,6 +43,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -79,9 +80,9 @@ public class OrderServiceImpl implements OrderService {
     private final RefundRequestRepository refundRequestRepository;
     private final OrderExpiryJob orderExpiryJob;
     private final ReturnRequestRepository returnRequestRepository;
+    private final TransactionTemplate transactionTemplate;
 
     @Override
-    @Transactional
     public OrderResponse createOrder(Long userId, CreateOrderRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
@@ -123,133 +124,123 @@ public class OrderServiceImpl implements OrderService {
                     "Giá đã thay đổi, vui lòng xem lại giỏ hàng: " + String.join(", ", priceChanges));
         }
 
-        // 3. Reserve stock (locks stock_levels rows, validates no oversell). Authoritative point.
-        inventoryFacade.reserve(warehouseId, quantityByVariant);
+        Order savedOrder = transactionTemplate.execute(status -> {
+            // 3. Reserve stock (locks stock_levels rows, validates no oversell). Authoritative point.
+            inventoryFacade.reserve(warehouseId, quantityByVariant);
 
-        // 4. Build order + items using the (now-validated) current DB prices.
-        BigDecimal calculatedTotal = BigDecimal.ZERO;
-        Order order = Order.builder()
-                .user(user)
-                .warehouseId(warehouseId)
-                .status(OrderStatus.PENDING)
-                .totalAmount(BigDecimal.ZERO)
-                .shippingAddress(request.shippingAddress())
-                .note(request.note())
-                .build();
+            // 4. Build order + items using the (now-validated) current DB prices.
+            BigDecimal calculatedTotal = BigDecimal.ZERO;
+            Order order = Order.builder()
+                    .user(user)
+                    .warehouseId(warehouseId)
+                    .status(OrderStatus.PENDING)
+                    .totalAmount(BigDecimal.ZERO)
+                    .shippingAddress(request.shippingAddress())
+                    .note(request.note())
+                    .build();
 
-        for (CartItemResponse item : cart.items()) {
-            ProductVariant variant = variantById.get(item.variantId());
-            BigDecimal unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
-            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(item.quantity()));
-            calculatedTotal = calculatedTotal.add(subtotal);
-            order.addItem(OrderItem.builder()
-                    .variantId(item.variantId())
-                    .productId(item.productId())
-                    .sku(item.sku())
-                    .productName(item.productName())
-                    .variantName(item.variantName())
-                    .unitPrice(unitPrice)
-                    .quantity(item.quantity())
-                    .subtotal(subtotal)
-                    .build());
-        }
-
-        // 3a. Charge 125,000 VND below the 3,750,000 VND free-shipping threshold.
-        BigDecimal shippingFee = calculatedTotal.compareTo(FREE_SHIPPING_THRESHOLD) >= 0
-                ? BigDecimal.ZERO
-                : STANDARD_SHIPPING_FEE;
-        order.setShippingFee(shippingFee);
-
-        // 3b. Apply coupon (optional). Locks the coupon row, validates against the cart, and
-        //     increments used_count inside this transaction (no oversell of usage_limit).
-        BigDecimal discount = BigDecimal.ZERO;
-        AppliedCoupon appliedCoupon = null;
-        if (StringUtils.hasText(request.couponCode())) {
-            appliedCoupon = promotionService.consume(request.couponCode(), userId, cart);
-            discount = appliedCoupon.discountAmount();
-            order.setPromotionCodeId(appliedCoupon.promotionCodeId());
-            order.setCouponCode(appliedCoupon.code());
-        }
-        order.setDiscountAmount(discount);
-
-        BigDecimal grandTotal = calculatedTotal.subtract(discount).add(shippingFee);
-        if (grandTotal.compareTo(BigDecimal.ZERO) < 0) {
-            grandTotal = BigDecimal.ZERO;
-        }
-        order.setTotalAmount(grandTotal);
-
-        PaymentMethod paymentMethod = request.paymentMethod() != null ? request.paymentMethod() : PaymentMethod.COD;
-        // Payment split (deposit due now / amount financed) is derived server-side from the
-        // authoritative grandTotal and is NEVER taken from the request: a tampered upfrontAmount could
-        // otherwise let a client pay a fraction of what they owe now, pushing the rest into "finance".
-        BigDecimal upfront;
-        BigDecimal finance;
-        if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
-            // BNPL: use request values if provided, otherwise default to 30% deposit due now.
-            upfront = request.upfrontAmount() != null ? request.upfrontAmount() : grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
-            finance = request.financeAmount() != null ? request.financeAmount() : grandTotal.subtract(upfront);
-            
-            // Ensure they sum up correctly
-            if (upfront.add(finance).compareTo(grandTotal) != 0) {
-                // If they don't sum up exactly, fallback to safe calculation or throw error.
-                // We'll throw an error to prevent mismatched totals.
-                throw new BadRequestException("Upfront amount and finance amount must exactly equal the total order amount");
+            for (CartItemResponse item : cart.items()) {
+                ProductVariant variant = variantById.get(item.variantId());
+                BigDecimal unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
+                BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(item.quantity()));
+                calculatedTotal = calculatedTotal.add(subtotal);
+                order.addItem(OrderItem.builder()
+                        .variantId(item.variantId())
+                        .productId(item.productId())
+                        .sku(item.sku())
+                        .productName(item.productName())
+                        .variantName(item.variantName())
+                        .unitPrice(unitPrice)
+                        .quantity(item.quantity())
+                        .subtotal(subtotal)
+                        .build());
             }
-        } else {
-            // COD / CREDIT_CARD / BANK_TRANSFER / WALLET: full amount due now, nothing financed.
-            upfront = grandTotal;
-            finance = BigDecimal.ZERO;
-        }
 
-        if (paymentMethod == PaymentMethod.WALLET) {
-            BigDecimal walletBalance = user.getWalletBalance() != null ? user.getWalletBalance() : BigDecimal.ZERO;
-            if (walletBalance.compareTo(grandTotal) < 0) {
-                throw new BadRequestException("Marketplace wallet balance is insufficient");
+            // 3a. Charge 125,000 VND below the 3,750,000 VND free-shipping threshold.
+            BigDecimal shippingFee = calculatedTotal.compareTo(FREE_SHIPPING_THRESHOLD) >= 0
+                    ? BigDecimal.ZERO
+                    : STANDARD_SHIPPING_FEE;
+            order.setShippingFee(shippingFee);
+
+            // 3b. Apply coupon (optional). Locks the coupon row, validates against the cart, and
+            //     increments used_count inside this transaction (no oversell of usage_limit).
+            BigDecimal discount = BigDecimal.ZERO;
+            AppliedCoupon appliedCoupon = null;
+            if (StringUtils.hasText(request.couponCode())) {
+                appliedCoupon = promotionService.consume(request.couponCode(), userId, cart);
+                discount = appliedCoupon.discountAmount();
+                order.setPromotionCodeId(appliedCoupon.promotionCodeId());
+                order.setCouponCode(appliedCoupon.code());
             }
-            user.setWalletBalance(walletBalance.subtract(grandTotal).setScale(2, java.math.RoundingMode.HALF_UP));
-            userRepository.save(user);
-        }
+            order.setDiscountAmount(discount);
 
-        order.setPaymentMethod(paymentMethod);
-        order.setUpfrontAmount(upfront != null ? upfront : grandTotal);
-        order.setFinanceAmount(finance != null ? finance : BigDecimal.ZERO);
+            BigDecimal grandTotal = calculatedTotal.subtract(discount).add(shippingFee);
+            if (grandTotal.compareTo(BigDecimal.ZERO) < 0) {
+                grandTotal = BigDecimal.ZERO;
+            }
+            order.setTotalAmount(grandTotal);
 
-        // A 0đ order (e.g. a full-value coupon) has nothing to charge, and PayGate cannot process a
-        // zero-amount checkout — settle it immediately like a successful prepaid payment.
-        boolean zeroTotal = grandTotal.compareTo(BigDecimal.ZERO) == 0;
-        if (zeroTotal || paymentMethod == PaymentMethod.WALLET) {
-            order.setStatus(OrderStatus.CONFIRMED);
-            order.setPaymentStatus(PaymentStatus.PAID);
-        } else if (paymentMethod == PaymentMethod.COD) {
-            order.setStatus(OrderStatus.CONFIRMED);
-            order.setPaymentStatus(PaymentStatus.UNPAID);
-        } else {
-            order.setStatus(OrderStatus.PENDING);
-            order.setPaymentStatus(PaymentStatus.PENDING_PAYGATE);
-        }
+            PaymentMethod paymentMethod = request.paymentMethod() != null ? request.paymentMethod() : PaymentMethod.COD;
+            BigDecimal upfront;
+            BigDecimal finance;
+            if (paymentMethod == PaymentMethod.PAYGATE_BNPL) {
+                upfront = request.upfrontAmount() != null ? request.upfrontAmount() : grandTotal.multiply(new BigDecimal("0.30")).setScale(2, java.math.RoundingMode.HALF_UP);
+                finance = request.financeAmount() != null ? request.financeAmount() : grandTotal.subtract(upfront);
+                if (upfront.add(finance).compareTo(grandTotal) != 0) {
+                    throw new BadRequestException("Upfront amount and finance amount must exactly equal the total order amount");
+                }
+            } else {
+                upfront = grandTotal;
+                finance = BigDecimal.ZERO;
+            }
 
-        Order savedOrder = orderRepository.save(order);
+            if (paymentMethod == PaymentMethod.WALLET) {
+                BigDecimal walletBalance = user.getWalletBalance() != null ? user.getWalletBalance() : BigDecimal.ZERO;
+                if (walletBalance.compareTo(grandTotal) < 0) {
+                    throw new BadRequestException("Marketplace wallet balance is insufficient");
+                }
+                user.setWalletBalance(walletBalance.subtract(grandTotal).setScale(2, java.math.RoundingMode.HALF_UP));
+                userRepository.save(user);
+            }
 
-        // 0đ order is settled on creation, so convert its reservation into an actual stock decrement now
-        // (no PayGate webhook will arrive to do it). Fulfil exactly once — the SHIPPED transition skips
-        // orders that are already PAID.
-        if ((zeroTotal || paymentMethod == PaymentMethod.WALLET) && warehouseId != null && !quantityByVariant.isEmpty()) {
-            inventoryFacade.fulfill(warehouseId, quantityByVariant);
-        }
+            order.setPaymentMethod(paymentMethod);
+            order.setUpfrontAmount(upfront != null ? upfront : grandTotal);
+            order.setFinanceAmount(finance != null ? finance : BigDecimal.ZERO);
 
-        // 3c. Record the redemption now the order id is known.
-        if (appliedCoupon != null) {
-            promotionService.recordRedemption(
-                    appliedCoupon.promotionCodeId(), userId, savedOrder.getId(), discount);
-        }
+            boolean zeroTotal = grandTotal.compareTo(BigDecimal.ZERO) == 0;
+            if (zeroTotal || paymentMethod == PaymentMethod.WALLET) {
+                order.setStatus(OrderStatus.CONFIRMED);
+                order.setPaymentStatus(PaymentStatus.PAID);
+            } else if (paymentMethod == PaymentMethod.COD) {
+                order.setStatus(OrderStatus.CONFIRMED);
+                order.setPaymentStatus(PaymentStatus.UNPAID);
+            } else {
+                order.setStatus(OrderStatus.PENDING);
+                order.setPaymentStatus(PaymentStatus.PENDING_PAYGATE);
+            }
 
-        // 3d. Best-effort last-click merchandising attribution (B-408). Runs in its own transaction
-        //     (REQUIRES_NEW) and must never break order creation, so failures are swallowed.
-        try {
-            merchandisingEventService.attributeOrder(savedOrder.getId(), userId, savedOrder.getCreatedAt());
-        } catch (Exception ex) {
-            log.warn("Merchandising attribution skipped for order {}: {}", savedOrder.getId(), ex.getMessage());
-        }
+            Order saved = orderRepository.save(order);
+
+            if ((zeroTotal || paymentMethod == PaymentMethod.WALLET) && warehouseId != null && !quantityByVariant.isEmpty()) {
+                inventoryFacade.fulfill(warehouseId, quantityByVariant);
+            }
+
+            if (appliedCoupon != null) {
+                promotionService.recordRedemption(
+                        appliedCoupon.promotionCodeId(), userId, saved.getId(), discount);
+            }
+
+            try {
+                merchandisingEventService.attributeOrder(saved.getId(), userId, saved.getCreatedAt());
+            } catch (Exception ex) {
+                log.warn("Merchandising attribution skipped for order {}: {}", saved.getId(), ex.getMessage());
+            }
+
+            return saved;
+        });
+
+        BigDecimal grandTotalFinal = savedOrder.getTotalAmount();
+        PaymentMethod paymentMethodFinal = savedOrder.getPaymentMethod();
 
         // Cart will be cleared after successful PayGate session creation or at the end for COD/Wallet
         // 5. Publish OrderCreatedEvent (payment → notification; and downstream export bridge).
@@ -270,10 +261,10 @@ public class OrderServiceImpl implements OrderService {
                 eventItems));
 
         log.info("Order created: orderId={}, userId={}, paymentMethod={}, status={}, total={}",
-                savedOrder.getId(), userId, paymentMethod, savedOrder.getStatus(), grandTotal);
+                savedOrder.getId(), userId, paymentMethodFinal, savedOrder.getStatus(), grandTotalFinal);
 
         OrderResponse baseResponse = orderMapper.toResponse(savedOrder);
-        PaygatePayloadResponse paygatePayload = paymentService.createPaymentSession(savedOrder, paymentMethod);
+        PaygatePayloadResponse paygatePayload = paymentService.createPaymentSession(savedOrder, paymentMethodFinal);
 
         // 4. Clear cart only after successful order placement and external API calls
         cartService.clearCart(userId);
