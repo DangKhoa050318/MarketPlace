@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,6 +35,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "List all users with pagination and filters")
     public ApiResponse<PageResponse<UserResponse>> getAll(
             @RequestParam(required = false) String search,
@@ -49,18 +51,21 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get user by ID")
     public ApiResponse<UserResponse> getById(@PathVariable Long id) {
         return ApiResponse.success(userService.getById(id));
     }
 
     @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get current authenticated user profile")
     public ApiResponse<UserResponse> getMe(Authentication authentication) {
         return ApiResponse.success(userService.getMe(authentication));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a new user")
     public ApiResponse<UserResponse> create(@Valid @RequestBody CreateUserRequest request) {
@@ -68,6 +73,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update an existing user")
     public ApiResponse<UserResponse> update(
             @PathVariable Long id,
@@ -76,6 +82,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Delete a user")
     public void delete(@PathVariable Long id) {

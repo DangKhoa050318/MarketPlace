@@ -2,16 +2,17 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
-export const adminGuard: CanActivateFn = () => {
+const backOfficeRoles = ['ADMIN', 'MANAGER', 'STAFF'];
+
+export const adminGuard: CanActivateFn = (route) => {
   const router = inject(Router);
   const authService = inject(AuthService);
   const role = authService.getRole();
+  const allowedRoles = (route.data?.['roles'] as string[] | undefined) ?? backOfficeRoles;
 
-  // Allow back-office management roles (ADMIN, MANAGER, STAFF)
-  if (authService.isAuthenticated() && (role === 'ADMIN' || role === 'MANAGER' || role === 'STAFF')) {
+  if (authService.isAuthenticated() && role && allowedRoles.includes(role)) {
     return true;
   }
 
-  router.navigate(['/products']);
-  return false;
+  return router.createUrlTree(['/products']);
 };

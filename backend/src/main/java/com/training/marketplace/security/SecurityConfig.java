@@ -80,6 +80,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/products/**").hasRole("ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/categories/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/categories/**").hasAnyRole("MANAGER", "ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/categories/**").hasRole("ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/variants/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/variants/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/variants/**").hasRole("ADMIN")

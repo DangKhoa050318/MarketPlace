@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,6 +38,7 @@ public class ProductVariantController {
     }
 
     @PostMapping("/products/{productId}/variants")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a variant under a product (MANAGER/ADMIN)")
     public ApiResponse<ProductVariantResponse> create(
@@ -52,6 +54,7 @@ public class ProductVariantController {
     }
 
     @PutMapping("/variants/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Operation(summary = "Update a variant (MANAGER/ADMIN)")
     public ApiResponse<ProductVariantResponse> update(
             @PathVariable Long id,
@@ -60,6 +63,7 @@ public class ProductVariantController {
     }
 
     @DeleteMapping("/variants/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Soft delete a variant (ADMIN)")
     public void delete(@PathVariable Long id) {

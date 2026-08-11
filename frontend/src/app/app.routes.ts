@@ -55,125 +55,155 @@ export const routes: Routes = [
     path: '',
     loadComponent: () => import('./layout/admin-layout/admin-layout.component').then(m => m.AdminLayoutComponent),
     canActivate: [authGuard, adminGuard],
+    canActivateChild: [adminGuard],
     children: [
       { path: 'admin', redirectTo: 'admin/dashboard', pathMatch: 'full' },
       {
         path: 'admin/dashboard',
         canActivate: [analyticsGuard],
+        data: { roles: ['ADMIN', 'MANAGER'] },
         loadComponent: () => import('./features/dashboard/admin-dashboard.component').then(m => m.DashboardComponent)
       },
       {
         path: 'admin/products',
+        data: { roles: ['ADMIN', 'MANAGER'] },
         loadComponent: () => import('./features/admin/products/admin-product-list/admin-product-list.component').then(m => m.AdminProductListComponent)
       },
       {
         path: 'admin/products/new',
+        data: { roles: ['ADMIN', 'MANAGER'] },
         loadComponent: () => import('./features/products/product-form/product-form.component').then(m => m.ProductFormComponent)
       },
       {
         path: 'admin/products/:id/edit',
+        data: { roles: ['ADMIN', 'MANAGER'] },
         loadComponent: () => import('./features/products/product-form/product-form.component').then(m => m.ProductFormComponent)
       },
       {
         path: 'admin/orders',
+        data: { roles: ['ADMIN', 'MANAGER', 'STAFF'] },
         loadComponent: () => import('./features/admin/orders/admin-order-list/admin-order-list.component').then(m => m.AdminOrderListComponent)
       },
       {
         path: 'admin/coupons',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/promotions/promotion-list/promotion-list.component').then(m => m.PromotionListComponent)
       },
       {
         path: 'admin/coupons/new',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/promotions/promotion-form/promotion-form.component').then(m => m.PromotionFormComponent)
       },
       {
         path: 'admin/coupons/:id/edit',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/promotions/promotion-form/promotion-form.component').then(m => m.PromotionFormComponent)
       },
       {
         path: 'admin/campaigns',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/merchandising/campaign-list/campaign-list.component').then(m => m.CampaignListComponent)
       },
       {
         path: 'admin/campaigns/new',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/merchandising/campaign-form/campaign-form.component').then(m => m.CampaignFormComponent)
       },
       {
         path: 'admin/campaigns/:id/edit',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/merchandising/campaign-form/campaign-form.component').then(m => m.CampaignFormComponent)
       },
       {
         path: 'admin/collections',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/merchandising/collection-list/collection-list.component').then(m => m.CollectionListComponent)
       },
       {
         path: 'admin/collections/new',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/merchandising/collection-form/collection-form.component').then(m => m.CollectionFormComponent)
       },
       {
         path: 'admin/collections/:id/edit',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/merchandising/collection-form/collection-form.component').then(m => m.CollectionFormComponent)
       },
       {
         path: 'admin/banners',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/merchandising/banner-list/banner-list.component').then(m => m.BannerListComponent)
       },
       {
         path: 'admin/banners/new',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/merchandising/banner-form/banner-form.component').then(m => m.BannerFormComponent)
       },
       {
         path: 'admin/banners/:id/edit',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/merchandising/banner-form/banner-form.component').then(m => m.BannerFormComponent)
       },
       {
         path: 'admin/merchandising/effectiveness',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/admin/merchandising/effectiveness/merchandising-effectiveness.component').then(m => m.MerchandisingEffectivenessComponent)
       },
       {
         path: 'admin/users',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/users/user-list/user-list.component').then(m => m.UserListComponent)
       },
       {
         path: 'admin/users/new',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/users/user-form/user-form.component').then(m => m.UserFormComponent)
       },
       {
         path: 'admin/users/:id/edit',
+        data: { roles: ['ADMIN'] },
         loadComponent: () => import('./features/users/user-form/user-form.component').then(m => m.UserFormComponent)
       },
       {
         path: 'admin/moderation',
+        data: { roles: ['ADMIN', 'MANAGER', 'STAFF'] },
         loadComponent: () => import('./features/admin/moderation/moderation-queue/moderation-queue.component').then(m => m.ModerationQueueComponent)
       },
       {
         path: 'admin/reviews',
+        data: { roles: ['ADMIN', 'MANAGER'] },
         loadComponent: () => import('./features/admin/reviews/admin-review-list/admin-review-list.component').then(m => m.AdminReviewListComponent)
       },
 
       // Stock & Warehouse Features (Merged from StockPulse)
       {
         path: 'warehouses',
+        data: { roles: ['ADMIN', 'MANAGER', 'STAFF'] },
         loadComponent: () => import('./features/warehouses/warehouse-list/warehouse-list.component').then(m => m.WarehouseListComponent)
       },
       {
         path: 'warehouses/create',
+        data: { roles: ['ADMIN', 'MANAGER', 'STAFF'] },
         loadComponent: () => import('./features/warehouses/warehouse-form/warehouse-form.component').then(m => m.WarehouseFormComponent)
       },
       {
         path: 'warehouses/:id/edit',
+        data: { roles: ['ADMIN', 'MANAGER', 'STAFF'] },
         loadComponent: () => import('./features/warehouses/warehouse-form/warehouse-form.component').then(m => m.WarehouseFormComponent)
       },
       {
         path: 'stock',
+        data: { roles: ['ADMIN', 'MANAGER', 'STAFF'] },
         loadComponent: () => import('./features/stock/stock-list/stock-list.component').then(m => m.StockListComponent)
       },
       {
         path: 'stock/movements',
+        data: { roles: ['ADMIN', 'MANAGER', 'STAFF'] },
         loadComponent: () => import('./features/stock/movement-list/movement-list.component').then(m => m.MovementListComponent)
       },
       {
         path: 'stock/movements/new',
+        data: { roles: ['ADMIN', 'MANAGER', 'STAFF'] },
         loadComponent: () => import('./features/stock/movement-form/movement-form.component').then(m => m.MovementFormComponent)
       }
     ]

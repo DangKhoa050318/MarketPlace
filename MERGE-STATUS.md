@@ -541,3 +541,16 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
 - ✅ Local demo giữ `AUTH_REFRESH_COOKIE_SECURE=false`; production HTTPS phải bật `true`.
 - ✅ Verify: backend unit **387/387 PASS**; Angular unit **79/79 PASS**; Angular production build
   **SUCCESS** (giữ nguyên 2 CSS budget warnings và 1 CommonJS warning có sẵn).
+
+### MP-H4 back-office authorization hardening — 2026-08-11
+
+- ✅ Đóng lỗ hổng `DELETE /api/v1/categories/{id}` từng rơi xuống `authenticated()` và cho phép mọi
+  tài khoản đăng nhập đi tới thao tác xóa; hiện chỉ `ADMIN` được phép ở cả request matcher và method level.
+- ✅ Bổ sung `@PreAuthorize` defense-in-depth cho catalog/user mutation và các controller Campaign,
+  Collection, Banner, Merchandising; backend tiếp tục là security boundary độc lập với Angular guard.
+- ✅ Angular admin routes khai báo role contract theo từng màn hình và `canActivateChild` thực thi contract;
+  STAFF/MANAGER không còn điều hướng vào màn hình mà API tương ứng chỉ dành cho ADMIN.
+- ✅ Regression matrix kiểm tra anonymous **401**, sai role **403**, đúng role **2xx** và không gọi service
+  khi bị từ chối.
+- ✅ Verify: backend unit **405/405 PASS**; Angular unit **84/84 PASS**; Angular production build
+  **SUCCESS** (giữ nguyên 2 CSS budget warnings và 1 CommonJS warning có sẵn).
