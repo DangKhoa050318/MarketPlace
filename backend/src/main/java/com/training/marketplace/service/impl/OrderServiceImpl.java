@@ -124,6 +124,9 @@ public class OrderServiceImpl implements OrderService {
                     "Giá đã thay đổi, vui lòng xem lại giỏ hàng: " + String.join(", ", priceChanges));
         }
 
+        // DB work runs in a bounded TransactionTemplate so the HikariCP connection (and its row locks)
+        // is released as soon as the order is persisted. The PayGate HTTP call and the RabbitMQ publish
+        // below must NOT hold a DB connection open — that was the GĐ2 HikariCP-exhaustion root cause.
         Order savedOrder = transactionTemplate.execute(status -> {
             // 3. Reserve stock (locks stock_levels rows, validates no oversell). Authoritative point.
             inventoryFacade.reserve(warehouseId, quantityByVariant);
@@ -242,7 +245,6 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal grandTotalFinal = savedOrder.getTotalAmount();
         PaymentMethod paymentMethodFinal = savedOrder.getPaymentMethod();
 
-        // Cart will be cleared after successful PayGate session creation or at the end for COD/Wallet
         // 5. Publish OrderCreatedEvent (payment → notification; and downstream export bridge).
         List<OrderCreatedEvent.OrderItemInfo> eventItems = savedOrder.getItems().stream()
                 .map(i -> new OrderCreatedEvent.OrderItemInfo(
@@ -587,6 +589,7 @@ public class OrderServiceImpl implements OrderService {
         }
         return quantityByVariant;
     }
+
 
     public void validateStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {
         if (currentStatus == newStatus) {

@@ -50,8 +50,8 @@ import { Warehouse } from '../../../core/models/warehouse.model';
       <!-- Warehouse Filter Bar -->
       <div class="filter-bar surface-card">
         <div class="filter-item">
-          <label class="filter-label">Filter by Warehouse:</label>
-          <select class="custom-select" [(ngModel)]="selectedWarehouseId" (change)="onFilterChange()">
+          <label class="filter-label" for="stock-warehouse-select">Filter by Warehouse:</label>
+          <select id="stock-warehouse-select" class="custom-select" [(ngModel)]="selectedWarehouseId" (change)="onFilterChange()">
             <option [value]="null">All Warehouses</option>
             <option *ngFor="let w of warehouses" [value]="w.id">{{ w.name }} ({{ w.code }})</option>
           </select>
@@ -280,7 +280,7 @@ export class StockListComponent implements OnInit {
 
   loadWarehouses(): void {
     this.warehouseService.getWarehouses().subscribe({
-      next: (res: any) => {
+      next: (res) => {
         if (res.success && res.data) {
           this.warehouses = Array.isArray(res.data) ? res.data : (res.data.content || []);
         }

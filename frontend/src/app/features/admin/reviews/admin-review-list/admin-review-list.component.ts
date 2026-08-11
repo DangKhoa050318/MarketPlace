@@ -148,8 +148,8 @@ import { AdminOrderService } from '../../../../core/services/admin-order.service
         </div>
       </div>
       <!-- Review detail modal -->
-      <div *ngIf="detailReview" class="rv-modal-backdrop" (click)="closeDetail()">
-        <div class="rv-modal surface-card" (click)="$event.stopPropagation()">
+      <div *ngIf="detailReview" class="rv-modal-backdrop" tabindex="0" (click)="closeDetail()" (keydown.escape)="closeDetail()">
+        <div class="rv-modal surface-card" tabindex="0" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
           <div class="rv-modal-head">
             <h3><mat-icon>rate_review</mat-icon> Review detail</h3>
             <button mat-icon-button (click)="closeDetail()" aria-label="Close"><mat-icon>close</mat-icon></button>

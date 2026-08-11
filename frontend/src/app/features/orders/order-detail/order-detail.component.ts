@@ -657,7 +657,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   returnEvidenceImageUrls: string[] = [];
   uploadingReturnEvidence = false;
   displayedColumns = ['productName', 'variantInfo', 'unitPrice', 'quantity', 'subtotal'];
-  private pollingTimer: any = null;
+  private pollingTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private route: ActivatedRoute,

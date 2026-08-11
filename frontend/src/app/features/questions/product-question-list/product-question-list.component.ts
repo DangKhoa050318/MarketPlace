@@ -319,7 +319,7 @@ export class ProductQuestionListComponent implements OnInit {
     });
   }
 
-  vote(targetId: number, targetType: ContentType, item: any): void {
+  vote(targetId: number, targetType: ContentType, item: { isVotedByCurrentUser?: boolean; helpfulCount?: number; upvoteCount?: number; userUpvoted?: boolean }): void {
     if (!this.authService.isAuthenticated()) {
       this.notificationService.info('Vui lòng đăng nhập để bình chọn');
       return;

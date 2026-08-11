@@ -613,7 +613,7 @@ export class VietQrDialogComponent implements OnInit, OnDestroy {
   copyNotice: string | null = null;
 
   timerSeconds = 900; // 15 minutes (900 seconds)
-  timerInterval: any = null;
+  timerInterval: ReturnType<typeof setInterval> | null = null;
 
   get bankNameDisplay(): string {
     if (this.data.bankName) {

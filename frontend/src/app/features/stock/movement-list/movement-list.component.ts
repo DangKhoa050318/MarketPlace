@@ -43,16 +43,16 @@ import { Warehouse } from '../../../core/models/warehouse.model';
       <!-- Filter Controls -->
       <div class="filter-bar surface-card">
         <div class="filter-group">
-          <label>Warehouse:</label>
-          <select class="custom-select" [(ngModel)]="selectedWarehouseId" (change)="loadMovements()">
+          <label for="warehouse-select">Warehouse:</label>
+          <select id="warehouse-select" class="custom-select" [(ngModel)]="selectedWarehouseId" (change)="loadMovements()">
             <option [value]="null">All Warehouses</option>
             <option *ngFor="let w of warehouses" [value]="w.id">{{ w.name }}</option>
           </select>
         </div>
 
         <div class="filter-group">
-          <label>Type:</label>
-          <select class="custom-select" [(ngModel)]="selectedType" (change)="loadMovements()">
+          <label for="type-select">Type:</label>
+          <select id="type-select" class="custom-select" [(ngModel)]="selectedType" (change)="loadMovements()">
             <option value="">All Types</option>
             <option value="IMPORT">IMPORT</option>
             <option value="EXPORT">EXPORT</option>
@@ -187,7 +187,7 @@ export class MovementListComponent implements OnInit {
 
   loadWarehouses(): void {
     this.warehouseService.getWarehouses().subscribe({
-      next: (res: any) => {
+      next: (res) => {
         if (res.success && res.data) {
           this.warehouses = Array.isArray(res.data) ? res.data : (res.data.content || []);
         }

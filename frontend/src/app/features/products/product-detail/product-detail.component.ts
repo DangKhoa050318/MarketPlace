@@ -89,7 +89,7 @@ import { ProductQuestionListComponent } from '../../questions/product-question-l
             <div class="subtle-loading"><mat-spinner diameter="20"></mat-spinner> <span>Đang tải các lựa chọn mẫu mã...</span></div>
           } @else if (variants.length > 0) {
             <div class="variant-section">
-              <label class="field-label">Lựa chọn mẫu mã:</label>
+              <span class="field-label">Lựa chọn mẫu mã:</span>
               <div class="variant-chips">
                 @for (v of variants; track v.id) {
                   <button type="button" class="variant-chip"

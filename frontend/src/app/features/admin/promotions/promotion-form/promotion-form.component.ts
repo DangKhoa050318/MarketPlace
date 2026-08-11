@@ -79,7 +79,7 @@ import {
           <mat-form-field appearance="outline" class="span-2" *ngIf="form.get('scopeType')?.value === 'CATEGORY'">
             <mat-label>Categories ({{ form.get('scopeIds')?.value?.length || 0 }} selected)</mat-label>
             <mat-select formControlName="scopeIds" multiple panelClass="scope-select-panel" (openedChange)="scopeSearch = ''">
-              <div class="scope-search" (click)="$event.stopPropagation()">
+              <div class="scope-search" tabindex="0" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
                 <mat-icon>search</mat-icon>
                 <input type="text" [(ngModel)]="scopeSearch" [ngModelOptions]="{ standalone: true }"
                        placeholder="Search categories..." (keydown)="$event.stopPropagation()" />
@@ -92,7 +92,7 @@ import {
           <mat-form-field appearance="outline" class="span-2" *ngIf="form.get('scopeType')?.value === 'PRODUCT'">
             <mat-label>Products ({{ form.get('scopeIds')?.value?.length || 0 }} selected)</mat-label>
             <mat-select formControlName="scopeIds" multiple panelClass="scope-select-panel" (openedChange)="scopeSearch = ''">
-              <div class="scope-search" (click)="$event.stopPropagation()">
+              <div class="scope-search" tabindex="0" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
                 <mat-icon>search</mat-icon>
                 <input type="text" [(ngModel)]="scopeSearch" [ngModelOptions]="{ standalone: true }"
                        placeholder="Search products..." (keydown)="$event.stopPropagation()" />
@@ -259,7 +259,7 @@ export class PromotionFormComponent implements OnInit {
       return;
     }
 
-    const num = (x: any) => (x === null || x === '' || x === undefined ? null : Number(x));
+    const num = (x: unknown) => (x === null || x === '' || x === undefined ? null : Number(x));
     const base = {
       discountType: v.discountType,
       discountValue: Number(v.discountValue),
