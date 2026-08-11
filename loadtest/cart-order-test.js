@@ -43,10 +43,9 @@ export function setup() {
   const baseUrl = __ENV.BASE_URL || 'http://localhost:8080';
   const users = [];
 
-  // Login cho 5 user khác nhau để test (Limit 5 req/min theo RateLimitingFilter)
-  // Không dùng X-Forwarded-For spoofing vì đó là anti-pattern che giấu lỗ hổng security
+  // Login cho 10 user khác nhau cho GĐ2 (demo_customer_01 đến demo_customer_10)
   const testPassword = __ENV.TEST_PASSWORD || 'admin123';
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= 10; i++) {
     const userStr = i < 10 ? `0${i}` : `${i}`;
     const username = `demo_customer_${userStr}`;
     const loginPayload = JSON.stringify({
