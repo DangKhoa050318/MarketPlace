@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -123,14 +124,16 @@ public class ProductController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a new product (ADMIN only)")
+    @Operation(summary = "Create a new product (MANAGER/ADMIN)")
     public ApiResponse<ProductResponse> create(@Valid @RequestBody CreateProductRequest request) {
         return ApiResponse.success("Product created", productService.create(request));
     }
 
     @PutMapping("/{id:[0-9]+}")
-    @Operation(summary = "Update an existing product (ADMIN only)")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @Operation(summary = "Update an existing product (MANAGER/ADMIN)")
     public ApiResponse<ProductResponse> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateProductRequest request) {
@@ -138,6 +141,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id:[0-9]+}")
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Soft delete a product (ADMIN only)")
     public void delete(@PathVariable Long id) {

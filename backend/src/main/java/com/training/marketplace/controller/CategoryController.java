@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,14 +44,16 @@ public class CategoryController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a new category (ADMIN only)")
+    @Operation(summary = "Create a new category (MANAGER/ADMIN)")
     public ApiResponse<CategoryResponse> create(@Valid @RequestBody CreateCategoryRequest request) {
         return ApiResponse.success("Category created", categoryService.create(request));
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update an existing category (ADMIN only)")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @Operation(summary = "Update an existing category (MANAGER/ADMIN)")
     public ApiResponse<CategoryResponse> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateCategoryRequest request) {
@@ -58,6 +61,7 @@ public class CategoryController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Delete a category (ADMIN only)")
     public void delete(@PathVariable Long id) {
