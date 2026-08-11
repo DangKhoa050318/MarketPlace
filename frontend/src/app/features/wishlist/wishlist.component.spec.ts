@@ -63,7 +63,7 @@ describe('WishlistComponent', () => {
   });
 
   it('moves a wishlist item to cart and removes it from wishlist', () => {
-    cartService.addToCart.and.returnValue(of({ success: true, message: '', timestamp: '', data: {} as any }));
+    cartService.addToCart.and.returnValue(of({ success: true, message: '', timestamp: '', data: {} as never }));
     wishlistService.remove.and.returnValue(of(undefined));
 
     component.moveToCart(item);

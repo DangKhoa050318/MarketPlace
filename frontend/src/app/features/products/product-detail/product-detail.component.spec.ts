@@ -31,17 +31,17 @@ describe('ProductDetailComponent', () => {
       contextFor: jasmine.createSpy('contextFor')
     };
     const component = new ProductDetailComponent(
-      { paramMap: routeParams.asObservable() } as any,
-      {} as any,
-      productService as any,
-      reviewService as any,
-      { isAuthenticated: () => false } as any,
-      {} as any,
-      {} as any,
-      analyticsService as any,
-      attributionService as any,
-      { record: () => of({}) } as any,
-      { status: () => of({ data: { wishlisted: false } }) } as any
+      { paramMap: routeParams.asObservable() } as never,
+      {} as never,
+      productService as never,
+      reviewService as never,
+      { isAuthenticated: () => false } as never,
+      {} as never,
+      {} as never,
+      analyticsService as never,
+      attributionService as never,
+      { record: () => of({}) } as never,
+      { status: () => of({ data: { wishlisted: false } }) } as never
     );
 
     component.ngOnInit();

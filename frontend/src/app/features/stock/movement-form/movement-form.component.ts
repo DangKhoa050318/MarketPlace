@@ -191,7 +191,7 @@ export class MovementFormComponent implements OnInit {
 
   loadWarehouses(): void {
     this.warehouseService.getWarehouses().subscribe({
-      next: (res: any) => {
+      next: (res) => {
         if (res.success && res.data) {
           this.warehouses = Array.isArray(res.data) ? res.data : (res.data.content || []);
         }
@@ -233,7 +233,7 @@ export class MovementFormComponent implements OnInit {
 
     const val = this.form.value;
     const type = val.type;
-    const itemsReq = (val.items || []).map((i: any) => ({
+    const itemsReq = (val.items || []).map((i: { variantId: number; quantity: number }) => ({
       variantId: Number(i.variantId),
       quantity: Number(i.quantity)
     }));

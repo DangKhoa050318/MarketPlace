@@ -69,8 +69,10 @@ export interface CheckoutDialogData {
             <!-- Option 1: COD -->
             <div
               class="payment-card"
+              tabindex="0"
               [class.active]="selectedMethod === 'COD'"
-              (click)="selectMethod('COD')">
+              (click)="selectMethod('COD')"
+              (keydown.enter)="selectMethod('COD')">
               <div class="radio-indicator"></div>
               <mat-icon class="method-icon cod-icon">local_post_office</mat-icon>
               <div class="method-details">
@@ -83,8 +85,10 @@ export interface CheckoutDialogData {
             <!-- Option 2: PayGate E-Wallet / Card Gateway -->
             <div
               class="payment-card"
+              tabindex="0"
               [class.active]="selectedMethod === 'CREDIT_CARD'"
-              (click)="selectMethod('CREDIT_CARD')">
+              (click)="selectMethod('CREDIT_CARD')"
+              (keydown.enter)="selectMethod('CREDIT_CARD')">
               <div class="radio-indicator"></div>
               <mat-icon class="method-icon card-icon">account_balance_wallet</mat-icon>
               <div class="method-details">
@@ -96,8 +100,10 @@ export interface CheckoutDialogData {
             <!-- Option 3: Marketplace Wallet -->
             <div
               class="payment-card"
+              tabindex="0"
               [class.active]="selectedMethod === 'WALLET'"
-              (click)="selectMethod('WALLET')">
+              (click)="selectMethod('WALLET')"
+              (keydown.enter)="selectMethod('WALLET')">
               <div class="radio-indicator"></div>
               <mat-icon class="method-icon wallet-icon">account_balance_wallet</mat-icon>
               <div class="method-details">
@@ -110,8 +116,10 @@ export interface CheckoutDialogData {
             <!-- Option 4: BNPL (Buy Now Pay Later) -->
             <div
               class="payment-card"
+              tabindex="0"
               [class.active]="selectedMethod === 'PAYGATE_BNPL'"
-              (click)="selectMethod('PAYGATE_BNPL')">
+              (click)="selectMethod('PAYGATE_BNPL')"
+              (keydown.enter)="selectMethod('PAYGATE_BNPL')">
               <div class="radio-indicator"></div>
               <mat-icon class="method-icon bnpl-icon">event_repeat</mat-icon>
               <div class="method-details">
@@ -124,8 +132,10 @@ export interface CheckoutDialogData {
             <!-- Option 5: Bank Transfer / QR VietQR -->
             <div
               class="payment-card"
+              tabindex="0"
               [class.active]="selectedMethod === 'BANK_TRANSFER'"
-              (click)="selectMethod('BANK_TRANSFER')">
+              (click)="selectMethod('BANK_TRANSFER')"
+              (keydown.enter)="selectMethod('BANK_TRANSFER')">
               <div class="radio-indicator"></div>
               <mat-icon class="method-icon bank-icon">qr_code_2</mat-icon>
               <div class="method-details">

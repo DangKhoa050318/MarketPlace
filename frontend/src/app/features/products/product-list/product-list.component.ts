@@ -681,7 +681,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
   ];
 
   currentSlide = 0;
-  private carouselInterval: any;
+  private carouselInterval: ReturnType<typeof setInterval> | undefined;
 
   products: StorefrontProduct[] = [];
   selectedVariantMap: { [productId: number]: StorefrontVariantItem } = {};

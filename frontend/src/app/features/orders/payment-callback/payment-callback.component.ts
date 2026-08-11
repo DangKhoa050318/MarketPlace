@@ -233,7 +233,7 @@ export class PaymentCallbackComponent implements OnInit {
     private orderService: OrderService
   ) {}
 
-  private getFirstString(val: any): string | null {
+  private getFirstString(val: unknown): string | null {
     if (!val) return null;
     if (Array.isArray(val)) {
       return val.length > 0 ? String(val[0]) : null;
@@ -313,7 +313,7 @@ export class PaymentCallbackComponent implements OnInit {
     });
   }
 
-  cleanOrderId(rawId: any): string {
+  cleanOrderId(rawId: unknown): string {
     const str = this.getFirstString(rawId);
     if (!str) return '';
     return str.replace(/^ORD-/, '');

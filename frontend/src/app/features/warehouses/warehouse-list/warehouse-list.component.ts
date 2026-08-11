@@ -146,7 +146,7 @@ export class WarehouseListComponent implements OnInit {
   loadWarehouses(): void {
     this.loading = true;
     this.warehouseService.getWarehouses().subscribe({
-      next: (res: any) => {
+      next: (res) => {
         this.loading = false;
         if (res.success && res.data) {
           this.warehouses = Array.isArray(res.data) ? res.data : (res.data.content || []);
