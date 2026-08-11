@@ -1,12 +1,9 @@
 import { Component, Inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule, CurrencyPipe } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { catchError, finalize, of } from 'rxjs';
 import { VietQrService } from '../../../core/services/vietqr.service';
-import { environment } from '../../../../environments/environment';
 
 export interface VietQrDialogData {
   orderId: string | number;
@@ -635,11 +632,8 @@ export class VietQrDialogComponent implements OnInit, OnDestroy {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
-  submittingPaid = false;
-
   constructor(
     private vietQrService: VietQrService,
-    private http: HttpClient,
     public dialogRef: MatDialogRef<VietQrDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: VietQrDialogData
   ) {}
@@ -784,43 +778,5 @@ export class VietQrDialogComponent implements OnInit, OnDestroy {
 
   onConfirmPaid(): void {
     this.dialogRef.close(true);
-  }
-
-  simulateBankTransfer(): void {
-    if (this.submittingPaid) return;
-    this.submittingPaid = true;
-    const rawId = String(this.data.orderId || '').replace(/^ORD-/, '');
-    const cleanOrderId = 'ORD-' + rawId;
-    const payload = {
-      bankRef: 'TXN_BANK_' + Date.now(),
-      amount: this.amountVnd,
-      transferContent: 'PAYGATE ' + cleanOrderId
-    };
-
-    // Dev-mode HMAC signature (matches paygate.bank-webhook.hmac-secret default)
-    const devSecret = 'dev-bank-webhook-secret-key-change-in-production';
-    const bodyStr = JSON.stringify(payload);
-    this.computeHmacSha256(bodyStr, devSecret).then(signature => {
-      const headers = { 'X-Bank-Signature': signature };
-      this.http.post(`${environment.paygateApiUrl}/api/v1/integration/bank-webhook`, payload, { headers }).pipe(
-        catchError(err => {
-          console.warn('Bank webhook simulation notification:', err);
-          return of(null);
-        }),
-        finalize(() => {
-          this.submittingPaid = false;
-          this.dialogRef.close(true);
-        })
-      ).subscribe();
-    });
-  }
-
-  private async computeHmacSha256(message: string, secret: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-    );
-    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
-    return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 }

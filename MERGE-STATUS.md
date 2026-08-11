@@ -554,3 +554,16 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
   khi bị từ chối.
 - ✅ Verify: backend unit **405/405 PASS**; Angular unit **84/84 PASS**; Angular production build
   **SUCCESS** (giữ nguyên 2 CSS budget warnings và 1 CommonJS warning có sẵn).
+
+### PayGate card + VietQR webhook reconciliation fix — 2026-08-11
+
+- ✅ GatePay local webhook dispatch now allowlists only the configured internal host (`localhost` by default),
+  while the `prod` profile fails fast unless that allowlist is empty. This preserves SSRF blocking for all other
+  loopback/private/link-local targets.
+- ✅ Marketplace accepts the current `X-PayGate-Signature` contract and the legacy `X-Signature` header during
+  rolling upgrades. GatePay signs the exact raw webhook body with the merchant API key.
+- ✅ VietQR dev confirmation is signed server-to-server with `PAYGATE_BANK_WEBHOOK_SECRET`; the obsolete browser
+  HMAC code and hard-coded client-side secret were removed.
+- ✅ Verify: Marketplace backend unit **408/408 PASS**; Angular unit **84/84 PASS** and production build
+  **SUCCESS**. GatePay focused webhook tests **11/11 PASS**; its pre-existing full suite remains red in unrelated
+  legacy controller/service tests.
