@@ -37,13 +37,14 @@ test('customer journey records wishlist cart checkout order and dashboard funnel
   };
 
   await page.addInitScript(() => {
-    localStorage.setItem('access_token', 'e2e-token');
-    localStorage.setItem('refresh_token', 'e2e-refresh');
-    localStorage.setItem('username', 'customer');
-    localStorage.setItem('role', 'ADMIN');
+    localStorage.setItem('marketplace_session_present', 'true');
     localStorage.setItem('analytics_consent', 'true');
     localStorage.setItem('recently_viewed_session_id', 'journey-session');
   });
+
+  await page.route('**/api/v1/auth/refresh', route => route.fulfill({
+    json: envelope({ accessToken: 'e2e-token', username: 'customer', role: 'ADMIN' })
+  }));
 
   await page.route('**/api/v1/analytics/events', async route => {
     const payload = route.request().postDataJSON();

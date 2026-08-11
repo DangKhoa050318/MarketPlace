@@ -529,3 +529,15 @@ Tài khoản seed (mật khẩu `admin123`): `admin` / `manager` / `staff` / `cu
   công khi webhook đã cập nhật `paymentStatus=PAID`, hoặc thất bại/hủy khi order thành `CANCELLED`.
 - ✅ Pending payment được lưu local để tự theo dõi lại sau reload/callback; PayGate/MarketPlace vẫn nối
   qua API + signed webhook, không thêm coupling hoặc schema mới bên GatePay.
+
+### MP-H2/M7 client auth hardening — 2026-08-11
+
+- ✅ Backend trả refresh token bằng cookie `HttpOnly`, `SameSite=Lax`, path `/api/v1/auth`; response JSON
+  không còn lộ `refreshToken`. Login/register/refresh rotate cookie, logout revoke Redis token và xóa cookie.
+- ✅ Angular chỉ giữ access token/username/role trong bộ nhớ; `localStorage` chỉ giữ cờ phiên không nhạy cảm
+  để quyết định có khôi phục phiên bằng cookie khi reload hay không. Dữ liệu auth từ build cũ được dọn.
+- ✅ Refresh dùng một observable single-flight dùng chung cho các request 401 đồng thời; cả request thành công
+  lẫn thất bại đều kết thúc, không còn subscriber chờ vô hạn.
+- ✅ Local demo giữ `AUTH_REFRESH_COOKIE_SECURE=false`; production HTTPS phải bật `true`.
+- ✅ Verify: backend unit **387/387 PASS**; Angular unit **79/79 PASS**; Angular production build
+  **SUCCESS** (giữ nguyên 2 CSS budget warnings và 1 CommonJS warning có sẵn).

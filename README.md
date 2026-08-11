@@ -45,8 +45,11 @@ Tài khoản seed (mật khẩu `admin123`): `admin`, `manager`, `staff`, `custo
 
 > ⚠️ Seed chỉ dùng **local**. Khi deploy thật: đổi mật khẩu mạnh cho mọi tài khoản (đừng giữ `admin123`) và đặt `JWT_SECRET` **riêng cho từng môi trường** (app không còn giá trị default — bắt buộc set, xem `backend/.env.example`).
 
-Refresh token được lưu server-side trong Redis, rotate sau mỗi lần refresh và revoke tại
-`POST /api/v1/auth/logout`. Cấu hình payment mặc định là `disabled`: hệ thống không tự xác nhận
+Refresh token được lưu server-side trong Redis và gửi cho trình duyệt bằng cookie `HttpOnly`
+(không còn xuất hiện trong JSON hoặc `localStorage`); access token chỉ giữ trong bộ nhớ Angular.
+Token được rotate tại `POST /api/v1/auth/refresh` và revoke tại `POST /api/v1/auth/logout`.
+Local HTTP demo dùng `AUTH_REFRESH_COOKIE_SECURE=false`; khi triển khai HTTPS phải đặt thành `true`.
+Cấu hình payment mặc định là `disabled`: hệ thống không tự xác nhận
 đơn chưa thanh toán; cần cài adapter `PaymentGateway` thật và đặt `PAYMENT_PROVIDER` sau khi chọn
 nhà cung cấp.
 
