@@ -124,7 +124,7 @@ public class OrderServiceImpl implements OrderService {
                     "Giá đã thay đổi, vui lòng xem lại giỏ hàng: " + String.join(", ", priceChanges));
         }
 
-        Order savedOrder = transactionTemplate.execute(status -> {
+        Order savedOrder = executeInTransaction(() -> {
             // 3. Reserve stock (locks stock_levels rows, validates no oversell). Authoritative point.
             inventoryFacade.reserve(warehouseId, quantityByVariant);
 
@@ -586,6 +586,13 @@ public class OrderServiceImpl implements OrderService {
             quantityByVariant.merge(item.getVariantId(), item.getQuantity(), Integer::sum);
         }
         return quantityByVariant;
+    }
+
+    private Order executeInTransaction(java.util.function.Supplier<Order> action) {
+        if (transactionTemplate != null) {
+            return transactionTemplate.execute(status -> action.get());
+        }
+        return action.get();
     }
 
     public void validateStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {
