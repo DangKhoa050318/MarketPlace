@@ -40,7 +40,6 @@ public class PaymentServiceImpl implements PaymentService {
     private final UserRepository userRepository;
 
     @Override
-    @Transactional
     public PaygatePayloadResponse createPaymentSession(Order order, PaymentMethod paymentMethod) {
         boolean zeroTotal = order.getTotalAmount().compareTo(java.math.BigDecimal.ZERO) == 0;
         if (paymentMethod == PaymentMethod.COD || paymentMethod == PaymentMethod.WALLET || zeroTotal) {
@@ -93,7 +92,6 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional
     public PaygatePayloadResponse retryOrderPayment(Long userId, Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));

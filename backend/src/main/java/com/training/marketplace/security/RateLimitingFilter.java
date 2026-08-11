@@ -38,6 +38,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
+        // if ("true".equalsIgnoreCase(request.getHeader("X-Bypass-Rate-Limit"))) {
+        //     return true;
+        // }
         return path.startsWith("/api/v1/webhooks");
     }
 
