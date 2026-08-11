@@ -23,7 +23,8 @@ public class PaymentWebhookController {
     @PostMapping("/paygate-webhook")
     @Operation(summary = "Receive Webhook IPN notification from PayGate microservice (server-to-server only)")
     public ApiResponse<Map<String, Object>> handlePaygateWebhook(
-            @RequestHeader(value = "X-Signature", required = false) String signature,
+            @RequestHeader(value = "X-PayGate-Signature", required = false) String paygateSignature,
+            @RequestHeader(value = "X-Signature", required = false) String legacySignature,
             @RequestBody String rawPayload) {
         log.info("Received PayGate Webhook request on endpoint /paygate-webhook");
 
@@ -36,6 +37,8 @@ public class PaymentWebhookController {
             throw new com.training.marketplace.exception.BadRequestException("Invalid webhook payload format");
         }
 
+        String signature = paygateSignature != null && !paygateSignature.isBlank()
+                ? paygateSignature : legacySignature;
         Map<String, Object> result = paymentWebhookService.processPaygateWebhook(payload, signature, rawPayload);
         return ApiResponse.success("PayGate Webhook processed successfully", result);
     }

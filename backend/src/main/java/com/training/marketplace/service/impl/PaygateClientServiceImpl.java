@@ -41,6 +41,9 @@ public class PaygateClientServiceImpl implements PaygateClientService {
     @Value("${marketplace.paygate.cancel-url:http://localhost:4200/orders/callback}")
     private String cancelUrl;
 
+    @Value("${marketplace.paygate.bank-webhook-secret:vietqr-secret-default}")
+    private String bankWebhookSecret;
+
     public PaygateClientServiceImpl() {
         var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(5_000);   // 5 seconds
@@ -255,9 +258,13 @@ public class PaygateClientServiceImpl implements PaygateClientService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        HttpEntity<java.util.Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
         try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            String jsonBody = mapper.writeValueAsString(requestBody);
+            headers.set("X-Bank-Signature",
+                    com.training.marketplace.utils.HmacUtils.generateSignature(jsonBody, bankWebhookSecret));
+            HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
+
             log.info("Sending S2S Bank Transfer simulation to PayGate: endpoint={}, transferContent={}, amount={}",
                     fullEndpoint, "PAYGATE " + orderIdStr, vndAmount);
             restTemplate.postForObject(fullEndpoint, entity, String.class);

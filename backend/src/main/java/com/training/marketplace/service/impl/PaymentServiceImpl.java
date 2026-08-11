@@ -238,7 +238,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         // Trigger S2S Bank Transfer simulation to PayGate.
-        // PayGate will process settlement and send a signed Webhook (X-Signature) back to MarketPlace.
+        // PayGate will process settlement and send a signed Webhook (X-PayGate-Signature) back to MarketPlace.
         // The webhook handler (PaymentWebhookServiceImpl) will acquire its own FOR UPDATE lock
         // and atomically update the order to CONFIRMED + PAID.
         paygateClientService.simulateBankTransfer(orderId, order.getTotalAmount());

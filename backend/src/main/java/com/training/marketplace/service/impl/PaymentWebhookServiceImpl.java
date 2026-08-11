@@ -64,7 +64,8 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
         }
 
         // 1. Signature / Authorization Verification (Security Check).
-        // PayGate authenticates each webhook by sending the shared merchant secret in X-Signature.
+        // PayGate authenticates each webhook with an HMAC in X-PayGate-Signature.
+        // Controllers also accept the legacy X-Signature name during rolling upgrades.
         verifySignature(signature, rawPayload);
 
         // 2. Parse Order ID
@@ -138,7 +139,7 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
     private void verifySignature(String signature, String rawPayload) {
         if (signature == null || signature.isBlank()) {
             if (requireSignature) {
-                log.warn("Rejected PayGate webhook: missing X-Signature header");
+                log.warn("Rejected PayGate webhook: missing X-PayGate-Signature header");
                 throw new ForbiddenException("Missing webhook signature / unauthorized request");
             }
             log.warn("PayGate webhook accepted without a signature "
@@ -154,7 +155,7 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
 
             String expectedSignature = com.training.marketplace.utils.HmacUtils.generateSignature(rawPayload, merchantApiKey);
             if (!constantTimeEquals(signature, expectedSignature)) {
-                log.warn("Rejected PayGate webhook: invalid X-Signature. Expected {}, got {}", expectedSignature, signature);
+                log.warn("Rejected PayGate webhook: invalid X-PayGate-Signature. Expected {}, got {}", expectedSignature, signature);
                 throw new ForbiddenException("Invalid webhook signature / unauthorized request");
             }
         } catch (ForbiddenException fe) {

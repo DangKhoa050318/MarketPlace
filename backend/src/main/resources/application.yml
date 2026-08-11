@@ -100,6 +100,7 @@ marketplace:
     merchant-code: ${PAYGATE_MERCHANT_CODE:MARKETPLACE_MP}
     return-url: ${PAYGATE_RETURN_URL:http://localhost:4200/orders/callback}
     cancel-url: ${PAYGATE_CANCEL_URL:http://localhost:4200/orders/callback}
+    bank-webhook-secret: ${PAYGATE_BANK_WEBHOOK_SECRET:vietqr-secret-default}
     webhook:
       # The webhook endpoint is public (permitAll); this shared-secret signature is its only auth.
       # Keep true in real environments. Set false only if the PayGate build here does not yet send
