@@ -32,6 +32,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -45,6 +47,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -67,6 +70,7 @@ class OrderServiceTest {
     @Mock private DeliveryService deliveryService;
     @Mock private RefundRequestRepository refundRequestRepository;
     @Mock private ReturnRequestRepository returnRequestRepository;
+    @Mock private TransactionTemplate transactionTemplate;
 
     @InjectMocks private OrderServiceImpl orderService;
 
@@ -77,6 +81,11 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+
         testUser = User.builder()
                 .username("testuser").email("test@example.com").password("encoded_pass")
                 .role(Role.CUSTOMER).active(true).build();
